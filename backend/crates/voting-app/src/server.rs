@@ -1,4 +1,3 @@
-use crate::handlers;
 use axum::{Router, middleware, response::IntoResponse, routing::get};
 use axum_oidc::{EmptyAdditionalClaims, OidcAuthLayer, OidcLoginLayer, error::MiddlewareError};
 use http::Uri;
@@ -98,7 +97,7 @@ pub async fn setup() {
         .route("/health", get(|| async { "OK" }))
         .route(
             "/api/{session_code}/attendance",
-            get(handlers::attendance::join),
+            get(crate::domain::attendance::handlers::join),
         )
         .fallback(get(crate::domain::auth::handlers::demo_not_found)) // demo only
         .layer(oidc_auth_service)

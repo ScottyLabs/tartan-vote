@@ -1,7 +1,6 @@
 mod config;
 mod core;
 mod domain;
-mod handlers;
 mod server;
 mod static_event_reader;
 
