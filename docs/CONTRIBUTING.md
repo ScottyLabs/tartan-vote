@@ -1,5 +1,5 @@
 # Contributing
-Thanks for your interest in contributing to Voting App!
+Thanks for your interest in contributing to Poodle!
 
 Before contributing to this repository, please discuss the change you wish to make via issue on this repository, email to one of the codeowners, or on the ScottyLabs [discord](go.scottylabs.org/discord).
 

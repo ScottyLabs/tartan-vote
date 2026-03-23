@@ -1,4 +1,4 @@
-# Extensive Guide to Running Voting App
+# Extensive Guide to Running Poodle
 
 ## Prerequisites
 
@@ -13,7 +13,7 @@ To install Cargo, similarly, follow the documentation at [https://doc.rust-lang.
 For Docker, you may optionally use Docker Desktop, providing a GUI interface, which can be installed from [https://www.docker.com/get-started/]. On the otherhand, you may want to only install Docker Enginer, which includes a server and a CLI, found at [https://docs.docker.com/engine/install].
 
 ## Starting up
-Now, we will get your own instance of Voting App running!
+Now, we will get your own instance of Poodle running!
 
 ### Setup
 You will need [git](https://git-scm.com/install/).
