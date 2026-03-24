@@ -6,7 +6,7 @@ use axum::{
 use axum_oidc::{EmptyAdditionalClaims, OidcClaims, OidcRpInitiatedLogout};
 use http::Uri;
 use serde::{Deserialize, Serialize};
-use urlencoding::encode;
+use tower_sessions::Session;
 
 use crate::AppState;
 use crate::core::auth::middleware::SyncedUser;
@@ -25,18 +25,18 @@ pub struct AuthStatusResponse {
 pub async fn login(
     State(state): State<AppState>,
     Query(params): Query<LoginQuery>,
+    session: Session,
 ) -> impl IntoResponse {
     let callback = format!(
         "{}/auth/callback",
         state.config.app_base_url.trim_end_matches('/')
     );
 
-    if let Some(redirect_uri) = params
-        .redirect_uri
-        .filter(|uri| uri.starts_with(&state.config.app_base_url))
-    {
-        let target = format!("{}?redirect_uri={}", callback, encode(&redirect_uri));
-        return Redirect::to(&target);
+    if let Some(redirect_uri) = params.redirect_uri {
+        session
+            .insert("post_login_redirect", redirect_uri)
+            .await
+            .ok();
     }
 
     Redirect::to(&callback)
@@ -46,14 +46,16 @@ pub async fn callback(
     _claims: OidcClaims<EmptyAdditionalClaims>,
     user: SyncedUser,
     State(state): State<AppState>,
-    Query(params): Query<LoginQuery>,
+    session: Session,
 ) -> impl IntoResponse {
     let _user_id = user.0.id;
 
-    let redirect_to = params
-        .redirect_uri
-        .filter(|uri| uri.starts_with(&state.config.app_base_url))
-        .unwrap_or_else(|| state.config.app_base_url.clone());
+    let redirect_to = session
+        .remove::<String>("post_login_redirect")
+        .await
+        .ok()
+        .flatten()
+        .unwrap_or_else(|| state.config.frontend_base_url.clone());
 
     Redirect::to(&redirect_to)
 }
@@ -69,10 +71,13 @@ pub async fn logout(
         .into_response()
 }
 
-pub async fn auth_status(user: Option<OidcClaims<EmptyAdditionalClaims>>) -> impl IntoResponse {
+pub async fn auth_status(
+    claims: Option<OidcClaims<EmptyAdditionalClaims>>,
+    user: Option<SyncedUser>,
+) -> impl IntoResponse {
     let payload = AuthStatusResponse {
-        logged_in: user.is_some(),
-        user_id: None,
+        logged_in: claims.is_some(),
+        user_id: user.map(|u| u.0.id),
     };
     Json(payload)
 }

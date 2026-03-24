@@ -49,13 +49,17 @@ where
 
 pub async fn sync_user_middleware(
     State(state): State<AppState>,
-    claims: OidcClaims<EmptyAdditionalClaims>,
+    claims: Option<OidcClaims<EmptyAdditionalClaims>>,
     mut request: http::Request<body::Body>,
     next: Next,
 ) -> Response {
     if request.extensions().get::<SyncedUser>().is_some() {
         return next.run(request).await;
     }
+
+    let Some(claims) = claims else {
+        return next.run(request).await;
+    };
 
     let oidc_sub = claims.subject().to_string();
     let user = User::find()

@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { onMount } from 'svelte';
     import logo from "../lib/images/logoplaceholder.png";
 
     type Props = {
@@ -7,8 +8,32 @@
 
     let { onNext }: Props = $props();
 
-    function handleClick() {
-        onNext();
+    const API_BASE = import.meta.env.VITE_API_BASE || "";
+
+    onMount(() => {
+        void (async () => {
+            try {
+                const response = await fetch(`${API_BASE}/auth/status`, {
+                    cache: 'no-store',
+                    credentials: 'include',
+                });
+
+                if (!response.ok) {
+                    return;
+                }
+
+                const status: { logged_in: boolean } = await response.json();
+                if (status.logged_in) {
+                    onNext();
+                }
+            } catch (error) {
+            }
+        })();
+    });
+
+    async function handleClick() {
+        const redirectUri = encodeURIComponent(window.location.origin);
+        window.location.href = `${API_BASE}/auth/login?redirect_uri=${redirectUri}`;
     }
 </script>
 

@@ -3,6 +3,7 @@ use std::env;
 #[derive(Clone, Debug)]
 pub struct Config {
     pub app_base_url: String,
+    pub frontend_base_url: String,
     pub database_url: String,
     pub oidc_issuer: String,
     pub oidc_client_id: String,
@@ -14,6 +15,7 @@ impl Config {
     pub fn from_env() -> Result<Self, String> {
         Ok(Self {
             app_base_url: must_env("APP_BASE_URL")?,
+            frontend_base_url: must_env("FRONTEND_BASE_URL")?,
             database_url: must_env("DATABASE_URL")?,
             oidc_issuer: must_env("OIDC_ISSUER")?,
             oidc_client_id: must_env("OIDC_CLIENT_ID")?,

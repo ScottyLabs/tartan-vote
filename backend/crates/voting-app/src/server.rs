@@ -1,9 +1,10 @@
 use axum::{Router, middleware, response::IntoResponse, routing::get};
 use axum_oidc::{EmptyAdditionalClaims, OidcAuthLayer, OidcLoginLayer, error::MiddlewareError};
-use http::Uri;
+use http::{HeaderValue, Method, Uri, header};
 use migration::{Migrator, MigratorTrait};
 use sea_orm::Database;
 use tower::ServiceBuilder;
+use tower_http::cors::CorsLayer;
 use tower_sessions::{
     Expiry, SessionManagerLayer,
     cookie::{SameSite, time::Duration},
@@ -66,16 +67,30 @@ pub async fn setup() {
 
     let bind_addr = app_state.config.bind_addr.clone();
 
+    let cors_layer = CorsLayer::new()
+        .allow_origin(
+            app_state
+                .config
+                .frontend_base_url
+                .parse::<HeaderValue>()
+                .expect("valid frontend URL"),
+        )
+        .allow_methods([
+            Method::GET,
+            Method::POST,
+            Method::PUT,
+            Method::DELETE,
+            Method::OPTIONS,
+        ])
+        .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION, header::ACCEPT])
+        .allow_credentials(true);
+
     let protected_auth_router = Router::new()
         .route(
             "/auth/callback",
             get(crate::domain::auth::handlers::callback),
         )
         .route("/auth/logout", get(crate::domain::auth::handlers::logout))
-        .layer(middleware::from_fn_with_state(
-            app_state.clone(),
-            crate::core::auth::middleware::sync_user_middleware,
-        ))
         .layer(oidc_login_service.clone());
 
     let api_router = Router::new()
@@ -100,8 +115,13 @@ pub async fn setup() {
             get(crate::domain::attendance::handlers::join),
         )
         .fallback(get(crate::domain::auth::handlers::demo_not_found)) // demo only
+        .layer(middleware::from_fn_with_state(
+            app_state.clone(),
+            crate::core::auth::middleware::sync_user_middleware,
+        ))
         .layer(oidc_auth_service)
         .layer(session_layer)
+        .layer(cors_layer)
         .with_state(app_state);
 
     let listener = tokio::net::TcpListener::bind(&bind_addr)
