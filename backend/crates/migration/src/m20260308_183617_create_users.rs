@@ -19,6 +19,8 @@ impl MigrationTrait for Migration {
                             .primary_key(),
                     )
                     .col(ColumnDef::new(User::Name).string().not_null())
+                    .col(ColumnDef::new(User::AndrewId).string().not_null())
+                    .col(ColumnDef::new(User::OidcSubject).string().not_null())
                     .col(
                         ColumnDef::new(User::CreatedAt)
                             .timestamp_with_time_zone()
@@ -42,5 +44,7 @@ pub enum User {
     Table,
     Id,
     Name,
+    AndrewId,
+    OidcSubject,
     CreatedAt,
 }

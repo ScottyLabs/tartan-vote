@@ -41,21 +41,21 @@
     }
 
     let users: User[] = $state([
-        new User({
-            id: 69,
-            name: "Max Tentype",
-            created_at: "2026-01-01T00:00:00Z",
-        }),
-        new User({
-            id: 420,
-            name: "Yiyoung Liu",
-            created_at: "2026-01-01T00:00:00Z",
-        }),
-        new User({
-            id: 67,
-            name: "Anish Pallati",
-            created_at: "2026-01-01T00:00:00Z",
-        }),
+    //     new User({
+    //         id: 69,
+    //         name: "Max Tentype",
+    //         created_at: "2026-01-01T00:00:00Z",
+    //     }),
+    //     new User({
+    //         id: 420,
+    //         name: "Yiyoung Liu",
+    //         created_at: "2026-01-01T00:00:00Z",
+    //     }),
+    //     new User({
+    //         id: 67,
+    //         name: "Anish Pallati",
+    //         created_at: "2026-01-01T00:00:00Z",
+    //     }),
     ]);
 
     let meetingCode: string = "3CMU67";

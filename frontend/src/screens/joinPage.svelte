@@ -16,7 +16,7 @@
     } = $props();
 
     let sessionID = $state("");
-    let authStatus = $state<{ logged_in: boolean; user_id: number | null } | null>(null);
+    let authStatus = $state<{ logged_in: boolean; user_id: number; user_name: string; user_andrew_id: string; oidc_subject: string | null } | null>(null);
     let authStatusError = $state<string | null>(null);
 
     const API_BASE = import.meta.env.VITE_API_BASE || "";
@@ -55,7 +55,7 @@
         <h1>CampusVoting</h1>
         <h3>Powered by ScottyLabs</h3>
         {#if authStatus}
-            <h2>{authStatus.logged_in ? 'Signed in' : 'Not signed in'}</h2>
+            <h2>{authStatus.logged_in ? `Welcome, ${authStatus.user_name}` : 'Not signed in'}</h2>
         {:else if authStatusError}
             <h2>{authStatusError}</h2>
         {/if}

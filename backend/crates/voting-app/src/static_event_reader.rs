@@ -380,10 +380,12 @@ mod tests {
     use super::*;
     use chrono::Utc;
     use serde_json::json;
-    fn mock_user(id: i32, name: &str) -> user::Model {
+    fn mock_user(id: i32, name: &str, andrew_id: &str, oidc_subject: &str) -> user::Model {
         user::Model {
             id,
             name: name.to_string(),
+            andrew_id: andrew_id.to_string(),
+            oidc_subject: oidc_subject.to_string(),
             created_at: Utc::now().fixed_offset(),
         }
     }
@@ -452,12 +454,12 @@ mod tests {
             (
                 mock_vote(1, vec!["yes"]),
                 Some(mock_voter(1, 1, 1)),
-                Some(mock_user(1, "Alice")),
+                Some(mock_user(1, "Alice", "alice", "123456789")),
             ),
             (
                 mock_vote(2, vec!["no"]),
                 Some(mock_voter(2, 1, 2)),
-                Some(mock_user(2, "Bob")),
+                Some(mock_user(2, "Bob", "bobby", "987654321")),
             ),
         ];
         let event = mock_event(votes);
@@ -470,7 +472,7 @@ mod tests {
             (
                 mock_vote(1, vec!["yes"]),
                 Some(mock_voter(1, 1, 1)),
-                Some(mock_user(1, "Alice")),
+                Some(mock_user(1, "Alice", "alice", "123456789")),
             ),
             (mock_vote(2, vec!["no"]), Some(mock_voter(2, 1, 2)), None), // no user
         ];
@@ -486,12 +488,12 @@ mod tests {
             (
                 mock_vote(1, vec!["yes"]),
                 Some(mock_voter(1, 1, 1)),
-                Some(mock_user(1, "Alice")),
+                Some(mock_user(1, "Alice", "alice", "123456789")),
             ),
             (
                 mock_vote(2, vec!["no"]),
                 Some(mock_voter(2, 1, 2)),
-                Some(mock_user(2, "Bob")),
+                Some(mock_user(2, "Bob", "bobby", "987654321")),
             ),
         ];
         let event = mock_event(votes);
@@ -510,7 +512,7 @@ mod tests {
             (
                 mock_vote(1, vec!["yes"]),
                 Some(mock_voter(1, 1, 1)),
-                Some(mock_user(1, "Alice")),
+                Some(mock_user(1, "Alice", "alice", "123456789")),
             ),
             (mock_vote(2, vec!["no"]), Some(mock_voter(2, 1, 2)), None), // skipped
         ];
@@ -525,17 +527,17 @@ mod tests {
             (
                 mock_vote(1, vec!["yes"]),
                 Some(mock_voter(1, 1, 1)),
-                Some(mock_user(1, "Alice")),
+                Some(mock_user(1, "Alice", "alice", "123456789")),
             ),
             (
                 mock_vote(2, vec!["yes"]),
                 Some(mock_voter(2, 1, 2)),
-                Some(mock_user(2, "Bob")),
+                Some(mock_user(2, "Bob", "bobby", "987654321")),
             ),
             (
                 mock_vote(3, vec!["no"]),
                 Some(mock_voter(3, 1, 3)),
-                Some(mock_user(3, "Carol")),
+                Some(mock_user(3, "Carol", "car", "1111")),
             ),
         ];
         let event = mock_event(votes);
@@ -558,17 +560,17 @@ mod tests {
             (
                 mock_vote(1, vec!["Alice", "Bob", "Carol"]),
                 Some(mock_voter(1, 1, 1)),
-                Some(mock_user(1, "Voter1")),
+                Some(mock_user(1, "Voter1", "vot1", "3131")),
             ),
             (
                 mock_vote(2, vec!["Bob", "Alice", "Carol"]),
                 Some(mock_voter(2, 1, 2)),
-                Some(mock_user(2, "Voter2")),
+                Some(mock_user(2, "Voter2", "vot2", "3232")),
             ),
             (
                 mock_vote(3, vec!["Alice", "Carol", "Bob"]),
                 Some(mock_voter(3, 1, 3)),
-                Some(mock_user(3, "Voter3")),
+                Some(mock_user(3, "Voter3", "vot3", "3333")),
             ),
         ];
         let event = mock_event_typed(votes, EventType::Election);
@@ -599,17 +601,17 @@ mod tests {
             (
                 mock_vote(1, vec!["Alice", "Bob"]),
                 Some(mock_voter(1, 1, 1)),
-                Some(mock_user(1, "Voter1")),
+                Some(mock_user(1, "Voter1", "vot1", "3131")),
             ),
             (
                 mock_vote(2, vec!["Alice", "Bob"]),
                 Some(mock_voter(2, 1, 2)),
-                Some(mock_user(2, "Voter2")),
+                Some(mock_user(2, "Voter2", "vot2", "3232")),
             ),
             (
                 mock_vote(3, vec!["Bob", "Alice"]),
                 Some(mock_voter(3, 1, 3)),
-                Some(mock_user(3, "Voter3")),
+                Some(mock_user(3, "Voter3", "vot3", "3333")),
             ),
         ];
         let event = mock_event_typed(votes, EventType::Election);
@@ -633,22 +635,22 @@ mod tests {
             (
                 mock_vote(1, vec!["Alice", "Bob"]),
                 Some(mock_voter(1, 1, 1)),
-                Some(mock_user(1, "Voter1")),
+                Some(mock_user(1, "Voter1", "vot1", "3131")),
             ),
             (
                 mock_vote(2, vec!["Alice", "Bob"]),
                 Some(mock_voter(2, 1, 2)),
-                Some(mock_user(2, "Voter2")),
+                Some(mock_user(2, "Voter2", "vot2", "3232")),
             ),
             (
                 mock_vote(3, vec!["Alice", "Bob"]),
                 Some(mock_voter(3, 1, 3)),
-                Some(mock_user(3, "Voter3")),
+                Some(mock_user(3, "Voter3", "vot3", "3333")),
             ),
             (
                 mock_vote(4, vec!["Bob", "Alice"]),
                 Some(mock_voter(4, 1, 4)),
-                Some(mock_user(4, "Voter4")),
+                Some(mock_user(4, "Voter4", "vot4", "3434")),
             ),
         ];
         let event = mock_event_typed(votes, EventType::Election);
@@ -669,12 +671,12 @@ mod tests {
             (
                 mock_vote(1, vec!["Alice", "Bob", "Carol"]),
                 Some(mock_voter(1, 1, 1)),
-                Some(mock_user(1, "Voter1")),
+                Some(mock_user(1, "Voter1", "vot1", "3131")),
             ),
             (
                 mock_vote(2, vec!["Bob"]),
                 Some(mock_voter(2, 1, 2)),
-                Some(mock_user(2, "Voter2")),
+                Some(mock_user(2, "Voter2", "vot2", "3232")),
             ),
         ];
         let event = mock_event(votes);
@@ -694,12 +696,12 @@ mod tests {
             (
                 mock_vote(1, vec!["Alice", "Bob", "Carol"]),
                 Some(mock_voter(1, 1, 1)),
-                Some(mock_user(1, "Voter1")),
+                Some(mock_user(1, "Voter1", "vot1", "3131")),
             ),
             (
                 mock_vote(2, vec!["Bob", "Alice", "Carol"]),
                 Some(mock_voter(2, 1, 2)),
-                Some(mock_user(2, "Voter2")),
+                Some(mock_user(2, "Voter2", "vot2", "3232")),
             ),
         ];
         let event = mock_event_typed(votes, EventType::Election);
@@ -714,17 +716,17 @@ mod tests {
             (
                 mock_vote(1, vec!["yes"]),
                 Some(mock_voter(1, 1, 1)),
-                Some(mock_user(1, "Alice")),
+                Some(mock_user(1, "Alice", "alice", "123456789")),
             ),
             (
                 mock_vote(2, vec!["no"]),
                 Some(mock_voter(2, 1, 2)),
-                Some(mock_user(2, "Bob")),
+                Some(mock_user(2, "Bob", "bobby", "987654321")),
             ),
             (
                 mock_vote(3, vec!["yes"]),
                 Some(mock_voter(3, 1, 3)),
-                Some(mock_user(3, "Carol")),
+                Some(mock_user(3, "Carol", "car", "1111")),
             ),
         ];
         let event = mock_event(votes);
@@ -738,17 +740,17 @@ mod tests {
             (
                 mock_vote(1, vec!["yes"]),
                 Some(mock_voter(1, 1, 1)),
-                Some(mock_user(1, "Alice")),
+                Some(mock_user(1, "Alice", "alice", "123456789")),
             ),
             (
                 mock_vote(2, vec!["yes"]),
                 Some(mock_voter(2, 1, 2)),
-                Some(mock_user(2, "Bob")),
+                Some(mock_user(2, "Bob", "bobby", "987654321")),
             ),
             (
                 mock_vote(3, vec!["no"]),
                 Some(mock_voter(3, 1, 3)),
-                Some(mock_user(3, "Carol")),
+                Some(mock_user(3, "Carol", "car", "1111")),
             ),
         ];
         let event = mock_event(votes);
@@ -780,7 +782,7 @@ mod tests {
         let mut event = mock_event(vec![(
             mock_vote(1, vec!["yes"]),
             Some(mock_voter(1, 1, 1)),
-            Some(mock_user(1, "Alice")),
+            Some(mock_user(1, "Alice", "alice", "123456789")),
         )]);
         event.end_time = Some(chrono::Utc::now().fixed_offset());
         let result = event.export_result_json();
@@ -797,12 +799,12 @@ mod tests {
             (
                 mock_vote(1, vec!["yes"]),
                 Some(mock_voter(1, 1, 1)),
-                Some(mock_user(1, "Alice")),
+                Some(mock_user(1, "Alice", "alice", "123456789")),
             ),
             (
                 mock_vote(2, vec!["no"]),
                 Some(mock_voter(2, 1, 2)),
-                Some(mock_user(2, "Bob")),
+                Some(mock_user(2, "Bob", "bobby", "987654321")),
             ),
         ];
         let event = mock_event(votes);
@@ -828,17 +830,17 @@ mod tests {
             (
                 mock_vote(1, vec!["yes"]),
                 Some(mock_voter(1, 1, 1)),
-                Some(mock_user(1, "Alice")),
+                Some(mock_user(1, "Alice", "alice", "123456789")),
             ),
             (
                 mock_vote(2, vec!["no"]),
                 Some(mock_voter(2, 1, 2)),
-                Some(mock_user(2, "Bob")),
+                Some(mock_user(2, "Bob", "bobby", "987654321")),
             ),
             (
                 mock_vote(3, vec!["yes"]),
                 Some(mock_voter(3, 1, 3)),
-                Some(mock_user(3, "Carol")),
+                Some(mock_user(3, "Carol", "car", "1111")),
             ),
         ];
         let event = mock_event(votes);
@@ -853,22 +855,22 @@ mod tests {
             (
                 mock_vote(1, vec!["Alice", "Bob", "Carol"]),
                 Some(mock_voter(1, 1, 1)),
-                Some(mock_user(1, "Voter1")),
+                Some(mock_user(1, "Voter1", "vot1", "3131")),
             ),
             (
                 mock_vote(2, vec!["Bob", "Alice", "Carol"]),
                 Some(mock_voter(2, 1, 2)),
-                Some(mock_user(2, "Voter2")),
+                Some(mock_user(2, "Voter2", "vot2", "3232")),
             ),
             (
                 mock_vote(3, vec!["Alice", "Carol", "Bob"]),
                 Some(mock_voter(3, 1, 3)),
-                Some(mock_user(3, "Voter3")),
+                Some(mock_user(3, "Voter3", "vot3", "3333")),
             ),
             (
                 mock_vote(4, vec!["Carol", "Alice", "Bob"]),
                 Some(mock_voter(4, 1, 4)),
-                Some(mock_user(4, "Voter4")),
+                Some(mock_user(4, "Voter4", "vot4", "3434")),
             ),
         ];
         let event = mock_event_typed(votes, EventType::Election);
@@ -883,12 +885,12 @@ mod tests {
             (
                 mock_vote(1, vec!["yes"]),
                 Some(mock_voter(1, 1, 1)),
-                Some(mock_user(1, "Alice")),
+                Some(mock_user(1, "Alice", "alice", "123456789")),
             ),
             (
                 mock_vote(2, vec!["no"]),
                 Some(mock_voter(2, 1, 2)),
-                Some(mock_user(2, "Bob")),
+                Some(mock_user(2, "Bob", "bobby", "987654321")),
             ),
         ];
         let event = mock_event(votes);
@@ -910,12 +912,12 @@ mod tests {
             (
                 mock_vote(1, vec!["yes"]),
                 Some(mock_voter(1, 1, 1)),
-                Some(mock_user(1, "Alice")),
+                Some(mock_user(1, "Alice", "alice", "123456789")),
             ),
             (
                 mock_vote(2, vec!["no"]),
                 Some(mock_voter(2, 1, 2)),
-                Some(mock_user(2, "Bob")),
+                Some(mock_user(2, "Bob", "bobby", "987654321")),
             ),
         ];
 
@@ -925,7 +927,12 @@ mod tests {
                 (
                     mock_vote(i, vec!["yes"]),
                     Some(mock_voter(i, 1, i)),
-                    Some(mock_user(i, &format!("User{}", i))),
+                    Some(mock_user(
+                        i,
+                        &format!("User{}", i),
+                        &format!("user{}", i),
+                        &format!("oidc{}", i),
+                    )),
                 )
             })
             .collect();

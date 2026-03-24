@@ -20,6 +20,8 @@ pub struct LoginQuery {
 pub struct AuthStatusResponse {
     pub logged_in: bool,
     pub user_id: Option<i32>,
+    pub user_name: Option<String>,
+    pub user_andrew_id: Option<String>,
 }
 
 pub async fn login(
@@ -44,12 +46,10 @@ pub async fn login(
 
 pub async fn callback(
     _claims: OidcClaims<EmptyAdditionalClaims>,
-    user: SyncedUser,
+    _user: SyncedUser,
     State(state): State<AppState>,
     session: Session,
 ) -> impl IntoResponse {
-    let _user_id = user.0.id;
-
     let redirect_to = session
         .remove::<String>("post_login_redirect")
         .await
@@ -77,7 +77,9 @@ pub async fn auth_status(
 ) -> impl IntoResponse {
     let payload = AuthStatusResponse {
         logged_in: claims.is_some(),
-        user_id: user.map(|u| u.0.id),
+        user_id: user.clone().map(|u| u.0.id),
+        user_name: user.clone().map(|u| u.0.name.clone()),
+        user_andrew_id: user.map(|u| u.0.andrew_id.clone()),
     };
     Json(payload)
 }

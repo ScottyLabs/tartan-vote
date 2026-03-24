@@ -63,11 +63,24 @@ pub async fn sync_user_middleware(
 
     let oidc_sub = claims.subject().to_string();
     let user = User::find()
-        .filter(user::Column::Name.eq(&oidc_sub))
+        .filter(user::Column::OidcSubject.eq(&oidc_sub))
         .one(&state.db)
         .await
         .ok()
         .flatten();
+
+    let name = claims
+        .name()
+        .and_then(|n| n.get(None))
+        .map(|n| n.as_str())
+        .unwrap_or("")
+        .to_string();
+
+    let andrewid = claims
+        .preferred_username()
+        .map(|a| a.as_str())
+        .unwrap_or("")
+        .to_string();
 
     match user {
         Some(user) => {
@@ -75,8 +88,9 @@ pub async fn sync_user_middleware(
         }
         None => {
             let new_user = user::ActiveModel {
-                // Current schema only has `name`, so we store OIDC subject as a stable identity key.
-                name: Set(oidc_sub.clone()),
+                name: Set(name),
+                andrew_id: Set(andrewid),
+                oidc_subject: Set(oidc_sub.clone()),
                 ..Default::default()
             };
 
