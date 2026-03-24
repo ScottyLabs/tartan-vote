@@ -7,12 +7,16 @@
     import TimeScroller from "../lib/components/timeScroller.svelte";
     import HoverCard from "../lib/components/hoverCard.svelte";
     import { User } from "../lib/models/User";
-    import { Event } from "../lib/models/Event";
+    import { Event as VoteEvent } from "../lib/models/Event";
 
     let { onNext, onBack } = $props();
+    const env = import.meta.env as Record<string, string | undefined>;
+    const backendBaseUrl = (env.VITE_BACKEND_URL ?? env.BACKEND_URL ?? "")
+        .trim()
+        .replace(/\/+$/, "");
 
-    function eventDraft_new(vote_type: "motion" | "election"): Event {
-        return new Event({
+    function eventDraft_new(vote_type: "motion" | "election"): VoteEvent {
+        return new VoteEvent({
             id: 0,
             event_type: vote_type,
             name: "",
@@ -78,7 +82,7 @@
         { label: "Unanimous", value: 1.0 },
     ];
 
-    let draft = $state<Event>(eventDraft_new("motion"));
+    let draft = $state<VoteEvent>(eventDraft_new("motion"));
     let draftTime: Time = $state({
         days: 0,
         hours: 0,
@@ -92,6 +96,10 @@
     let inspectingUser = $state<User | null>(null);
     let inspectingAllUsers = $state(false);
     let timerEnded = $state(false);
+
+    let creatingMotionRequest = $state(false);
+    let creatingElectionRequest = $state(false);
+    let createError = $state<string | null>(null);
 
     function deleteUser(i: number) {
         users.splice(i, 1);
@@ -116,6 +124,7 @@
         creatingMotion = false;
         inspectingAllUsers = false;
         timerEnded = false;
+        createError = null;
     }
 
     function inspectUser(user: User) {
@@ -130,21 +139,144 @@
         timerEnded = true;
     }
 
+    function thresholdToDecimal(label: string): number {
+        switch (label) {
+            case "2/3":
+                return 2 / 3;
+            case "3/4":
+                return 3 / 4;
+            case "Unanimous":
+                return 1;
+            case "Majority":
+            default:
+                return 0.5;
+        }
+    }
+
+    function timerToEndTime(timer: {
+        days: number;
+        hours: number;
+        mins: number;
+        secs: number;
+    }): string | undefined {
+        const totalSeconds =
+            timer.days * 24 * 60 * 60 +
+            timer.hours * 60 * 60 +
+            timer.mins * 60 +
+            timer.secs;
+        if (totalSeconds <= 0) return undefined;
+        return new Date(Date.now() + totalSeconds * 1000).toISOString();
+    }
+
+    async function readErrorMessage(response: Response): Promise<string> {
+        try {
+            const json = (await response.json()) as { error?: string };
+            return json.error ?? `Request failed with status ${response.status}`;
+        } catch {
+            return `Request failed with status ${response.status}`;
+        }
+    }
+
+    async function createEvent(payload: unknown): Promise<void> {
+        if (!backendBaseUrl) {
+            throw new Error(
+                "BACKEND_URL is missing. Set VITE_BACKEND_URL (or BACKEND_URL) in frontend env.",
+            );
+        }
+
+        // Backend route from backend/src/event/router.rs: POST /api/event/create
+        const response = await fetch(`${backendBaseUrl}/api/event/create`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+            throw new Error(await readErrorMessage(response));
+        }
+    }
+
+    async function submitMotion(event: SubmitEvent) {
+        event.preventDefault();
+        createError = null;
+        creatingMotionRequest = true;
+
+        try {
+            const payload = {
+                event_type: "motion",
+                name: draft.name.trim() || "Motion",
+                created_by_user_id: users[0]?.id ?? 1,
+                organization_id: 1,
+                end_time: timerToEndTime(draftTime),
+                data: {
+                    motion: {
+                        description: draft.data.description.trim(),
+                        threshold: thresholdToDecimal(String(draft.data.threshold)),
+                        visibility: { participants: "hidden_until_release" },
+                        proxy: false,
+                        vote_options: ["yes", "no", "abstain"],
+                    },
+                },
+            };
+
+            await createEvent(payload);
+            creatingMotion = false;
+        } catch (error) {
+            createError =
+                error instanceof Error
+                    ? error.message
+                    : "Unable to create motion.";
+        } finally {
+            creatingMotionRequest = false;
+        }
+    }
+
+    async function submitElection(event: SubmitEvent) {
+        event.preventDefault();
+        createError = null;
+        creatingElectionRequest = true;
+
+        try {
+            const voteOptions = draft.data.vote_options
+                .map((candidate: string) => candidate.trim())
+                .filter((candidate: string) => candidate.length > 0);
+
+            const payload = {
+                event_type: "vote",
+                name: draft.name.trim() || "Election",
+                created_by_user_id: users[0]?.id ?? 1,
+                organization_id: 1,
+                end_time: timerToEndTime(draftTime),
+                data: {
+                    vote: {
+                        description: draft.name.trim() || "Election",
+                        vote_type: "election",
+                        threshold: 0.5,
+                        visibility: { participants: "hidden_until_release" },
+                        proxy: false,
+                        vote_options: voteOptions,
+                    },
+                },
+            };
+
+            await createEvent(payload);
+            creatingElection = false;
+        } catch (error) {
+            createError =
+                error instanceof Error
+                    ? error.message
+                    : "Unable to create election.";
+        } finally {
+            creatingElectionRequest = false;
+        }
+    }
+
+    // TODO: after backend exists it can pass on live results to here
     function getResults() {
         return "TBD";
     }
 
     const API_BASE = import.meta.env.VITE_API_BASE || "";
-
-    function timerToEndTime(timer: Time): string {
-        const now = Date.now();
-        const ms =
-            timer.days * 86400000 +
-            timer.hours * 3600000 +
-            timer.mins * 60000 +
-            timer.secs * 1000;
-        return new Date(now + ms).toISOString();
-    }
 
     async function submitDraft() {
         try {
@@ -237,7 +369,7 @@
     open={creatingMotion}
     onClose={onPopupClose}
 >
-    <form onsubmit={onPopupClose}>
+    <form onsubmit={submitMotion}>
         <LongTextInput
             title="Description:"
             bind:value={draft.data.description}
@@ -258,12 +390,17 @@
 
         <TimeScroller value={draftTime}></TimeScroller>
 
-        <button type="submit" class="submitBtn">Push Motion</button>
+        <button type="submit" class="submitBtn" disabled={creatingMotionRequest}
+            >{creatingMotionRequest ? "Creating..." : "Push Motion"}</button
+        >
+        {#if createError}
+            <p class="errorText">{createError}</p>
+        {/if}
     </form>
 </Popup>
 
-<Popup title={draft.name} open={creatingElection} onClose={onPopupClose}>
-    <form onsubmit={onPopupClose}>
+<Popup title={draft.name || "Election"} open={creatingElection} onClose={onPopupClose}>
+    <form onsubmit={submitElection}>
         <label>
             <h3>Title:</h3>
             <input type="text" bind:value={draft.name} required />
@@ -280,7 +417,15 @@
 
         <TimeScroller bind:value={draftTime}></TimeScroller>
 
-        <button type="submit" class="submitBtn">Push Election</button>
+        <button
+            type="submit"
+            class="submitBtn"
+            disabled={creatingElectionRequest}
+            >{creatingElectionRequest ? "Creating..." : "Push Election"}</button
+        >
+        {#if createError}
+            <p class="errorText">{createError}</p>
+        {/if}
     </form>
 </Popup>
 
@@ -510,5 +655,16 @@
         font-size: 20px;
         padding: 10px 140px;
         cursor: pointer;
+    }
+
+    .submitBtn:disabled {
+        cursor: not-allowed;
+        opacity: 0.7;
+    }
+
+    .errorText {
+        margin: 0.5rem 0 0;
+        color: #d92d20;
+        font-size: 0.9rem;
     }
 </style>
