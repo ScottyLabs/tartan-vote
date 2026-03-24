@@ -25,6 +25,8 @@ interface EventData {
 interface User {
     id: number;
     name: string;
+    andrew_id: string;
+    oidc_subject: string;
     created_at: string;
 }
 
