@@ -9,7 +9,7 @@
     import { User } from "../lib/models/User";
     import { Event } from "../lib/models/Event";
 
-    let { onNext, onBack } = $props();
+    let { onNext, onBack, sessionCode } = $props();
 
     function eventDraft_new(vote_type: "motion" | "election") {
         return {
@@ -61,8 +61,6 @@
         //         created_at: "2026-01-01T00:00:00Z",
         //     }),
     ]);
-
-    let meetingCode: string = "3CMU67";
 
     let electionStyleOptions: string[] = [
         "Plurality Election",
@@ -292,7 +290,7 @@
     <div class="card">
         <div class="row">
             <h1>Meeting Code:</h1>
-            <h1 style="color:var(--colors-primary)">{meetingCode}</h1>
+            <h1 style="color:var(--colors-primary)">{sessionCode}</h1>
         </div>
         <hr />
 

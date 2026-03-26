@@ -17,34 +17,8 @@
     // Current Events and User; this is passed to screens and is updated by screens
     let currentUser = $state<User | null>(null);
     let currentEvent = $state<Event | null>(null);
-
-    const fetchAttendance = async (sessionCode: string) => {
-        const response = await fetch(
-            `${API_BASE}/api/attendance/${sessionCode}`,
-            { cache: "no-store" },
-        );
-        if (!response.ok) {
-            throw new Error(`Failed to join event: ${response.status}`);
-        }
-        return await response.json();
-    };
-
-    let joinError = $state<string | null>(null);
-    let joining = $state(false);
-
-    const joinEvent = async (sessionCode: string) => {
-        joining = true;
-        joinError = null;
-        try {
-            const data = await fetchAttendance(sessionCode);
-            // valid session code — navigate to waiting
-            screen = "waiting";
-        } catch (error) {
-            joinError = "Invalid session code. Please try again.";
-        } finally {
-            joining = false;
-        }
-    };
+    let createSessionPayload = $state<string | null>(null);
+    let globalSessionCode = $state<string | null>(null);
 
     let bgDark = getComputedStyle(document.documentElement)
         .getPropertyValue("--colors-backgroundDark")
@@ -79,11 +53,8 @@
 {:else if screen === "join"}
     <div transition:slide>
         <Home
-            {joinEvent}
-            {joinError}
-            {joining}
-            toVoter={() => (screen = "waiting")}
-            toAdmin={() => (screen = "SessionCreation")}
+            toVoter={(sessionCode: string) => { globalSessionCode = sessionCode; screen = "waiting"}}
+            toAdmin={(sessionCode: string) => { createSessionPayload = sessionCode; screen = "SessionCreation"}}
         />
     </div>
 {:else if screen === "waiting"}
@@ -106,6 +77,7 @@
         <SessionCreation
             onNext={() => (screen = "ResultsAdmin")}
             onBack={() => (screen = "join")}
+            sessionCode = {createSessionPayload}
         />
     </div>
 {:else if screen === "ResultsAdmin"}

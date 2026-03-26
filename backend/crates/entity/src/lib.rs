@@ -6,6 +6,8 @@ pub mod enums;
 pub mod event;
 pub mod organization;
 pub mod organization_member;
+pub mod session;
 pub mod user;
+pub mod user_session;
 pub mod vote;
 pub mod voter;

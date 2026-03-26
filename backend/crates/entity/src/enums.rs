@@ -12,6 +12,14 @@ pub enum EventType {
     #[sea_orm(string_value = "election")]
     Election,
 }
+#[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum)]
+#[sea_orm(rs_type = "String", db_type = "Enum", enum_name = "join_left")]
+pub enum JoinLeft {
+    #[sea_orm(string_value = "joined")]
+    Joined,
+    #[sea_orm(string_value = "left")]
+    Left,
+}
 #[derive(
     Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, serde::Serialize, serde::Deserialize,
 )]
@@ -21,4 +29,16 @@ pub enum StatusOption {
     Active,
     #[sea_orm(string_value = "inactive")]
     Inactive,
+}
+#[derive(
+    Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, serde::Serialize, serde::Deserialize,
+)]
+#[sea_orm(rs_type = "String", db_type = "Enum", enum_name = "session_status")]
+pub enum SessionStatus {
+    #[sea_orm(string_value = "open")]
+    Open,
+    #[sea_orm(string_value = "locked")]
+    Locked,
+    #[sea_orm(string_value = "closed")]
+    Closed,
 }

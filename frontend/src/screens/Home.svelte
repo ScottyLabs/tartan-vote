@@ -2,20 +2,15 @@
     import { onMount } from "svelte";
 
     let {
-        joinEvent,
-        joinError,
-        joining,
         toVoter,
         toAdmin,
     }: {
-        joinEvent: (sessionCode: string) => Promise<void>;
-        joinError: string | null;
-        joining: boolean;
-        toVoter: () => void;
-        toAdmin: () => void;
+        toVoter: (sessionCode: string) => void;
+        toAdmin: (sessionCode: string) => void;
     } = $props();
 
-    let sessionID = $state("");
+    let sessionCode = $state("");
+
     let authStatus = $state<{
         logged_in: boolean;
         user_id: number;
@@ -24,6 +19,9 @@
         oidc_subject: string | null;
     } | null>(null);
     let authStatusError = $state<string | null>(null);
+
+    let joinError = $state<string | null>(null);
+    let joining = $state<boolean>(false);
 
     const API_BASE = import.meta.env.VITE_API_BASE || "";
 
@@ -46,13 +44,33 @@
         })();
     });
 
-    function handleJoinClick() {
-        void joinEvent(sessionID);
+    async function handleJoinClick() {
+        joining = true;
+        const response = await fetch(`${API_BASE}/session/join/${sessionCode}`, { cache: 'no-store', credentials: 'include' });
+
+        if (!response.ok) {
+            joining = false;
+            joinError = "Invalid session code";
+            return;
+        }
+
+        toVoter(sessionCode);
     }
 
     function handleSignInClick() {
         const redirectUri = encodeURIComponent(window.location.origin);
         window.location.href = `${API_BASE}/auth/login?redirect_uri=${redirectUri}`;
+    }
+
+    async function handleCreateSessionClick() {
+        const response = await fetch(`${API_BASE}/session/create`, { cache: 'no-store', credentials: 'include'});
+
+        if (!response.ok) {
+            throw new Error(`Session creation failed: ${response.status}`);
+        }
+
+        const data = await response.json();
+        toAdmin(data.session_code);
     }
 </script>
 
@@ -74,11 +92,11 @@
     <div></div>
 
     <div class="card">
-        <input type="text" bind:value={sessionID} placeholder="Session ID" />
+        <input type="text" bind:value={sessionCode} placeholder="Session Code" />
         <button
             onclick={handleJoinClick}
             class="joinBtn"
-            disabled={joining || !sessionID.trim()}
+            disabled={joining || !sessionCode.trim()}
         >
             {joining ? "JOINING..." : "JOIN SESSION"}
         </button>
@@ -91,7 +109,7 @@
     <div class="row">
         <h3 class="session">Want to create a session?</h3>
         {#if authStatus?.logged_in}
-            <button onclick={toAdmin} class="sessBtn">Create Session</button>
+            <button onclick={handleCreateSessionClick} class="sessBtn">Create Session</button>
         {:else}
             <button onclick={handleSignInClick} class="sessBtn"
                 >Sign in to Create Session</button

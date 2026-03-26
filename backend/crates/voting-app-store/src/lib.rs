@@ -1,6 +1,8 @@
 pub mod events;
 pub mod organization_members;
 pub mod organizations;
+pub mod sessions;
+pub mod user_sessions;
 pub mod users;
 pub mod votes;
 
@@ -30,6 +32,14 @@ impl Store {
 
     pub fn organization_members(&self) -> organization_members::OrganizationMemberRepository<'_> {
         organization_members::OrganizationMemberRepository::new(&self.db)
+    }
+
+    pub fn sessions(&self) -> sessions::SessionRepository<'_> {
+        sessions::SessionRepository::new(&self.db)
+    }
+
+    pub fn user_sessions(&self) -> user_sessions::UserSessionRepository<'_> {
+        user_sessions::UserSessionRepository::new(&self.db)
     }
 
     pub fn events(&self) -> events::EventRepository<'_> {
