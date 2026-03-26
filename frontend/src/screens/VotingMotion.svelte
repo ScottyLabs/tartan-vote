@@ -1,6 +1,7 @@
 <script lang="ts">
     import { Event } from "../lib/models/Event";
     import { User } from "../lib/models/User";
+    import { Vote } from "../lib/models/Vote";
 
     let {
         event,
@@ -12,13 +13,47 @@
         onNext: () => void;
     } = $props();
 
-    let ballot = $state({
-        vote_response: "",
-    });
+    let draftVote = $state<Vote | null>(null);
+    draftVote = {
+        id: 0,
+        cast_time: "",
+        data: {
+            vote_type: "",
+            vote_response: [""],
+        },
+    };
+
+    let time = $state(new Date());
+
+    const API_BASE = import.meta.env.VITE_API_BASE || "";
+
+    async function submitDraft() {
+        try {
+            const response = await fetch(`${API_BASE}/${"event.id"}/vote`, {
+                // TODO remove when event data is actually passed
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    id: draftVote?.id,
+                    cast_time: time.toISOString(),
+                    data: {
+                        vote_type: draftVote?.data.vote_type,
+                        vote_response: draftVote?.data.vote_response,
+                    },
+                }),
+            });
+            if (!response.ok) throw new Error(`Failed: ${response.status}`);
+            const event = await response.json();
+            console.log("Vote Casted:", event);
+            onNext?.();
+        } catch (error) {
+            console.error(error);
+        }
+    }
 
     function vote(e: SubmitEvent) {
         e.preventDefault();
-        onNext?.();
+        submitDraft();
     }
 
     function handleClick() {
@@ -37,7 +72,7 @@
         <form onsubmit={vote}>
             <label>
                 <h3>Concerning this motion I vote...</h3>
-                <select bind:value={ballot.vote_response} required>
+                <select bind:value={draftVote.data.vote_response[0]} required>
                     <option value="" disabled>Select one...</option>
                     {#each ["Pass", "Reject", "Abstain"] as option}
                         <option value={option}>{option}</option>

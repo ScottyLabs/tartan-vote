@@ -1,6 +1,6 @@
 <script lang="ts">
-    import LongTextInput from "./../lib/components/longTextInput.svelte";
-    import SelectMenu from "./../lib/components/selectMenu.svelte";
+    import LongTextInput from "../lib/components/longTextInput.svelte";
+    import SelectMenu from "../lib/components/selectMenu.svelte";
     import Popup from "../lib/components/popup.svelte";
     import backArr from "../lib/images/back_arrow.png";
     import ArrayEditor from "../lib/components/arrayEditor.svelte";
@@ -11,8 +11,8 @@
 
     let { onNext, onBack } = $props();
 
-    function eventDraft_new(vote_type: "motion" | "election"): Event {
-        return new Event({
+    function eventDraft_new(vote_type: "motion" | "election") {
+        return {
             id: 0,
             event_type: vote_type,
             name: "",
@@ -33,29 +33,33 @@
             },
             created_by_user_id: 0,
             organization_id: 0,
-        });
+        };
     }
+
+    let draft = $state(eventDraft_new("motion"));
 
     function goNext() {
         onNext?.();
     }
 
     let users: User[] = $state([
-    //     new User({
-    //         id: 69,
-    //         name: "Max Tentype",
-    //         created_at: "2026-01-01T00:00:00Z",
-    //     }),
-    //     new User({
-    //         id: 420,
-    //         name: "Yiyoung Liu",
-    //         created_at: "2026-01-01T00:00:00Z",
-    //     }),
-    //     new User({
-    //         id: 67,
-    //         name: "Anish Pallati",
-    //         created_at: "2026-01-01T00:00:00Z",
-    //     }),
+        new User({
+            id: 69,
+            name: "Max Tentype",
+            andrew_id: "maxwen",
+            oidc_client: "null",
+            created_at: "2026-01-01T00:00:00Z",
+        }),
+        //     new User({
+        //         id: 420,
+        //         name: "Yiyoung Liu",
+        //         created_at: "2026-01-01T00:00:00Z",
+        //     }),
+        //     new User({
+        //         id: 67,
+        //         name: "Anish Pallati",
+        //         created_at: "2026-01-01T00:00:00Z",
+        //     }),
     ]);
 
     let meetingCode: string = "3CMU67";
@@ -78,7 +82,6 @@
         { label: "Unanimous", value: 1.0 },
     ];
 
-    let draft = $state<Event>(eventDraft_new("motion"));
     let draftTime: Time = $state({
         days: 0,
         hours: 0,
@@ -148,7 +151,7 @@
 
     async function submitDraft() {
         try {
-            const response = await fetch(`${API_BASE}/api/events`, {
+            const response = await fetch(`${API_BASE}/events/create`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -237,7 +240,7 @@
     open={creatingMotion}
     onClose={onPopupClose}
 >
-    <form onsubmit={onPopupClose}>
+    <form onsubmit={submitDraft}>
         <LongTextInput
             title="Description:"
             bind:value={draft.data.description}
@@ -263,7 +266,7 @@
 </Popup>
 
 <Popup title={draft.name} open={creatingElection} onClose={onPopupClose}>
-    <form onsubmit={onPopupClose}>
+    <form onsubmit={submitDraft}>
         <label>
             <h3>Title:</h3>
             <input type="text" bind:value={draft.name} required />
@@ -319,11 +322,9 @@
                             </HoverCard>
                         </div>
                     {/each}
-                    {#if users.length >= 30}
-                        <button onclick={inspectAllUsers} class="slot plus"
-                            >+</button
-                        >
-                    {/if}
+                    <button onclick={inspectAllUsers} class="slot plus"
+                        >+</button
+                    >
                 </div>
             </div>
         </div>

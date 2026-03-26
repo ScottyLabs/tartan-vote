@@ -1,6 +1,6 @@
 <script lang="ts">
-    import { Event } from "./../lib/models/Event";
-    import { User } from "./../lib/models/User";
+    import { Event } from "../lib/models/Event";
+    import { User } from "../lib/models/User";
     let {
         event,
         user,

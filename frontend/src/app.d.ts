@@ -30,6 +30,17 @@ interface User {
     created_at: string;
 }
 
+interface Vote {
+    id: i32,
+    cast_time: string,
+    data: Json,
+}
+
+interface VoteData {
+    vote_type: string,
+    vote_response: string[]
+}
+
 interface Time {
     days: number;
     hours: number;

@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
+    import { onMount } from "svelte";
 
     let {
         joinEvent,
@@ -16,7 +16,13 @@
     } = $props();
 
     let sessionID = $state("");
-    let authStatus = $state<{ logged_in: boolean; user_id: number; user_name: string; user_andrew_id: string; oidc_subject: string | null } | null>(null);
+    let authStatus = $state<{
+        logged_in: boolean;
+        user_id: number;
+        user_name: string;
+        user_andrew_id: string;
+        oidc_subject: string | null;
+    } | null>(null);
     let authStatusError = $state<string | null>(null);
 
     const API_BASE = import.meta.env.VITE_API_BASE || "";
@@ -25,8 +31,8 @@
         void (async () => {
             try {
                 const response = await fetch(`${API_BASE}/auth/status`, {
-                    cache: 'no-store',
-                    credentials: 'include',
+                    cache: "no-store",
+                    credentials: "include",
                 });
 
                 if (!response.ok) {
@@ -35,7 +41,7 @@
 
                 authStatus = await response.json();
             } catch (error) {
-                authStatusError = 'Unable to load auth status.';
+                authStatusError = "Unable to load auth status.";
             }
         })();
     });
@@ -55,7 +61,11 @@
         <h1>CampusVoting</h1>
         <h3>Powered by ScottyLabs</h3>
         {#if authStatus}
-            <h2>{authStatus.logged_in ? `Welcome, ${authStatus.user_name}` : 'Not signed in'}</h2>
+            <h2>
+                {authStatus.logged_in
+                    ? `Welcome, ${authStatus.user_name}`
+                    : "Not signed in"}
+            </h2>
         {:else if authStatusError}
             <h2>{authStatusError}</h2>
         {/if}
@@ -65,8 +75,12 @@
 
     <div class="card">
         <input type="text" bind:value={sessionID} placeholder="Session ID" />
-        <button onclick={handleJoinClick} class="joinBtn" disabled={joining || !sessionID.trim()}>
-            {joining ? 'JOINING...' : 'JOIN SESSION'}
+        <button
+            onclick={handleJoinClick}
+            class="joinBtn"
+            disabled={joining || !sessionID.trim()}
+        >
+            {joining ? "JOINING..." : "JOIN SESSION"}
         </button>
     </div>
 
@@ -79,7 +93,9 @@
         {#if authStatus?.logged_in}
             <button onclick={toAdmin} class="sessBtn">Create Session</button>
         {:else}
-            <button onclick={handleSignInClick} class="sessBtn">Sign in to Create Session</button>
+            <button onclick={handleSignInClick} class="sessBtn"
+                >Sign in to Create Session</button
+            >
         {/if}
     </div>
 </main>

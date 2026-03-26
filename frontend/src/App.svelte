@@ -1,18 +1,20 @@
 <script lang="ts">
-    import WaitingPage from "./screens/waitingPage.svelte";
+    import WaitingPage from "./screens/WaitingPage.svelte";
     import { slide } from "svelte/transition";
-    import AuthPage from "./screens/authPage.svelte";
-    import JoinPage from "./screens/joinPage.svelte";
-    import VotingMotion from "./screens/votingMotion.svelte";
-    import SessionCreation from "./screens/sessionCreation.svelte";
-    import ResultsAdmin from "./screens/resultsAdmin.svelte";
-    import ResultsVoter from "./screens/resultsVoter.svelte";
+    import SignIn from "./screens/SignIn.svelte";
+    import Home from "./screens/Home.svelte";
+    import VotingMotion from "./screens/VotingMotion.svelte";
+    import SessionCreation from "./screens/SessionCreation.svelte";
+    import ResultsAdmin from "./screens/ResultsAdmin.svelte";
+    import ResultsVoter from "./screens/ResultsVoter.svelte";
     import { Event } from "./lib/models/Event";
     import { User } from "./lib/models/User";
 
     const API_BASE = import.meta.env.VITE_API_BASE || "";
 
     let screen = $state("auth");
+
+    // Current Events and User; this is passed to screens and is updated by screens
     let currentUser = $state<User | null>(null);
     let currentEvent = $state<Event | null>(null);
 
@@ -72,11 +74,11 @@
 
 {#if screen === "auth"}
     <div transition:slide>
-        <AuthPage onNext={() => (screen = "join")} />
+        <SignIn onNext={() => (screen = "join")} />
     </div>
 {:else if screen === "join"}
     <div transition:slide>
-        <JoinPage
+        <Home
             {joinEvent}
             {joinError}
             {joining}

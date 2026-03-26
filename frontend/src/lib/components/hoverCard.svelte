@@ -13,14 +13,14 @@
     .card {
         position: absolute;
         top: 36px;
-        width: 240px;
+        width: fit-content;
         left: 60%;
         transform: translateX(-50%);
 
         background: white;
         border: 1px solid #ccc;
         border-radius: 6px;
-        padding: 6px 0px;
+        padding: 6px 6px;
 
         white-space: nowrap;
         z-index: 100;

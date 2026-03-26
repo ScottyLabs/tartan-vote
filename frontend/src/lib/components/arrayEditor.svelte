@@ -2,11 +2,13 @@
     let { title = "List", items = $bindable([]) } = $props();
 
     function addItem() {
-        items.push("");
+        console.log("addItem called", items);
+        items = [...items, ""];
+        console.log("after push", items);
     }
 
     function removeItem(i: number) {
-        items.splice(i, 1);
+        items = items.filter((_, index) => index !== i);
     }
 </script>
 
@@ -61,6 +63,8 @@
         padding: 0.5rem;
         border-radius: 6px;
         border: 1px solid #ccc;
+        background: white;
+        color: black;
     }
 
     .delete {
@@ -83,5 +87,7 @@
         font-size: 18px;
         border-radius: 6px;
         cursor: pointer;
+        background: #e0e0e0;
+        color: black;
     }
 </style>

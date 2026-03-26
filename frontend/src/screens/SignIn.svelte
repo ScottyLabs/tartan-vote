@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
+    import { onMount } from "svelte";
     import logo from "../lib/images/logoplaceholder.png";
 
     type Props = {
@@ -14,8 +14,8 @@
         void (async () => {
             try {
                 const response = await fetch(`${API_BASE}/auth/status`, {
-                    cache: 'no-store',
-                    credentials: 'include',
+                    cache: "no-store",
+                    credentials: "include",
                 });
 
                 if (!response.ok) {
@@ -26,8 +26,7 @@
                 if (status.logged_in) {
                     onNext();
                 }
-            } catch (error) {
-            }
+            } catch (error) {}
         })();
     });
 
