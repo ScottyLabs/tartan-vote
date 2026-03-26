@@ -16,15 +16,21 @@ pub struct Model {
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
     #[sea_orm(
-        belongs_to = "Entity",
+        belongs_to = "super::user::Entity",
         from = "Column::Id",
-        to = "Column::Id",
+        to = "super::user::Column::Id",
         on_update = "NoAction",
         on_delete = "Cascade"
     )]
-    SelfRef,
+    User,
     #[sea_orm(has_many = "super::user_session::Entity")]
     UserSession,
+}
+
+impl Related<super::user::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::User.def()
+    }
 }
 
 impl Related<super::user_session::Entity> for Entity {

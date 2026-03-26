@@ -35,6 +35,11 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .default(Expr::current_timestamp()),
                     )
+                    .primary_key(
+                        Index::create()
+                            .col(UserSession::UserId)
+                            .col(UserSession::SessionId),
+                    )
                     .foreign_key(
                         ForeignKey::create()
                             .from(UserSession::Table, UserSession::UserId)
