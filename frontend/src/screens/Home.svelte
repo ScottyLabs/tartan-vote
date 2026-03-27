@@ -46,7 +46,12 @@
 
     async function handleJoinClick() {
         joining = true;
-        const response = await fetch(`${API_BASE}/session/join/${sessionCode}`, { cache: 'no-store', credentials: 'include' });
+        sessionCode = sessionCode.toUpperCase();
+
+        const response = await fetch(
+            `${API_BASE}/session/join/${sessionCode}`,
+            { cache: "no-store", credentials: "include" },
+        );
 
         if (!response.ok) {
             joining = false;
@@ -63,7 +68,10 @@
     }
 
     async function handleCreateSessionClick() {
-        const response = await fetch(`${API_BASE}/session/create`, { cache: 'no-store', credentials: 'include'});
+        const response = await fetch(`${API_BASE}/session/create`, {
+            cache: "no-store",
+            credentials: "include",
+        });
 
         if (!response.ok) {
             throw new Error(`Session creation failed: ${response.status}`);
@@ -92,7 +100,17 @@
     <div></div>
 
     <div class="card">
-        <input type="text" bind:value={sessionCode} placeholder="Session Code" />
+        <input
+            type="text"
+            style="text-transform: uppercase;"
+            bind:value={sessionCode}
+            placeholder="Session Code"
+            onkeydown={(event) => {
+                if (event.key === "Enter") {
+                    handleJoinClick();
+                }
+            }}
+        />
         <button
             onclick={handleJoinClick}
             class="joinBtn"
@@ -109,7 +127,9 @@
     <div class="row">
         <h3 class="session">Want to create a session?</h3>
         {#if authStatus?.logged_in}
-            <button onclick={handleCreateSessionClick} class="sessBtn">Create Session</button>
+            <button onclick={handleCreateSessionClick} class="sessBtn"
+                >Create Session</button
+            >
         {:else}
             <button onclick={handleSignInClick} class="sessBtn"
                 >Sign in to Create Session</button
