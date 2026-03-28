@@ -110,13 +110,17 @@ pub async fn setup() {
             get(crate::domain::votes::handlers::get_motion_results),
         )
         .route(
+            "/events/{id}/end",
+            axum::routing::get(crate::domain::event::handlers::end_event),
+        )
+        .route(
             "/events/create/{session_code}",
             axum::routing::post(crate::domain::event::handlers::create_event),
         )
         .route("/health", get(|| async { "OK" }))
         .route(
-            "/api/{session_code}/attendance",
-            get(crate::domain::attendance::handlers::join),
+            "/session/{session_code}/attendance",
+            get(crate::domain::attendance::handlers::attendance),
         )
         .route(
             "/session/create",
@@ -125,6 +129,10 @@ pub async fn setup() {
         .route(
             "/session/join/{session_code}",
             get(crate::domain::session::handlers::join_session),
+        )
+        .route(
+            "/session/{session_code}/end",
+            axum::routing::get(crate::domain::session::handlers::end_session),
         )
         .route(
             "/session/{session_code}/status",

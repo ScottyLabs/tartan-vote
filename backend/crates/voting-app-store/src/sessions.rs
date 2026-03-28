@@ -23,4 +23,8 @@ impl<'a> SessionRepository<'a> {
     pub async fn create(&self, session: session::ActiveModel) -> Result<session::Model, DbErr> {
         session.insert(self.db).await
     }
+
+    pub async fn update(&self, session: session::ActiveModel) -> Result<session::Model, DbErr> {
+        session.update(self.db).await
+    }
 }

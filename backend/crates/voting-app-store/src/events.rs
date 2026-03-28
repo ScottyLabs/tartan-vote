@@ -36,23 +36,4 @@ impl<'a> EventRepository<'a> {
             .one(self.db)
             .await
     }
-
-    pub async fn find_active_by_session_code(
-        &self,
-        session_code: &str,
-    ) -> Result<Option<event::Model>, DbErr> {
-        Event::find()
-            .filter(event::Column::Status.eq("active"))
-            .all(self.db)
-            .await
-            .map(|events| {
-                events.into_iter().find(|e| {
-                    e.data
-                        .get("session_code")
-                        .and_then(|v| v.as_str())
-                        .map(|code| code == session_code)
-                        .unwrap_or(false)
-                })
-            })
-    }
 }
