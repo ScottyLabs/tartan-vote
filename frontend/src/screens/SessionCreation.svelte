@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { onDestroy, onMount } from "svelte";
     import LongTextInput from "../lib/components/longTextInput.svelte";
     import SelectMenu from "../lib/components/selectMenu.svelte";
     import Popup from "../lib/components/popup.svelte";
@@ -23,6 +24,16 @@
     type ProxyAssignmentDraft = {
         proxy_holder_user_id: number;
         proxied_senator_user_id: number;
+    };
+
+    type AttendanceResponse = {
+        session_code: string;
+        headcount: number;
+        attendees: Array<{
+            id: number;
+            name: string;
+            andrew_id: string;
+        }>;
     };
 
     function eventDraft_new(vote_type: "motion" | "election") {
@@ -64,25 +75,7 @@
         onNext?.();
     }
 
-    let users: User[] = $state([
-        new User({
-            id: 69,
-            name: "Max Tentype",
-            andrew_id: "maxwen",
-            oidc_client: "null",
-            created_at: "2026-01-01T00:00:00Z",
-        }),
-        //     new User({
-        //         id: 420,
-        //         name: "Yiyoung Liu",
-        //         created_at: "2026-01-01T00:00:00Z",
-        //     }),
-        //     new User({
-        //         id: 67,
-        //         name: "Anish Pallati",
-        //         created_at: "2026-01-01T00:00:00Z",
-        //     }),
-    ]);
+    let users: User[] = $state([]);
 
     let electionStyleOptions: string[] = [
         "Plurality Election",
@@ -144,10 +137,9 @@
     let proxiedSenatorIdInput = $state("");
     let proxyAssignmentError = $state("");
     let proxyAssignments = $state<ProxyAssignmentDraft[]>([]);
-
-    function deleteUser(i: number) {
-        users.splice(i, 1);
-    }
+    let loadingParticipants = $state(false);
+    let participantsError = $state<string | null>(null);
+    let participantsPollId: number | null = null;
 
     function pushMotion() {
         draft = eventDraft_new("motion");
@@ -254,14 +246,66 @@
 
     const API_BASE = import.meta.env.VITE_API_BASE || "";
 
-    async function exportLatestEvent() {
-        if (!latestEventId) {
-            console.warn("No event has been created yet; nothing to export.");
+    async function loadParticipants() {
+        if (!sessionCode) return;
+
+        loadingParticipants = true;
+
+        try {
+            const response = await fetch(
+                `${API_BASE}/session/${sessionCode}/attendance`,
+                {
+                    cache: "no-store",
+                    credentials: "include",
+                },
+            );
+
+            if (!response.ok) {
+                throw new Error(`Failed to fetch participants: ${response.status}`);
+            }
+
+            const payload: AttendanceResponse = await response.json();
+            users = payload.attendees.map(
+                (attendee) =>
+                    new User({
+                        id: attendee.id,
+                        name: attendee.name,
+                        andrew_id: attendee.andrew_id,
+                        oidc_client: "",
+                        created_at: "",
+                    }),
+            );
+            participantsError = null;
+        } catch (error) {
+            console.error(error);
+            participantsError = "Unable to refresh participants right now.";
+        } finally {
+            loadingParticipants = false;
+        }
+    }
+
+    onMount(() => {
+        void loadParticipants();
+        participantsPollId = window.setInterval(() => {
+            void loadParticipants();
+        }, 3000);
+    });
+
+    onDestroy(() => {
+        if (participantsPollId !== null) {
+            window.clearInterval(participantsPollId);
+            participantsPollId = null;
+        }
+    });
+
+    async function exportSessionEvents() {
+        if (!sessionCode) {
+            console.warn("No session code available; nothing to export.");
             return;
         }
 
         try {
-            const response = await fetch(`${API_BASE}/events/${latestEventId}/export`, {
+            const response = await fetch(`${API_BASE}/session/${sessionCode}/events/export`, {
                 method: "GET",
                 credentials: "include",
             });
@@ -275,7 +319,7 @@
             const url = URL.createObjectURL(blob);
             const anchor = document.createElement("a");
             anchor.href = url;
-            anchor.download = `event-${latestEventId}-export.json`;
+            anchor.download = `session-${sessionCode}-events-export.json`;
             anchor.click();
             URL.revokeObjectURL(url);
         } catch (error) {
@@ -401,14 +445,14 @@
     onClose={onPopupClose}
 >
     <div class="button-list">
-        {#each users as user, i}
+        {#each users as user}
             <div
                 class="slot-wrapper"
                 role="group"
                 onmouseenter={() => inspectUser(user)}
                 onmouseleave={clearInspect}
             >
-                <button onclick={() => deleteUser(i)} class="slotDel">
+                <button class="slot">
                     {user.name?.charAt(0)}
                 </button>
                 <HoverCard open={inspectingUser?.id === user.id}>
@@ -429,6 +473,7 @@
     onClose={onPopupClose}
 >
     <form
+        class="motionForm"
         onsubmit={(e) => {
             e.preventDefault();
             submitDraft();
@@ -610,6 +655,12 @@
                 </div>
             </div>
         </div>
+        {#if loadingParticipants && users.length === 0}
+            <p>Loading participants...</p>
+        {/if}
+        {#if participantsError}
+            <p class="error">{participantsError}</p>
+        {/if}
         <hr />
         <div class="row" style="margin-bottom: 0em">
             <button onclick={pushMotion} class="btn">Push a Motion</button>
@@ -617,7 +668,7 @@
         </div>
         <div class="row" style="marging-top=0em">
             <button onclick={endTimer} class="btn">END MEETING</button>
-            <button class="btn" style="padding: 10px 175px" onclick={exportLatestEvent}
+            <button class="btn" style="padding: 10px 175px" onclick={exportSessionEvents}
                 >EXPORT</button
             >
         </div>
@@ -757,27 +808,6 @@
         justify-content: center;
     }
 
-    .slot:hover {
-        background: #eee;
-    }
-
-    .slotDel {
-        height: 28px;
-        min-width: 28px;
-        font-size: 0.8rem;
-        border: 1px solid #aaa;
-        border-radius: 4px;
-        background: white;
-        cursor: pointer;
-
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-
-    .slotDel:hover {
-        background: #f44a4a;
-    }
 
     .plus {
         font-weight: bold;
@@ -808,6 +838,22 @@
         flex-direction: column;
         width: 100%;
         gap: 0rem;
+    }
+
+    .motionForm {
+        max-height: 72vh;
+        overflow-y: auto;
+        padding-right: 0.35rem;
+    }
+
+    .motionForm input {
+        height: 44px;
+        font-size: 18px;
+    }
+
+    .motionForm .submitBtn {
+        padding: 10px 90px;
+        font-size: 18px;
     }
 
     input {

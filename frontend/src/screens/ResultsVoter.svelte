@@ -1,77 +1,168 @@
 <script lang="ts">
-    import { Event } from "../lib/models/Event";
+    import { onMount } from "svelte";
     import { User } from "../lib/models/User";
+
+    type ActiveEvent = {
+        id: number;
+        name: string;
+        event_type: string;
+        data: EventData;
+    };
+
     let {
         event,
         user,
         onNext,
     }: {
-        event: Event | null;
+        event: ActiveEvent | null;
         user: User | null;
         onNext: () => void;
     } = $props();
 
-    // Percent values (TO BE CONNECTED TO API)
-    let percentAbst: number = 10;
-    let percentYay: number = 60;
-    let percentNay: number = 100 - percentYay - percentAbst;
+    type MotionResults = {
+        pass: number;
+        reject: number;
+        abstain: number;
+        total: number;
+        threshold: number;
+        passed: boolean;
+    };
 
-    let barColor = $derived("#ffa500");
-    let message = $derived(" resulted in a tie");
+    type ElectionResults = {
+        vote_type: "election";
+        total: number;
+        options: Array<{
+            label: string;
+            count: number;
+            percent: number;
+        }>;
+    };
 
-    if (percentNay < percentYay) {
-        barColor = "#3fb991";
-        message = " is passed";
-    } else if (percentNay > percentYay) {
-        barColor = "#ff7563";
-        message = " is rejected";
-    }
+    const API_BASE = import.meta.env.VITE_API_BASE || "";
 
-    let motion: string = $state("Motion description here");
+    let loading = $state(false);
+    let error = $state<string | null>(null);
+    let bars = $state<Array<{ label: string; percent: number; color: string; count: number }>>([]);
+    let totalVotes = $state(0);
+    let heading = $state("Results");
+    let summary = $state("");
+    let barColor = $state("#ffa500");
 
     function handleClick() {
         onNext();
     }
 
-    const bars = [
-        { label: "Pass", percent: percentYay, color: "#3fb991" },
-        { label: "Reject", percent: percentNay, color: "#ff7563" },
-        { label: "Abstain", percent: percentAbst, color: "#ffa500" },
-    ];
+    onMount(() => {
+        void loadResults();
+    });
+
+    async function loadResults() {
+        if (!event) {
+            error = "No event selected.";
+            return;
+        }
+
+        loading = true;
+        error = null;
+
+        try {
+            const response = await fetch(`${API_BASE}/events/${event.id}/results`, {
+                cache: "no-store",
+                credentials: "include",
+            });
+
+            if (!response.ok) {
+                throw new Error(`Failed to load results: ${response.status}`);
+            }
+
+            if (event.data.vote_type === "election") {
+                const payload: ElectionResults = await response.json();
+                heading = "Election Results";
+                totalVotes = payload.total;
+                bars = payload.options.map((option, index) => ({
+                    label: option.label,
+                    percent: option.percent,
+                    count: option.count,
+                    color: ["#3fb991", "#4f8ef7", "#ffa500", "#ff7563"][index % 4],
+                }));
+
+                const leading = payload.options.reduce((best, option) =>
+                    option.count > best.count ? option : best
+                , payload.options[0] ?? { label: "No winner", count: 0, percent: 0 });
+
+                barColor = "#4f8ef7";
+                summary = payload.total > 0
+                    ? `${leading.label} is currently leading.`
+                    : "No votes have been cast yet.";
+                return;
+            }
+
+            const payload: MotionResults = await response.json();
+            heading = "Motion Results";
+            totalVotes = payload.total;
+            bars = [
+                { label: "Pass", percent: payload.total > 0 ? Math.round((payload.pass / payload.total) * 100) : 0, color: "#3fb991", count: payload.pass },
+                { label: "Reject", percent: payload.total > 0 ? Math.round((payload.reject / payload.total) * 100) : 0, color: "#ff7563", count: payload.reject },
+                { label: "Abstain", percent: payload.total > 0 ? Math.round((payload.abstain / payload.total) * 100) : 0, color: "#ffa500", count: payload.abstain },
+            ];
+
+            if (payload.pass > payload.reject) {
+                barColor = "#3fb991";
+                summary = "Motion is passed.";
+            } else if (payload.pass < payload.reject) {
+                barColor = "#ff7563";
+                summary = "Motion is rejected.";
+            } else {
+                barColor = "#ffa500";
+                summary = "Motion is tied.";
+            }
+        } catch (e) {
+            console.error(e);
+            error = "Unable to load results right now.";
+        } finally {
+            loading = false;
+        }
+    }
 </script>
 
 <main>
     <div class="card">
         <div class="topBar" style="background-color: {barColor}"></div>
-        <h2>Motion Results</h2>
+        <h2>{heading}</h2>
         <hr />
 
-        {#each bars as bar}
-            <div class="resultRow">
-                <span class="label">{bar.label}:</span>
-                <div class="progress">
-                    <div
-                        class="fill"
-                        style="width: {bar.percent}%; background: {bar.color}"
-                    >
-                        <span class="inside">{bar.percent}%</span>
+        {#if loading}
+            <p>Loading results...</p>
+        {:else if error}
+            <p>{error}</p>
+        {:else}
+            {#each bars as bar}
+                <div class="resultRow">
+                    <span class="label">{bar.label}:</span>
+                    <div class="progress">
+                        <div
+                            class="fill"
+                            style="width: {bar.percent}%; background: {bar.color}"
+                        >
+                            <span class="inside">{bar.percent}%</span>
+                        </div>
                     </div>
                 </div>
-            </div>
-        {/each}
+            {/each}
 
-        <blockquote class="quote" style="border-left: 4px solid {barColor}">
-            {motion}{message}
-        </blockquote>
+            <blockquote class="quote" style="border-left: 4px solid {barColor}">
+                {summary}
+            </blockquote>
+        {/if}
 
         <hr />
 
         <div class="row">
             <div class="col">
-                <div>Total Votes: ##</div>
-                <div>Vote Closed: ## minutes ago</div>
+                <div>Total Votes: {totalVotes}</div>
+                <div>Event: {event?.name ?? "Unknown"}</div>
             </div>
-            <button onclick={handleClick} class="btn">BACK TO HOME</button>
+            <button onclick={handleClick} class="btn">BACK TO SESSION</button>
         </div>
     </div>
 </main>

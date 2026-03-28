@@ -1,15 +1,18 @@
 use crate::AppState;
+use crate::core::auth::middleware::SyncedUser;
 use crate::domain::attendance::handlers::get_attendance;
 use axum::{
+    Json,
     extract::{Path, State},
     http::{HeaderValue, StatusCode, header},
     response::IntoResponse,
 };
+use entity::event;
 use entity::session::{self, Entity as Session};
 use genpdf::elements::FrameCellDecorator;
 use sea_orm::{
     ColumnTrait, DatabaseConnection, DbBackend, EntityTrait, FromQueryResult, QueryFilter,
-    Statement,
+    QueryOrder, Statement,
 };
 use voting_app_store::Store;
 
@@ -76,6 +79,31 @@ async fn connect() -> (DatabaseConnection, Store) {
 struct VoteCount {
     option: String,
     count: i64,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct SessionEventExportItem {
+    pub event_id: i32,
+    pub event_name: String,
+    pub event_type: String,
+    pub status: String,
+    pub start_time: String,
+    pub end_time: Option<String>,
+    pub total_votes: u32,
+    pub option_counts: Vec<SessionEventOptionCount>,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct SessionEventOptionCount {
+    pub option: String,
+    pub count: u32,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct SessionEventsExportResponse {
+    pub session_code: String,
+    pub total_events: usize,
+    pub events: Vec<SessionEventExportItem>,
 }
 
 async fn get_vote_counts(
@@ -356,6 +384,144 @@ pub async fn export_session_data(
             (header::CONTENT_DISPOSITION, content_disposition),
         ],
         bytes,
+    )
+        .into_response()
+}
+
+pub async fn export_session_events_json(
+    user: SyncedUser,
+    State(state): State<AppState>,
+    Path(session_code): Path<String>,
+) -> impl IntoResponse {
+    let session = match Session::find()
+        .filter(session::Column::JoinCode.eq(session_code.clone()))
+        .one(&state.db)
+        .await
+    {
+        Ok(Some(session)) => session,
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": "Session not found"})),
+            )
+                .into_response();
+        }
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Database error"})),
+            )
+                .into_response();
+        }
+    };
+
+    if session.created_by_user_id != user.0.id {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({"error": "Only the session host may export events"})),
+        )
+            .into_response();
+    }
+
+    let events = match entity::prelude::Event::find()
+        .filter(event::Column::SessionId.eq(session.id))
+        .order_by_asc(event::Column::StartTime)
+        .all(&state.db)
+        .await
+    {
+        Ok(events) => events,
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Database error"})),
+            )
+                .into_response();
+        }
+    };
+
+    let mut event_exports = Vec::with_capacity(events.len());
+
+    for session_event in events {
+        let vote_rows = match entity::prelude::Vote::find()
+            .find_also_related(entity::voter::Entity)
+            .filter(entity::voter::Column::EventId.eq(session_event.id))
+            .all(&state.db)
+            .await
+        {
+            Ok(rows) => rows,
+            Err(_) => {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({"error": "Database error"})),
+                )
+                    .into_response();
+            }
+        };
+
+        let option_labels = session_event
+            .data
+            .get("vote_options")
+            .and_then(|value| value.as_array())
+            .map(|options| {
+                options
+                    .iter()
+                    .filter_map(|option| option.as_str().map(ToOwned::to_owned))
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+
+        let mut counts: std::collections::HashMap<String, u32> = option_labels
+            .iter()
+            .map(|option| (option.clone(), 0u32))
+            .collect();
+
+        let mut total_votes = 0u32;
+
+        for (vote_row, _related_voter) in vote_rows {
+            let Some(selected_option) = vote_row
+                .data
+                .get("vote_response")
+                .and_then(|value| value.as_array())
+                .and_then(|responses| responses.first())
+                .and_then(|response| response.as_str())
+            else {
+                continue;
+            };
+
+            if let Some(count) = counts.get_mut(selected_option) {
+                *count += 1;
+            } else {
+                counts.insert(selected_option.to_string(), 1);
+            }
+
+            total_votes += 1;
+        }
+
+        let mut option_counts = counts
+            .into_iter()
+            .map(|(option, count)| SessionEventOptionCount { option, count })
+            .collect::<Vec<_>>();
+        option_counts.sort_by(|a, b| a.option.cmp(&b.option));
+
+        event_exports.push(SessionEventExportItem {
+            event_id: session_event.id,
+            event_name: session_event.name,
+            event_type: format!("{:?}", session_event.event_type),
+            status: format!("{:?}", session_event.status),
+            start_time: session_event.start_time.to_rfc3339(),
+            end_time: session_event.end_time.map(|value| value.to_rfc3339()),
+            total_votes,
+            option_counts,
+        });
+    }
+
+    (
+        StatusCode::OK,
+        Json(SessionEventsExportResponse {
+            session_code,
+            total_events: event_exports.len(),
+            events: event_exports,
+        }),
     )
         .into_response()
 }

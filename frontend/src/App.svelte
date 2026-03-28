@@ -13,11 +13,18 @@
 
     const API_BASE = import.meta.env.VITE_API_BASE || "";
 
+    type ActiveEvent = {
+        id: number;
+        name: string;
+        event_type: string;
+        data: EventData;
+    };
+
     let screen = $state("auth");
 
     // Current Events and User; this is passed to screens and is updated by screens
     let currentUser = $state<User | null>(null);
-    let currentEvent = $state<Event | null>(null);
+    let currentEvent = $state<ActiveEvent | null>(null);
     let adminActiveEvent = $state<{
         id: number;
         name: string;
@@ -71,6 +78,10 @@
     <div transition:slide>
         <WaitingPage
             sessionCode={globalSessionCode}
+            onEventFound={(event: ActiveEvent) => {
+                currentEvent = event;
+                screen = "votingMotion";
+            }}
         />
     </div>
 {:else if screen === "votingMotion"}
@@ -78,7 +89,15 @@
         <VotingMotion
             event={currentEvent}
             user={currentUser}
-            onNext={() => (screen = "ResultsVoter")}
+            onNext={(destination: "results" | "session") => {
+                if (destination === "results") {
+                    screen = "ResultsVoter";
+                    return;
+                }
+
+                currentEvent = null;
+                screen = "waiting";
+            }}
         />
     </div>
 {:else if screen === "SessionCreation"}
@@ -125,7 +144,10 @@
         <ResultsVoter
             event={currentEvent}
             user={currentUser}
-            onNext={() => (screen = "join")}
+            onNext={() => {
+                currentEvent = null;
+                screen = "waiting";
+            }}
         />
     </div>
 {/if}

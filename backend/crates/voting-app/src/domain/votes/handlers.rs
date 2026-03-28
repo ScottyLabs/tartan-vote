@@ -83,6 +83,20 @@ pub struct MotionResults {
     pub passed: bool,
 }
 
+#[derive(Debug, Serialize)]
+pub struct ElectionOptionResult {
+    pub label: String,
+    pub count: u32,
+    pub percent: u32,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ElectionResults {
+    pub vote_type: String,
+    pub total: u32,
+    pub options: Vec<ElectionOptionResult>,
+}
+
 fn parse_proxy_for_user_id(proxy: &Option<String>) -> Option<i32> {
     proxy.as_ref().and_then(|value| value.parse::<i32>().ok())
 }
@@ -125,6 +139,49 @@ fn compute_motion_totals(vote_records: &[VoteExportRecord], threshold: f64) -> M
         total,
         threshold,
         passed,
+    }
+}
+
+fn compute_election_totals(
+    vote_records: &[VoteExportRecord],
+    vote_options: &[String],
+) -> ElectionResults {
+    let mut counts: HashMap<String, u32> = vote_options
+        .iter()
+        .map(|option| (option.clone(), 0u32))
+        .collect();
+
+    for record in vote_records {
+        let response = record.vote_response.first().cloned().unwrap_or_default();
+        if let Some(count) = counts.get_mut(&response) {
+            *count += 1;
+        }
+    }
+
+    let total: u32 = counts.values().sum();
+
+    let options = vote_options
+        .iter()
+        .map(|label| {
+            let count = *counts.get(label).unwrap_or(&0);
+            let percent = if total > 0 {
+                ((count as f64 / total as f64) * 100.0).round() as u32
+            } else {
+                0
+            };
+
+            ElectionOptionResult {
+                label: label.clone(),
+                count,
+                percent,
+            }
+        })
+        .collect();
+
+    ElectionResults {
+        vote_type: "election".to_string(),
+        total,
+        options,
     }
 }
 
@@ -326,10 +383,10 @@ pub async fn get_motion_results(
     let event_data = event.data.clone();
     let vote_type = event_data["vote_type"].as_str().unwrap_or("");
 
-    if vote_type != "motion" {
+    if vote_type != "motion" && vote_type != "election" {
         return (
             StatusCode::BAD_REQUEST,
-            Json(json!({"error": "Event is not a motion"})),
+            Json(json!({"error": "Event is not a supported vote type"})),
         )
             .into_response();
     }
@@ -363,6 +420,15 @@ pub async fn get_motion_results(
     };
 
     let threshold = event_data["threshold"].as_f64().unwrap_or(0.5);
+    let vote_options: Vec<String> = event_data["vote_options"]
+        .as_array()
+        .map(|values| {
+            values
+                .iter()
+                .filter_map(|value| value.as_str().map(ToOwned::to_owned))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
     let mut export_records = Vec::new();
 
     for (vote, related_voter) in votes {
@@ -394,9 +460,13 @@ pub async fn get_motion_results(
         });
     }
 
-    let motion_results = compute_motion_totals(&export_records, threshold);
+    if vote_type == "motion" {
+        let motion_results = compute_motion_totals(&export_records, threshold);
+        return (StatusCode::OK, Json(json!(motion_results))).into_response();
+    }
 
-    (StatusCode::OK, Json(motion_results)).into_response()
+    let election_results = compute_election_totals(&export_records, &vote_options);
+    (StatusCode::OK, Json(json!(election_results))).into_response()
 }
 
 pub async fn assign_proxy(

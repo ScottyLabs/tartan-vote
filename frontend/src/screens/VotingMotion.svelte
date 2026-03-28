@@ -1,53 +1,138 @@
 <script lang="ts">
-    import { Event } from "../lib/models/Event";
+    import { onMount } from "svelte";
     import { User } from "../lib/models/User";
-    import { Vote } from "../lib/models/Vote";
+
+    type ActiveEvent = {
+        id: number;
+        name: string;
+        event_type: string;
+        data: EventData;
+    };
+
+    type VoteInstance = {
+        voter_instance_id: number;
+        is_proxy: boolean;
+        proxy_for_user_id: number | null;
+        proxy_for_name: string | null;
+        has_voted: boolean;
+    };
 
     let {
         event,
         user,
         onNext,
     }: {
-        event: Event | null;
+        event: ActiveEvent | null;
         user: User | null;
-        onNext: () => void;
+        onNext: (destination: "results" | "session") => void;
     } = $props();
 
-    let draftVote = $state<Vote | null>(null);
-    draftVote = {
-        id: 0,
-        cast_time: "",
-        data: {
-            vote_type: "",
-            vote_response: [""],
-        },
-    };
+    let selectedVoteOption = $state("");
+    let voteOptions = $state<string[]>([]);
+    let voteInstances = $state<VoteInstance[]>([]);
+    let selectedVoterInstanceId = $state<number | null>(null);
+    let loadingVoteData = $state(false);
+    let submittingVote = $state(false);
+    let error = $state<string | null>(null);
+    let alreadyVoted = $state(false);
 
-    let time = $state(new Date());
+    const isElection = $derived(event?.data?.vote_type === "election");
+    const eventLabel = $derived(isElection ? "Election" : "Motion");
+    const descriptionLabel = $derived(
+        isElection
+            ? event?.name || "No election details provided."
+            : event?.data?.description || "No motion details provided.",
+    );
+    const votePrompt = $derived(
+        isElection
+            ? "For this election I vote..."
+            : "Concerning this motion I vote...",
+    );
 
     const API_BASE = import.meta.env.VITE_API_BASE || "";
 
-    async function submitDraft() {
+    onMount(() => {
+        void loadVoteData();
+    });
+
+    async function loadVoteData() {
+        if (!event) {
+            error = "No active vote found.";
+            return;
+        }
+
+        loadingVoteData = true;
+        error = null;
+
         try {
-            const response = await fetch(`${API_BASE}/${"event.id"}/vote`, {
-                // TODO remove when event data is actually passed
+            const response = await fetch(
+                `${API_BASE}/events/${event.id}/vote-instances`,
+                {
+                    cache: "no-store",
+                    credentials: "include",
+                },
+            );
+
+            if (!response.ok) {
+                throw new Error(`Failed to load vote instances: ${response.status}`);
+            }
+
+            const instances: VoteInstance[] = await response.json();
+            voteInstances = instances;
+
+            const unvoted = instances.find((instance) => !instance.has_voted);
+            alreadyVoted = !unvoted;
+            selectedVoterInstanceId = unvoted?.voter_instance_id ?? null;
+
+            voteOptions = event.data?.vote_options?.length
+                ? event.data.vote_options
+                : ["Pass", "Reject", "Abstain"];
+        } catch (e) {
+            console.error(e);
+            error = "Unable to load your ballot right now.";
+        } finally {
+            loadingVoteData = false;
+        }
+    }
+
+    async function submitDraft() {
+        if (!event || !selectedVoteOption || submittingVote || alreadyVoted) return;
+
+        submittingVote = true;
+        error = null;
+
+        try {
+            const response = await fetch(`${API_BASE}/events/${event.id}/vote`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
+                credentials: "include",
                 body: JSON.stringify({
-                    id: draftVote?.id,
-                    cast_time: time.toISOString(),
-                    data: {
-                        vote_type: draftVote?.data.vote_type,
-                        vote_response: draftVote?.data.vote_response,
-                    },
+                    vote_response: [selectedVoteOption],
+                    voter_instance_id: selectedVoterInstanceId,
                 }),
             });
-            if (!response.ok) throw new Error(`Failed: ${response.status}`);
-            const event = await response.json();
-            console.log("Vote Casted:", event);
-            onNext?.();
-        } catch (error) {
-            console.error(error);
+
+            if (!response.ok) {
+                const payload = await response.json().catch(() => null);
+                throw new Error(payload?.error ?? `Failed: ${response.status}`);
+            }
+
+            const resultsResponse = await fetch(`${API_BASE}/events/${event.id}/results`, {
+                cache: "no-store",
+                credentials: "include",
+            });
+
+            if (resultsResponse.ok) {
+                onNext?.("results");
+                return;
+            }
+
+            onNext?.("session");
+        } catch (e) {
+            console.error(e);
+            error = e instanceof Error ? e.message : "Unable to submit vote.";
+        } finally {
+            submittingVote = false;
         }
     }
 
@@ -55,32 +140,62 @@
         e.preventDefault();
         submitDraft();
     }
-
-    function handleClick() {
-        onNext();
-    }
 </script>
 
 <main>
     <h1>CampusVoting</h1>
     <div class="card">
-        <h2>Vote on Current Motion</h2>
+        <h2>Vote on Current {eventLabel}</h2>
         <hr />
         <blockquote class="quote">
-            {event?.isMotion ? "No Motion" : event?.data}
+            {descriptionLabel}
         </blockquote>
-        <form onsubmit={vote}>
+
+        {#if loadingVoteData}
+            <p>Loading your ballot...</p>
+        {:else if alreadyVoted}
+            <p>You have already voted in this {eventLabel.toLowerCase()}.</p>
+            <button
+                type="button"
+                class="submitBtn"
+                onclick={() => onNext?.("session")}
+            >
+                Back to Session
+            </button>
+        {:else}
+            <form onsubmit={vote}>
             <label>
-                <h3>Concerning this motion I vote...</h3>
-                <select bind:value={draftVote.data.vote_response[0]} required>
+                <h3>{votePrompt}</h3>
+                <select bind:value={selectedVoteOption} required>
                     <option value="" disabled>Select one...</option>
-                    {#each ["Pass", "Reject", "Abstain"] as option}
+                    {#each voteOptions as option}
                         <option value={option}>{option}</option>
                     {/each}
                 </select>
             </label>
-            <button type="submit" class="submitBtn">Submit Vote</button>
-        </form>
+            {#if voteInstances.length > 1}
+                <label>
+                    <h3>Voting As...</h3>
+                    <select bind:value={selectedVoterInstanceId} required>
+                        {#each voteInstances.filter((instance) => !instance.has_voted) as instance}
+                            <option value={instance.voter_instance_id}>
+                                {instance.is_proxy && instance.proxy_for_name
+                                    ? `Proxy for ${instance.proxy_for_name}`
+                                    : "Your vote"}
+                            </option>
+                        {/each}
+                    </select>
+                </label>
+            {/if}
+            <button type="submit" class="submitBtn" disabled={submittingVote}>
+                {submittingVote ? "Submitting..." : "Submit Vote"}
+            </button>
+            </form>
+        {/if}
+
+        {#if error}
+            <p class="error">{error}</p>
+        {/if}
     </div>
 </main>
 
@@ -161,5 +276,10 @@
         background: #e0e0e0;
 
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    }
+
+    .error {
+        color: #b00020;
+        margin: 0;
     }
 </style>
