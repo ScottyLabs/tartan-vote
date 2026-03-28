@@ -3,10 +3,12 @@ use crate::core::auth::middleware::SyncedUser;
 use axum::{Json, extract::Path, extract::State, http::StatusCode, response::IntoResponse};
 use chrono::{FixedOffset, Utc};
 use entity::enums::{EventType, StatusOption};
-use entity::event;
-use sea_orm::{ActiveValue::Set, IntoActiveModel};
+use entity::{event, voter};
+use sea_orm::ActiveValue::Set;
+use sea_orm::{ActiveModelTrait, IntoActiveModel, TransactionTrait};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::collections::HashSet;
 
 #[derive(Debug, Deserialize)]
 pub struct CreateEventRequest {
@@ -26,6 +28,67 @@ pub struct CreateEventResponse {
     pub event_type: EventType,
     pub status: StatusOption,
     pub start_time: chrono::DateTime<chrono::FixedOffset>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ProxyAssignmentInput {
+    proxy_holder_user_id: i32,
+    proxied_senator_user_id: i32,
+}
+
+fn parse_user_ids(value: Option<&serde_json::Value>) -> Vec<i32> {
+    value
+        .and_then(|v| v.as_array())
+        .map(|array| {
+            array
+                .iter()
+                .filter_map(|item| item.as_i64())
+                .filter_map(|id| i32::try_from(id).ok())
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default()
+}
+
+fn parse_proxy_assignments(value: Option<&serde_json::Value>) -> Vec<ProxyAssignmentInput> {
+    value
+        .and_then(|v| v.as_array())
+        .map(|array| {
+            array
+                .iter()
+                .filter_map(|item| {
+                    serde_json::from_value::<ProxyAssignmentInput>(item.clone()).ok()
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default()
+}
+
+fn validate_proxy_assignments(
+    proxy_enabled: bool,
+    proxy_assignments: &[ProxyAssignmentInput],
+) -> Result<(), &'static str> {
+    if !proxy_enabled && !proxy_assignments.is_empty() {
+        return Err("Proxy assignments provided, but proxy voting is disabled");
+    }
+
+    let mut seen_proxy_holders = HashSet::new();
+    let mut seen_proxied_senators = HashSet::new();
+
+    for assignment in proxy_assignments {
+        if assignment.proxy_holder_user_id == assignment.proxied_senator_user_id {
+            return Err("A user cannot proxy for themself");
+        }
+
+        if !seen_proxy_holders.insert(assignment.proxy_holder_user_id) {
+            return Err("One participant may hold at most one proxy");
+        }
+
+        if !seen_proxied_senators.insert(assignment.proxied_senator_user_id) {
+            return Err("A senator may only be proxied once per event");
+        }
+    }
+
+    Ok(())
 }
 
 #[derive(Debug, Serialize)]
@@ -137,6 +200,9 @@ pub async fn create_event(
 
     event_data["session_code"] = json!(session_code);
 
+    let eligible_voter_user_ids = parse_user_ids(event_data.get("eligible_voter_user_ids"));
+    let proxy_assignments = parse_proxy_assignments(event_data.get("proxy_assignments"));
+
     let event_model = event::ActiveModel {
         name: Set(req.name.clone()),
         event_type: Set(parsed_event_type),
@@ -149,23 +215,176 @@ pub async fn create_event(
         ..Default::default()
     };
 
-    match store.events().create(event_model).await {
-        Ok(event) => (
-            StatusCode::CREATED,
-            Json(CreateEventResponse {
-                id: event.id,
-                name: event.name,
-                event_type: event.event_type,
-                status: event.status,
-                start_time: event.start_time,
-            }),
-        )
-            .into_response(),
-        Err(_) => (
+    let txn = match state.db.begin().await {
+        Ok(txn) => txn,
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Failed to start database transaction"})),
+            )
+                .into_response();
+        }
+    };
+
+    let event = match event_model.insert(&txn).await {
+        Ok(event) => event,
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Failed to create event"})),
+            )
+                .into_response();
+        }
+    };
+
+    let mut seeded_base_voters = HashSet::new();
+    for voter_id in eligible_voter_user_ids {
+        if seeded_base_voters.insert(voter_id) {
+            let base_voter = voter::ActiveModel {
+                event_id: Set(event.id),
+                voter_id: Set(voter_id),
+                proxy: Set(None),
+                ..Default::default()
+            };
+
+            if base_voter.insert(&txn).await.is_err() {
+                let _ = txn.rollback().await;
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({"error": "Failed to seed voters for event"})),
+                )
+                    .into_response();
+            }
+        }
+    }
+
+    let proxy_enabled = event.data["proxy"].as_bool().unwrap_or(false);
+    if let Err(message) = validate_proxy_assignments(proxy_enabled, &proxy_assignments) {
+        let _ = txn.rollback().await;
+        return (StatusCode::BAD_REQUEST, Json(json!({"error": message}))).into_response();
+    }
+
+    for assignment in proxy_assignments {
+        let proxy_voter = voter::ActiveModel {
+            event_id: Set(event.id),
+            voter_id: Set(assignment.proxy_holder_user_id),
+            proxy: Set(Some(assignment.proxied_senator_user_id.to_string())),
+            ..Default::default()
+        };
+
+        if proxy_voter.insert(&txn).await.is_err() {
+            let _ = txn.rollback().await;
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Failed to create proxy assignment"})),
+            )
+                .into_response();
+        }
+    }
+
+    if txn.commit().await.is_err() {
+        return (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({"error": "Failed to create event"})),
+            Json(json!({"error": "Failed to commit event transaction"})),
         )
-            .into_response(),
+            .into_response();
+    }
+
+    (
+        StatusCode::CREATED,
+        Json(CreateEventResponse {
+            id: event.id,
+            name: event.name,
+            event_type: event.event_type,
+            status: event.status,
+            start_time: event.start_time,
+        }),
+    )
+        .into_response()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn assignment(holder: i32, proxied: i32) -> ProxyAssignmentInput {
+        ProxyAssignmentInput {
+            proxy_holder_user_id: holder,
+            proxied_senator_user_id: proxied,
+        }
+    }
+
+    #[test]
+    fn parse_user_ids_reads_numeric_ids_only() {
+        let input = json!([1, 2, "3", null, 4]);
+        let parsed = parse_user_ids(Some(&input));
+        assert_eq!(parsed, vec![1, 2, 4]);
+    }
+
+    #[test]
+    fn parse_proxy_assignments_skips_invalid_entries() {
+        let input = json!([
+            {
+                "proxy_holder_user_id": 10,
+                "proxied_senator_user_id": 20
+            },
+            {
+                "proxy_holder_user_id": "bad",
+                "proxied_senator_user_id": 21
+            }
+        ]);
+
+        let parsed = parse_proxy_assignments(Some(&input));
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0].proxy_holder_user_id, 10);
+        assert_eq!(parsed[0].proxied_senator_user_id, 20);
+    }
+
+    #[test]
+    fn validate_proxy_assignments_allows_valid_distinct_assignments() {
+        let assignments = vec![assignment(10, 20), assignment(11, 21)];
+        let result = validate_proxy_assignments(true, &assignments);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn validate_proxy_assignments_rejects_when_disabled() {
+        let assignments = vec![assignment(10, 20)];
+        let result = validate_proxy_assignments(false, &assignments);
+        assert_eq!(
+            result.expect_err("should fail"),
+            "Proxy assignments provided, but proxy voting is disabled"
+        );
+    }
+
+    #[test]
+    fn validate_proxy_assignments_rejects_self_proxy() {
+        let assignments = vec![assignment(10, 10)];
+        let result = validate_proxy_assignments(true, &assignments);
+        assert_eq!(
+            result.expect_err("should fail"),
+            "A user cannot proxy for themself"
+        );
+    }
+
+    #[test]
+    fn validate_proxy_assignments_rejects_duplicate_holder() {
+        let assignments = vec![assignment(10, 20), assignment(10, 21)];
+        let result = validate_proxy_assignments(true, &assignments);
+        assert_eq!(
+            result.expect_err("should fail"),
+            "One participant may hold at most one proxy"
+        );
+    }
+
+    #[test]
+    fn validate_proxy_assignments_rejects_duplicate_proxied_senator() {
+        let assignments = vec![assignment(10, 20), assignment(11, 20)];
+        let result = validate_proxy_assignments(true, &assignments);
+        assert_eq!(
+            result.expect_err("should fail"),
+            "A senator may only be proxied once per event"
+        );
     }
 }
 

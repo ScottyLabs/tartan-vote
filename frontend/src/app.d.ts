@@ -20,6 +20,11 @@ interface EventData {
     };
     proxy: boolean;
     vote_options: string[];
+    eligible_voter_user_ids?: number[];
+    proxy_assignments?: {
+        proxy_holder_user_id: number;
+        proxied_senator_user_id: number;
+    }[];
 }
 
 interface User {
@@ -38,7 +43,9 @@ interface Vote {
 
 interface VoteData {
     vote_type: string,
-    vote_response: string[]
+    vote_response: string[],
+    proxy?: boolean,
+    proxy_for_user_id?: number
 }
 
 interface Time {

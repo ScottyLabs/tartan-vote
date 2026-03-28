@@ -10,6 +10,11 @@
 
     let { onNext, onBack, sessionCode } = $props();
 
+    type ProxyAssignmentDraft = {
+        proxy_holder_user_id: number;
+        proxied_senator_user_id: number;
+    };
+
     function eventDraft_new(vote_type: "motion" | "election") {
         return {
             id: 0,
@@ -92,6 +97,11 @@
     let inspectingUser = $state<User | null>(null);
     let inspectingAllUsers = $state(false);
     let timerEnded = $state(false);
+    let latestEventId = $state<number | null>(null);
+    let proxyHolderIdInput = $state("");
+    let proxiedSenatorIdInput = $state("");
+    let proxyAssignmentError = $state("");
+    let proxyAssignments = $state<ProxyAssignmentDraft[]>([]);
 
     function deleteUser(i: number) {
         users.splice(i, 1);
@@ -134,7 +144,81 @@
         return "TBD";
     }
 
+    function addProxyAssignment() {
+        proxyAssignmentError = "";
+        const proxy_holder_user_id = Number.parseInt(proxyHolderIdInput.trim(), 10);
+        const proxied_senator_user_id = Number.parseInt(
+            proxiedSenatorIdInput.trim(),
+            10,
+        );
+
+        if (!Number.isFinite(proxy_holder_user_id) || !Number.isFinite(proxied_senator_user_id)) {
+            proxyAssignmentError = "Both IDs must be valid numbers.";
+            return;
+        }
+
+        if (proxy_holder_user_id === proxied_senator_user_id) {
+            proxyAssignmentError = "A user cannot proxy for themself.";
+            return;
+        }
+
+        if (
+            proxyAssignments.some(
+                (assignment) =>
+                    assignment.proxy_holder_user_id === proxy_holder_user_id,
+            )
+        ) {
+            proxyAssignmentError =
+                "This participant already holds a proxy for this event.";
+            return;
+        }
+
+        proxyAssignments = [
+            ...proxyAssignments,
+            {
+                proxy_holder_user_id,
+                proxied_senator_user_id,
+            },
+        ];
+
+        proxyHolderIdInput = "";
+        proxiedSenatorIdInput = "";
+    }
+
+    function removeProxyAssignment(index: number) {
+        proxyAssignments = proxyAssignments.filter((_, i) => i !== index);
+    }
+
     const API_BASE = import.meta.env.VITE_API_BASE || "";
+
+    async function exportLatestEvent() {
+        if (!latestEventId) {
+            console.warn("No event has been created yet; nothing to export.");
+            return;
+        }
+
+        try {
+            const response = await fetch(`${API_BASE}/events/${latestEventId}/export`, {
+                method: "GET",
+                credentials: "include",
+            });
+
+            if (!response.ok) throw new Error(`Export failed: ${response.status}`);
+
+            const payload = await response.json();
+            const blob = new Blob([JSON.stringify(payload, null, 2)], {
+                type: "application/json",
+            });
+            const url = URL.createObjectURL(blob);
+            const anchor = document.createElement("a");
+            anchor.href = url;
+            anchor.download = `event-${latestEventId}-export.json`;
+            anchor.click();
+            URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error(error);
+        }
+    }
 
     function timerToEndTime(timer: Time): string {
         const now = Date.now();
@@ -167,11 +251,14 @@
                         vote_options: draft.data.vote_options,
                         proxy: draft.data.proxy,
                         visibility: draft.data.visibility.participants,
+                        eligible_voter_user_ids: users.map((u) => u.id),
+                        proxy_assignments: proxyAssignments,
                     },
                 }),
             });
             if (!response.ok) throw new Error(`Failed: ${response.status}`);
             const event = await response.json();
+            latestEventId = event.id;
             console.log("Event created:", event);
             onPopupClose();
             goNext();
@@ -267,6 +354,56 @@
             options={voteStyleOptions}
         ></SelectMenu>
 
+        <label>
+            <h3>Allow Proxy Voting</h3>
+            <input type="checkbox" bind:checked={draft.data.proxy} />
+        </label>
+
+        {#if draft.data.proxy}
+            <div class="proxy-panel">
+                <h3 style="margin: 0 0 0.5rem 0;">Proxy Assignments</h3>
+                <div class="proxy-row">
+                    <input
+                        type="number"
+                        placeholder="Proxy Holder User ID"
+                        bind:value={proxyHolderIdInput}
+                    />
+                    <input
+                        type="number"
+                        placeholder="Proxied Senator User ID"
+                        bind:value={proxiedSenatorIdInput}
+                    />
+                    <button type="button" class="proxy-add" onclick={addProxyAssignment}
+                        >Add</button
+                    >
+                </div>
+                {#if proxyAssignmentError}
+                    <div class="proxy-error">{proxyAssignmentError}</div>
+                {/if}
+
+                <div class="proxy-list">
+                    {#if proxyAssignments.length === 0}
+                        <div class="proxy-empty">No proxy assignments yet.</div>
+                    {:else}
+                        {#each proxyAssignments as assignment, i}
+                            <div class="proxy-item">
+                                <span>
+                                    Holder #{assignment.proxy_holder_user_id} → Senator #{assignment.proxied_senator_user_id}
+                                </span>
+                                <button
+                                    type="button"
+                                    class="proxy-remove"
+                                    onclick={() => removeProxyAssignment(i)}
+                                >
+                                    Remove
+                                </button>
+                            </div>
+                        {/each}
+                    {/if}
+                </div>
+            </div>
+        {/if}
+
         <TimeScroller value={draftTime}></TimeScroller>
 
         <button type="submit" class="submitBtn">Push Motion</button>
@@ -348,7 +485,9 @@
         </div>
         <div class="row" style="marging-top=0em">
             <button onclick={endTimer} class="btn">END MEETING</button>
-            <button class="btn" style="padding: 10px 175px">EXPORT</button>
+            <button class="btn" style="padding: 10px 175px" onclick={exportLatestEvent}
+                >EXPORT</button
+            >
         </div>
     </div>
     {#if !creatingElection && !creatingMotion && !inspectingAllUsers}
@@ -381,6 +520,62 @@
         padding: 1.5rem;
         border-radius: 12px;
         background: #e0e0e0;
+    }
+
+    .proxy-panel {
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        background: #f8f8f8;
+        padding: 0.75rem;
+    }
+
+    .proxy-row {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+    }
+
+    .proxy-row input {
+        flex: 1;
+        min-width: 0;
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+    }
+
+    .proxy-add,
+    .proxy-remove {
+        border: none;
+        border-radius: 6px;
+        padding: 8px 12px;
+        cursor: pointer;
+        background-color: var(--colors-primary);
+        color: white;
+    }
+
+    .proxy-list {
+        margin-top: 0.75rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .proxy-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .proxy-error {
+        margin-top: 0.5rem;
+        color: #b00020;
+        font-size: 0.9rem;
+    }
+
+    .proxy-empty {
+        color: #666;
+        font-size: 0.9rem;
     }
     .container {
         border: 2px solid #ccc;

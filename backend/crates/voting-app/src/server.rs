@@ -110,6 +110,19 @@ pub async fn setup() {
             get(crate::domain::votes::handlers::get_motion_results),
         )
         .route(
+            "/events/{id}/vote-instances",
+            get(crate::domain::votes::handlers::get_vote_instances),
+        )
+        .route(
+            "/events/{id}/proxies",
+            get(crate::domain::votes::handlers::list_proxy_assignments)
+                .post(crate::domain::votes::handlers::assign_proxy),
+        )
+        .route(
+            "/events/{id}/export",
+            get(crate::domain::votes::handlers::export_event_results),
+        )
+        .route(
             "/events/{id}/end",
             axum::routing::get(crate::domain::event::handlers::end_event),
         )
