@@ -298,28 +298,20 @@
         }
     });
 
-    async function exportSessionEvents() {
-        if (!sessionCode) {
-            console.warn("No session code available; nothing to export.");
-            return;
-        }
-
+    async function exportFile(kind: "attendance" | "votes", format: "pdf" | "csv") {
         try {
-            const response = await fetch(`${API_BASE}/session/${sessionCode}/events/export`, {
-                method: "GET",
-                credentials: "include",
-            });
+            const response = await fetch(
+                `${API_BASE}/session/${sessionCode}/export/${kind}/${format}`,
+                { method: "GET", credentials: "include" }
+            );
 
             if (!response.ok) throw new Error(`Export failed: ${response.status}`);
 
-            const payload = await response.json();
-            const blob = new Blob([JSON.stringify(payload, null, 2)], {
-                type: "application/json",
-            });
+            const blob = await response.blob();
             const url = URL.createObjectURL(blob);
             const anchor = document.createElement("a");
             anchor.href = url;
-            anchor.download = `session-${sessionCode}-events-export.json`;
+            anchor.download = `${sessionCode}-${kind}.${format}`;
             anchor.click();
             URL.revokeObjectURL(url);
         } catch (error) {
@@ -668,9 +660,12 @@
         </div>
         <div class="row" style="marging-top=0em">
             <button onclick={endTimer} class="btn">END MEETING</button>
-            <button class="btn" style="padding: 10px 175px" onclick={exportSessionEvents}
-                >EXPORT</button
-            >
+            <button class="btn export-btn" onclick={() => exportFile("attendance", "csv")}>ATTENDANCE CSV</button>
+            <button class="btn export-btn" onclick={() => exportFile("attendance", "pdf")}>ATTENDANCE PDF</button>
+        </div>
+        <div class="row">
+            <button class="btn export-btn" onclick={() => exportFile("votes", "csv")}>VOTES CSV</button>
+            <button class="btn export-btn" onclick={() => exportFile("votes", "pdf")}>VOTES PDF</button>
         </div>
     </div>
     {#if !creatingElection && !creatingMotion && !inspectingAllUsers}
@@ -701,6 +696,10 @@
     .btn:disabled {
         opacity: 0.6;
         cursor: not-allowed;
+    }
+    .export-btn {
+        font-size: 14px;
+        padding: 6px 24px;
     }
     .error {
         color: #b00020;

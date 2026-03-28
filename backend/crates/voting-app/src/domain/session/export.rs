@@ -35,7 +35,7 @@ impl ExportKind {
     fn parse(value: &str) -> Option<Self> {
         match value.to_ascii_lowercase().as_str() {
             "attendance" => Some(Self::Attendance),
-            "vote" => Some(Self::Vote),
+            "vote" | "votes" => Some(Self::Vote),
             _ => None,
         }
     }
