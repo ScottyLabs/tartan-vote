@@ -45,6 +45,7 @@
               };
 
               buildPhase = ''
+                nix flake update
                 bun run build
               '';
 
