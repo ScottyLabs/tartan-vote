@@ -8,7 +8,17 @@
     import HoverCard from "../lib/components/hoverCard.svelte";
     import { User } from "../lib/models/User";
 
-    let { onNext, onBack, sessionCode } = $props();
+    type CreatedEvent = {
+        id: number;
+        name: string;
+        event_type: string;
+        status: string;
+        start_time: string;
+    };
+
+    let { onNext, onBack, onEventStarted, sessionCode } = $props();
+
+    type MotionPreset = "standard" | "secret";
 
     type ProxyAssignmentDraft = {
         proxy_holder_user_id: number;
@@ -29,11 +39,19 @@
                 vote_type: vote_type,
                 threshold: 0.5,
                 visibility: {
-                    participants: "hidden_until_release",
+                    participants:
+                        vote_type === "motion"
+                            ? "live"
+                            : "hidden_until_release",
                 },
                 proxy: false,
+                ballot_style: vote_type === "motion" ? "standard" : "default",
+                meeting_display: vote_type === "motion"
+                    ? "named_by_category"
+                    : "totals_only",
+                export_scope: "totals_only",
                 vote_options:
-                    vote_type === "motion" ? ["Pass", "Reject", "Abstain"] : [],
+                    vote_type === "motion" ? ["Yes", "No", "Abstain"] : [],
             },
             created_by_user_id: 0,
             organization_id: 0,
@@ -71,10 +89,32 @@
         "Ranked Choice Election",
     ];
 
-    let voteStyleOptions: string[] = [
-        "Standard Vote",
-        "Recorded (roll-call) Vote",
-        "Secret Vote",
+    let motionPreset = $state<MotionPreset>("standard");
+
+    let motionPresetOptions: { label: string; value: MotionPreset }[] = [
+        { label: "Standard Vote", value: "standard" },
+        { label: "Secret Vote", value: "secret" },
+    ];
+
+    let motionDisplayOptions: { label: string; value: string }[] = [
+        {
+            label: "Show who voted in each category",
+            value: "named_by_category",
+        },
+        { label: "Show totals only", value: "totals_only" },
+    ];
+
+    let resultVisibilityOptions: { label: string; value: string }[] = [
+        { label: "Show live totals during meeting", value: "live" },
+        {
+            label: "Hide totals until vote closes",
+            value: "hidden_until_release",
+        },
+    ];
+
+    let exportScopeOptions: { label: string; value: string }[] = [
+        { label: "Save only totals in meeting export", value: "totals_only" },
+        { label: "Save detailed ballots in meeting export", value: "full_ballots" },
     ];
 
     let voteThresholds: { label: string; value: number }[] = [
@@ -97,6 +137,8 @@
     let inspectingUser = $state<User | null>(null);
     let inspectingAllUsers = $state(false);
     let timerEnded = $state(false);
+    let endingMeeting = $state(false);
+    let endMeetingError = $state<string | null>(null);
     let latestEventId = $state<number | null>(null);
     let proxyHolderIdInput = $state("");
     let proxiedSenatorIdInput = $state("");
@@ -109,6 +151,8 @@
 
     function pushMotion() {
         draft = eventDraft_new("motion");
+        motionPreset = "standard";
+        applyMotionPreset(motionPreset);
         creatingMotion = true;
     }
 
@@ -126,6 +170,7 @@
         creatingMotion = false;
         inspectingAllUsers = false;
         timerEnded = false;
+        endMeetingError = null;
     }
 
     function inspectUser(user: User) {
@@ -142,6 +187,24 @@
 
     function getResults() {
         return "TBD";
+    }
+
+    function applyMotionPreset(preset: MotionPreset) {
+        draft.data.vote_options = ["Yes", "No", "Abstain"];
+        draft.data.export_scope = "totals_only";
+
+        if (preset === "standard") {
+            draft.data.ballot_style = "standard";
+            draft.data.visibility.participants = "live";
+            draft.data.meeting_display = "named_by_category";
+            draft.data.proxy = false;
+            return;
+        }
+
+        draft.data.ballot_style = "secret";
+        draft.data.visibility.participants = "live";
+        draft.data.meeting_display = "totals_only";
+        draft.data.proxy = false;
     }
 
     function addProxyAssignment() {
@@ -245,11 +308,15 @@
                     start_time: new Date().toISOString(),
                     end_time: timerToEndTime(draftTime),
                     data: {
-                        vote_type: draft.data.vote_type,
+                        vote_type: draft.event_type,
                         description: draft.data.description,
                         threshold: draft.data.threshold,
                         vote_options: draft.data.vote_options,
                         proxy: draft.data.proxy,
+                        ballot_style: draft.data.ballot_style,
+                        meeting_display: draft.data.meeting_display,
+                        export_scope: draft.data.export_scope,
+                        anonymous: draft.data.ballot_style === "secret",
                         visibility: draft.data.visibility.participants,
                         eligible_voter_user_ids: users.map((u) => u.id),
                         proxy_assignments: proxyAssignments,
@@ -257,13 +324,39 @@
                 }),
             });
             if (!response.ok) throw new Error(`Failed: ${response.status}`);
-            const event = await response.json();
+            const event: CreatedEvent = await response.json();
             latestEventId = event.id;
             console.log("Event created:", event);
+            onPopupClose();
+            onEventStarted?.(event);
+        } catch (error) {
+            console.error(error);
+        }
+    }
+
+    async function endMeeting() {
+        if (!sessionCode || endingMeeting) return;
+
+        endingMeeting = true;
+        endMeetingError = null;
+
+        try {
+            const response = await fetch(`${API_BASE}/session/${sessionCode}/end`, {
+                cache: "no-store",
+                credentials: "include",
+            });
+
+            if (!response.ok) {
+                throw new Error(`Failed to end session: ${response.status}`);
+            }
+
             onPopupClose();
             goNext();
         } catch (error) {
             console.error(error);
+            endMeetingError = "Unable to end meeting. Please try again.";
+        } finally {
+            endingMeeting = false;
         }
     }
 </script>
@@ -280,21 +373,26 @@
     >
         <button
             type="button"
-            onclick={goNext}
+            onclick={endMeeting}
             class="btn"
             style="padding: 10px 50px; margin:0"
+            disabled={endingMeeting}
         >
-            Yes
+            {endingMeeting ? "Ending..." : "Yes"}
         </button>
         <button
             type="button"
             onclick={onPopupClose}
             class="btn"
             style="padding: 10px 50px; margin: 0"
+            disabled={endingMeeting}
         >
             No
         </button>
     </div>
+    {#if endMeetingError}
+        <p class="error">{endMeetingError}</p>
+    {/if}
 </Popup>
 
 <Popup
@@ -336,11 +434,33 @@
             submitDraft();
         }}
     >
+        <label>
+            <h3>Title:</h3>
+            <input type="text" bind:value={draft.name} required />
+        </label>
+
+        <SelectMenu
+            title="Preset:"
+            bind:value={motionPreset}
+            options={motionPresetOptions}
+        ></SelectMenu>
+
+        <button
+            type="button"
+            class="presetBtn"
+            onclick={() => applyMotionPreset(motionPreset)}
+        >
+            Apply Preset
+        </button>
+
         <LongTextInput
             title="Description:"
             bind:value={draft.data.description}
             emptyPlaceholder="Input Description"
         ></LongTextInput>
+
+        <ArrayEditor title="Vote Options" bind:items={draft.data.vote_options}
+        ></ArrayEditor>
 
         <SelectMenu
             title="Threshold:"
@@ -349,15 +469,27 @@
         ></SelectMenu>
 
         <SelectMenu
-            title="Voting Style:"
-            bind:value={draft.data.vote_type}
-            options={voteStyleOptions}
+            title="In-Meeting Display:"
+            bind:value={draft.data.meeting_display}
+            options={motionDisplayOptions}
         ></SelectMenu>
 
-        <label>
-            <h3>Allow Proxy Voting</h3>
+        <SelectMenu
+            title="Result Visibility:"
+            bind:value={draft.data.visibility.participants}
+            options={resultVisibilityOptions}
+        ></SelectMenu>
+
+        <label class="toggleRow">
             <input type="checkbox" bind:checked={draft.data.proxy} />
+            <span>Enable Proxy Voting</span>
         </label>
+
+        <SelectMenu
+            title="Meeting Export:"
+            bind:value={draft.data.export_scope}
+            options={exportScopeOptions}
+        ></SelectMenu>
 
         {#if draft.data.proxy}
             <div class="proxy-panel">
@@ -514,6 +646,14 @@
     }
     .btn:hover {
         background-color: color-mix(in srgb, var(--colors-primary), black 10%);
+    }
+    .btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+    .error {
+        color: #b00020;
+        margin-top: 0.5em;
     }
     .card {
         width: fit-content;
@@ -719,5 +859,38 @@
         font-size: 20px;
         padding: 10px 140px;
         cursor: pointer;
+    }
+
+    .presetBtn {
+        margin-top: 0.3em;
+        background-color: var(--colors-secondary);
+        color: black;
+        border: none;
+        border-radius: 4px;
+        font-size: 18px;
+        padding: 10px 20px;
+        cursor: pointer;
+    }
+
+    .presetBtn:hover {
+        background-color: color-mix(
+            in srgb,
+            var(--colors-secondary),
+            black 10%
+        );
+    }
+
+    .toggleRow {
+        display: flex;
+        align-items: center;
+        gap: 0.6em;
+        margin-top: 0.8em;
+        color: var(--colors-text);
+    }
+
+    .toggleRow input {
+        width: 18px;
+        height: 18px;
+        margin: 0;
     }
 </style>

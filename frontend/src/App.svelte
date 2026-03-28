@@ -7,6 +7,7 @@
     import SessionCreation from "./screens/SessionCreation.svelte";
     import ResultsAdmin from "./screens/ResultsAdmin.svelte";
     import ResultsVoter from "./screens/ResultsVoter.svelte";
+    import MotionRunningAdmin from "./screens/MotionRunningAdmin.svelte";
     import { Event } from "./lib/models/Event";
     import { User } from "./lib/models/User";
 
@@ -17,6 +18,13 @@
     // Current Events and User; this is passed to screens and is updated by screens
     let currentUser = $state<User | null>(null);
     let currentEvent = $state<Event | null>(null);
+    let adminActiveEvent = $state<{
+        id: number;
+        name: string;
+        event_type: string;
+        status: string;
+        start_time: string;
+    } | null>(null);
     let createSessionPayload = $state<string | null>(null);
     let globalSessionCode = $state<string | null>(null);
 
@@ -37,6 +45,8 @@
         } else if (screen === "votingMotion") {
             document.body.style.backgroundColor = bgDark;
         } else if (screen === "SessionCreation") {
+            document.body.style.backgroundColor = bgDark;
+        } else if (screen === "MotionRunningAdmin") {
             document.body.style.backgroundColor = bgDark;
         } else if (screen === "ResultsAdmin") {
             document.body.style.backgroundColor = bgLight;
@@ -76,12 +86,39 @@
         <SessionCreation
             onNext={() => (screen = "ResultsAdmin")}
             onBack={() => (screen = "join")}
+            onEventStarted={(event: {
+                id: number;
+                name: string;
+                event_type: string;
+                status: string;
+                start_time: string;
+            }) => {
+                adminActiveEvent = event;
+                screen = "MotionRunningAdmin";
+            }}
             sessionCode = {createSessionPayload}
+        />
+    </div>
+{:else if screen === "MotionRunningAdmin"}
+    <div transition:slide>
+        <MotionRunningAdmin
+            event={adminActiveEvent}
+            sessionCode={createSessionPayload}
+            onBack={() => (screen = "SessionCreation")}
+            onEnd={() => {
+                adminActiveEvent = null;
+                screen = "SessionCreation";
+            }}
         />
     </div>
 {:else if screen === "ResultsAdmin"}
     <div transition:slide>
-        <ResultsAdmin onNext={() => (screen = "SessionCreation")} />
+        <ResultsAdmin
+            onNext={() => {
+                createSessionPayload = null;
+                screen = "join";
+            }}
+        />
     </div>
 {:else if screen === "ResultsVoter"}
     <div transition:slide>
