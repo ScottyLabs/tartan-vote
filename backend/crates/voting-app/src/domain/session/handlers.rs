@@ -84,6 +84,14 @@ pub async fn join_session(
 
     match store.sessions().find_by_join_code(session_code).await {
         Ok(Some(session)) => {
+            if session.status != SessionStatus::Open {
+                return (
+                    StatusCode::FORBIDDEN,
+                    Json(json!({"error": "Session is not open"})),
+                )
+                    .into_response();
+            }
+
             let new_user_session = user_session::ActiveModel {
                 user_id: Set(user.0.id),
                 session_id: Set(session.id),
@@ -97,8 +105,8 @@ pub async fn join_session(
             }
         }
         // is this correct? idk when the store will return None vs Err
-        Ok(None) => (StatusCode::NOT_ACCEPTABLE).into_response(),
-        Err(_) => (StatusCode::NOT_ACCEPTABLE).into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND).into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR).into_response(),
     }
 }
 
