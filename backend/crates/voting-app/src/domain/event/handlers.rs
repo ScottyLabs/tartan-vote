@@ -28,6 +28,45 @@ pub struct CreateEventResponse {
     pub start_time: chrono::DateTime<chrono::FixedOffset>,
 }
 
+pub async fn check_event(
+    _user: SyncedUser,
+    State(state): State<AppState>,
+    Path(session_code): Path<String>,
+) -> impl IntoResponse {
+    let store = &state.store;
+
+    let session = match store.sessions().find_by_join_code(session_code).await {
+        Ok(Some(s)) => s,
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({"error": "Session not found"})),
+            )
+                .into_response();
+        }
+        Err(_) => {
+            return (StatusCode::INTERNAL_SERVER_ERROR).into_response();
+        }
+    };
+
+    match store.events().find_active_by_session_id(session.id).await {
+        Ok(Some(event)) => (
+            StatusCode::OK,
+            Json(json!({
+                "active_event": {
+                    "id": event.id,
+                    "name": event.name,
+                    "event_type": event.event_type,
+                    "data": event.data,
+                }
+            })),
+        )
+            .into_response(),
+        Ok(None) => (StatusCode::OK, Json(json!({ "active_event": null }))).into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR).into_response(),
+    }
+}
+
 pub async fn create_event(
     user: SyncedUser,
     State(state): State<AppState>,

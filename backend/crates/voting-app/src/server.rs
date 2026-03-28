@@ -126,6 +126,14 @@ pub async fn setup() {
             "/session/join/{session_code}",
             get(crate::domain::session::handlers::join_session),
         )
+        .route(
+            "/session/{session_code}/status",
+            get(crate::domain::session::handlers::status_session),
+        )
+        .route(
+            "/events/{session_code}/check",
+            get(crate::domain::event::handlers::check_event),
+        )
         .fallback(get(crate::domain::auth::handlers::demo_not_found)) // demo only
         .layer(middleware::from_fn_with_state(
             app_state.clone(),

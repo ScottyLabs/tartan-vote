@@ -1,4 +1,4 @@
-use ::entity::{event, prelude::*};
+use ::entity::{enums::StatusOption, event, prelude::*};
 use sea_orm::*;
 
 pub struct EventRepository<'a> {
@@ -24,6 +24,17 @@ impl<'a> EventRepository<'a> {
 
     pub async fn delete(&self, id: i32) -> Result<DeleteResult, DbErr> {
         Event::delete_by_id(id).exec(self.db).await
+    }
+
+    pub async fn find_active_by_session_id(
+        &self,
+        session_id: i32,
+    ) -> Result<Option<event::Model>, DbErr> {
+        Event::find()
+            .filter(event::Column::SessionId.eq(session_id))
+            .filter(event::Column::Status.eq(StatusOption::Active))
+            .one(self.db)
+            .await
     }
 
     pub async fn find_active_by_session_code(

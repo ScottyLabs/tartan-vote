@@ -6,6 +6,7 @@ use entity::{session, user_session};
 use random_string::generate;
 use sea_orm::ActiveValue::Set;
 use serde::Serialize;
+use serde_json::json;
 
 #[derive(Serialize)]
 pub struct CreateSessionResponse {
@@ -33,6 +34,28 @@ pub async fn create_session(user: SyncedUser, State(state): State<AppState>) -> 
             Json(CreateSessionResponse {
                 session_code: session.join_code,
             }),
+        )
+            .into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR).into_response(),
+    }
+}
+
+pub async fn status_session(
+    _user: SyncedUser,
+    State(state): State<AppState>,
+    Path(session_code): Path<String>,
+) -> impl IntoResponse {
+    let store = &state.store;
+
+    match store.sessions().find_by_join_code(session_code).await {
+        Ok(Some(session)) => (
+            StatusCode::OK,
+            Json(json!({ "session_ended": session.status == SessionStatus::Closed })),
+        )
+            .into_response(),
+        Ok(None) => (
+            StatusCode::NOT_FOUND,
+            Json(json!({"error": "Session not found"})),
         )
             .into_response(),
         Err(_) => (StatusCode::INTERNAL_SERVER_ERROR).into_response(),
