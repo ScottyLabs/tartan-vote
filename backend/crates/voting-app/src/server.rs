@@ -109,6 +109,10 @@ pub async fn setup() {
             "/events/{id}/results",
             get(crate::domain::votes::handlers::get_motion_results),
         )
+        .route(
+            "/events/create/{session_code}",
+            axum::routing::post(crate::domain::event::handlers::create_event),
+        )
         .route("/health", get(|| async { "OK" }))
         .route(
             "/api/{session_code}/attendance",

@@ -1,13 +1,29 @@
 <script lang="ts">
-    let { title = "Popup", value = $bindable(), options } = $props();
+    type PrimitiveOption = string | number;
+    type ObjectOption = { label: string; value: string | number };
+    type SelectOption = PrimitiveOption | ObjectOption;
+
+    let {
+        title = "Popup",
+        value = $bindable(),
+        options = [] as SelectOption[],
+    } = $props();
+
+    const normalizedOptions = $derived(
+        options.map((option) =>
+            typeof option === "object" && option !== null
+                ? option
+                : { label: String(option), value: option },
+        ),
+    );
 </script>
 
 <main>
     <h3>{title}</h3>
     <select bind:value required>
         <option value="" disabled>Select one...</option>
-        {#each options as option}
-            <option value={option}>{option}</option>
+        {#each normalizedOptions as option}
+            <option value={option.value}>{option.label}</option>
         {/each}
     </select>
 </main>

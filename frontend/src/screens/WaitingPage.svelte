@@ -1,35 +1,17 @@
 <script>
-    let { onNext, event } = $props();
-
-    function handleClick() {
-        onNext();
-    }
+    let { sessionCode } = $props();
 </script>
 
 <main>
-    <h1>Waiting for Host to Start the Session...</h1>
+    <h1>Waiting for Host to Start a Motion...</h1>
+    <h2>Session Code: {sessionCode}</h2>
     <div
         class="spinner"
         style="width: 40px; height: 40px; border-top-color: #FF3B3F;"
     ></div>
-    <button onclick={onNext} class="btn"> Go to Motion </button>
 </main>
 
 <style>
-    .btn {
-        margin-top: 0em;
-        background-color: var(--colors-primary);
-        color: white;
-        border: none;
-        border-radius: 4px;
-        font-size: 20px;
-        padding: 10px 140px;
-        cursor: pointer;
-    }
-
-    .btn:hover {
-        background-color: color-mix(in srgb, var(--colors-primary), black 10%);
-    }
     .spinner {
         border: 3px solid #ddd;
         border-radius: 50%;

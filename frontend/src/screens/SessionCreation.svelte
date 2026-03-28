@@ -7,7 +7,6 @@
     import TimeScroller from "../lib/components/timeScroller.svelte";
     import HoverCard from "../lib/components/hoverCard.svelte";
     import { User } from "../lib/models/User";
-    import { Event } from "../lib/models/Event";
 
     let { onNext, onBack, sessionCode } = $props();
 
@@ -149,20 +148,26 @@
 
     async function submitDraft() {
         try {
-            const response = await fetch(`${API_BASE}/events/create`, {
+            const backendEventType =
+                draft.event_type === "motion" ? "Motion" : "Election";
+
+            const response = await fetch(`${API_BASE}/events/create/${sessionCode}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
+                credentials: "include",
                 body: JSON.stringify({
                     name: draft.name,
-                    vote_type: draft.data.vote_type,
-                    description: draft.data.description,
-                    threshold: draft.data.threshold,
-                    vote_options: draft.data.vote_options,
-                    proxy: draft.data.proxy,
-                    visibility: draft.data.visibility.participants,
-                    organization_id: 1, // TODO: real org from auth
+                    event_type: backendEventType,
                     start_time: new Date().toISOString(),
                     end_time: timerToEndTime(draftTime),
+                    data: {
+                        vote_type: draft.data.vote_type,
+                        description: draft.data.description,
+                        threshold: draft.data.threshold,
+                        vote_options: draft.data.vote_options,
+                        proxy: draft.data.proxy,
+                        visibility: draft.data.visibility.participants,
+                    },
                 }),
             });
             if (!response.ok) throw new Error(`Failed: ${response.status}`);
@@ -238,7 +243,12 @@
     open={creatingMotion}
     onClose={onPopupClose}
 >
-    <form onsubmit={submitDraft}>
+    <form
+        onsubmit={(e) => {
+            e.preventDefault();
+            submitDraft();
+        }}
+    >
         <LongTextInput
             title="Description:"
             bind:value={draft.data.description}
@@ -264,7 +274,12 @@
 </Popup>
 
 <Popup title={draft.name} open={creatingElection} onClose={onPopupClose}>
-    <form onsubmit={submitDraft}>
+    <form
+        onsubmit={(e) => {
+            e.preventDefault();
+            submitDraft();
+        }}
+    >
         <label>
             <h3>Title:</h3>
             <input type="text" bind:value={draft.name} required />

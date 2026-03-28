@@ -19,7 +19,7 @@ pub enum Relation {
     Event,
     #[sea_orm(has_many = "super::organization_member::Entity")]
     OrganizationMember,
-    #[sea_orm(has_one = "super::session::Entity")]
+    #[sea_orm(has_many = "super::session::Entity")]
     Session,
     #[sea_orm(has_many = "super::user_session::Entity")]
     UserSession,

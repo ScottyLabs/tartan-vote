@@ -17,19 +17,19 @@ pub struct Model {
     #[sea_orm(column_type = "JsonBinary")]
     pub data: Json,
     pub created_by_user_id: i32,
-    pub organization_id: i32,
+    pub session_id: i32,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
     #[sea_orm(
-        belongs_to = "super::organization::Entity",
-        from = "Column::OrganizationId",
-        to = "super::organization::Column::Id",
+        belongs_to = "super::session::Entity",
+        from = "Column::SessionId",
+        to = "super::session::Column::Id",
         on_update = "NoAction",
         on_delete = "Cascade"
     )]
-    Organization,
+    Session,
     #[sea_orm(
         belongs_to = "super::user::Entity",
         from = "Column::CreatedByUserId",
@@ -42,9 +42,9 @@ pub enum Relation {
     Voter,
 }
 
-impl Related<super::organization::Entity> for Entity {
+impl Related<super::session::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::Organization.def()
+        Relation::Session.def()
     }
 }
 

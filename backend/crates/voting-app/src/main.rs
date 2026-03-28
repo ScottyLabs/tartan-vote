@@ -2,7 +2,6 @@ mod config;
 mod core;
 mod domain;
 mod server;
-mod static_event_reader;
 
 use dotenvy::dotenv;
 use sea_orm::DatabaseConnection;

@@ -6,9 +6,9 @@ use sea_orm::entity::prelude::*;
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
 #[sea_orm(table_name = "user_session")]
 pub struct Model {
-    #[sea_orm(primary_key, auto_increment = false)]
+    #[sea_orm(primary_key)]
+    pub id: i32,
     pub user_id: i32,
-    #[sea_orm(primary_key, auto_increment = false)]
     pub session_id: i32,
     pub join_left: JoinLeft,
     pub timestamp: DateTimeWithTimeZone,

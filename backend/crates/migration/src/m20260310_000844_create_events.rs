@@ -1,5 +1,5 @@
 use crate::m20260308_183617_create_users::User;
-use crate::m20260308_191852_create_organizations::Organization;
+use crate::m20260324_172033_create_sessions::Session;
 use sea_orm_migration::prelude::extension::postgres::Type;
 use sea_orm_migration::prelude::*;
 
@@ -58,7 +58,7 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(Event::EndTime).timestamp_with_time_zone())
                     .col(ColumnDef::new(Event::Data).json_binary().not_null())
                     .col(ColumnDef::new(Event::CreatedByUserId).integer().not_null())
-                    .col(ColumnDef::new(Event::OrganizationId).integer().not_null())
+                    .col(ColumnDef::new(Event::SessionId).integer().not_null())
                     .foreign_key(
                         ForeignKey::create()
                             .from(Event::Table, Event::CreatedByUserId)
@@ -68,8 +68,8 @@ impl MigrationTrait for Migration {
                     )
                     .foreign_key(
                         ForeignKey::create()
-                            .from(Event::Table, Event::OrganizationId)
-                            .to(Organization::Table, Organization::Id)
+                            .from(Event::Table, Event::SessionId)
+                            .to(Session::Table, Session::Id)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
                     .to_owned(),
@@ -103,7 +103,7 @@ pub enum Event {
     EndTime,
     Data,
     CreatedByUserId,
-    OrganizationId,
+    SessionId,
 }
 
 #[derive(DeriveIden)]

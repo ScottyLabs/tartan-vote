@@ -22,6 +22,13 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(UserSession::Table)
                     .if_not_exists()
+                    .col(
+                        ColumnDef::new(UserSession::Id)
+                            .integer()
+                            .not_null()
+                            .auto_increment()
+                            .primary_key(),
+                    )
                     .col(ColumnDef::new(UserSession::UserId).integer().not_null())
                     .col(ColumnDef::new(UserSession::SessionId).integer().not_null())
                     .col(
@@ -34,11 +41,6 @@ impl MigrationTrait for Migration {
                             .timestamp_with_time_zone()
                             .not_null()
                             .default(Expr::current_timestamp()),
-                    )
-                    .primary_key(
-                        Index::create()
-                            .col(UserSession::UserId)
-                            .col(UserSession::SessionId),
                     )
                     .foreign_key(
                         ForeignKey::create()
@@ -72,6 +74,7 @@ impl MigrationTrait for Migration {
 #[derive(DeriveIden)]
 pub enum UserSession {
     Table,
+    Id,
     UserId,
     SessionId,
     JoinLeft,

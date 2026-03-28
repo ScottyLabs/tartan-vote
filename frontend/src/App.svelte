@@ -60,8 +60,7 @@
 {:else if screen === "waiting"}
     <div transition:slide>
         <WaitingPage
-            event={currentEvent}
-            onNext={() => (screen = "votingMotion")}
+            sessionCode={globalSessionCode}
         />
     </div>
 {:else if screen === "votingMotion"}
