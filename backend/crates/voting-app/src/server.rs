@@ -152,6 +152,10 @@ pub async fn setup() {
             get(crate::domain::session::handlers::status_session),
         )
         .route(
+            "/session/{session_code}/export/{kind}/{format}",
+            get(crate::domain::session::export::export_session_data),
+        )
+        .route(
             "/events/{session_code}/check",
             get(crate::domain::event::handlers::check_event),
         )
