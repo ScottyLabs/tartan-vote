@@ -27,6 +27,13 @@ The backend is the link between the frontend and the database.
 # Copy the .env.example into a .env
 cp .env.example .env
 
+# Start Better Auth service in a separate terminal
+cd auth-service
+bun install
+bun x auth@latest migrate --config ./auth.mjs
+bun run dev
+cd ..
+
 # To start the backend, first navigate with
 cd backend
 

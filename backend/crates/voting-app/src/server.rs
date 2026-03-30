@@ -1,14 +1,8 @@
-use axum::{Router, middleware, response::IntoResponse, routing::get};
-use axum_oidc::{EmptyAdditionalClaims, OidcAuthLayer, OidcLoginLayer, error::MiddlewareError};
-use http::{HeaderValue, Method, Uri, header};
+use axum::{Router, middleware, routing::get};
+use http::{HeaderValue, Method, header};
 use migration::{Migrator, MigratorTrait};
 use sea_orm::Database;
-use tower::ServiceBuilder;
 use tower_http::cors::CorsLayer;
-use tower_sessions::{
-    Expiry, SessionManagerLayer,
-    cookie::{SameSite, time::Duration},
-};
 use voting_app_store::Store;
 
 use crate::{AppState, config::Config};
@@ -28,53 +22,21 @@ pub async fn setup() {
     let store = Store::new(db.clone());
     let app_state = AppState { db, store, config };
 
-    let session_layer = SessionManagerLayer::new(tower_sessions::MemoryStore::default())
-        .with_secure(false)
-        .with_same_site(SameSite::Lax)
-        .with_expiry(Expiry::OnInactivity(Duration::hours(24)));
-
-    let oidc_auth_layer = OidcAuthLayer::<EmptyAdditionalClaims>::discover_client(
-        Uri::try_from(app_state.config.app_base_url.clone()).expect("valid APP_BASE_URL"),
-        app_state.config.oidc_issuer.clone(),
-        app_state.config.oidc_client_id.clone(),
-        Some(app_state.config.oidc_client_secret.clone()),
-        vec![
-            "openid".to_string(),
-            "email".to_string(),
-            "profile".to_string(),
-        ],
-    )
-    .await
-    .expect("failed to discover OIDC provider");
-
-    let oidc_login_service = ServiceBuilder::new()
-        .layer(axum::error_handling::HandleErrorLayer::new(
-            |err: MiddlewareError| async move {
-                tracing::error!("OIDC login error: {:?}", err);
-                err.into_response()
-            },
-        ))
-        .layer(OidcLoginLayer::<EmptyAdditionalClaims>::new());
-
-    let oidc_auth_service = ServiceBuilder::new()
-        .layer(axum::error_handling::HandleErrorLayer::new(
-            |err: MiddlewareError| async move {
-                tracing::error!("OIDC auth error: {:?}", err);
-                err.into_response()
-            },
-        ))
-        .layer(oidc_auth_layer);
-
     let bind_addr = app_state.config.bind_addr.clone();
 
-    let cors_layer = CorsLayer::new()
-        .allow_origin(
-            app_state
-                .config
-                .frontend_base_url
+    let allowed_origins = app_state
+        .config
+        .cors_allowed_origins
+        .iter()
+        .map(|origin| {
+            origin
                 .parse::<HeaderValue>()
-                .expect("valid frontend URL"),
-        )
+                .expect("valid CORS_ALLOWED_ORIGINS entry")
+        })
+        .collect::<Vec<_>>();
+
+    let cors_layer = CorsLayer::new()
+        .allow_origin(allowed_origins)
         .allow_methods([
             Method::GET,
             Method::POST,
@@ -85,18 +47,14 @@ pub async fn setup() {
         .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION, header::ACCEPT])
         .allow_credentials(true);
 
-    let protected_auth_router = Router::new()
+    let api_router = Router::new()
+        .route("/", get(crate::domain::auth::handlers::demo_home)) // demo only
+        .route("/auth/login", get(crate::domain::auth::handlers::login))
         .route(
             "/auth/callback",
             get(crate::domain::auth::handlers::callback),
         )
         .route("/auth/logout", get(crate::domain::auth::handlers::logout))
-        .layer(oidc_login_service.clone());
-
-    let api_router = Router::new()
-        .route("/", get(crate::domain::auth::handlers::demo_home)) // demo only
-        .route("/auth/login", get(crate::domain::auth::handlers::login))
-        .merge(protected_auth_router)
         .route(
             "/auth/status",
             get(crate::domain::auth::handlers::auth_status),
@@ -168,8 +126,6 @@ pub async fn setup() {
             app_state.clone(),
             crate::core::auth::middleware::sync_user_middleware,
         ))
-        .layer(oidc_auth_service)
-        .layer(session_layer)
         .layer(cors_layer)
         .with_state(app_state);
 

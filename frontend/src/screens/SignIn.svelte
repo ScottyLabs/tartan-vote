@@ -1,5 +1,6 @@
 <script lang="ts">
     import { onMount } from "svelte";
+    import { authClient } from "../lib/auth-client";
     import logo from "../lib/images/logoplaceholder.png";
 
     type Props = {
@@ -8,22 +9,14 @@
 
     let { onNext }: Props = $props();
 
-    const API_BASE = import.meta.env.VITE_API_BASE || "";
+    const BETTER_AUTH_PROVIDER_ID =
+        import.meta.env.VITE_BETTER_AUTH_PROVIDER_ID || "cmu-sso";
 
     onMount(() => {
         void (async () => {
             try {
-                const response = await fetch(`${API_BASE}/auth/status`, {
-                    cache: "no-store",
-                    credentials: "include",
-                });
-
-                if (!response.ok) {
-                    return;
-                }
-
-                const status: { logged_in: boolean } = await response.json();
-                if (status.logged_in) {
+                const { data } = await authClient.getSession();
+                if (data?.user) {
                     onNext();
                 }
             } catch (error) {}
@@ -31,8 +24,10 @@
     });
 
     async function handleClick() {
-        const redirectUri = encodeURIComponent(window.location.origin);
-        window.location.href = `${API_BASE}/auth/login?redirect_uri=${redirectUri}`;
+        await authClient.signIn.oauth2({
+            providerId: BETTER_AUTH_PROVIDER_ID,
+            callbackURL: window.location.origin,
+        });
     }
 </script>
 

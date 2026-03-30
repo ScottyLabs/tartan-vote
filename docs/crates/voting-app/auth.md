@@ -1,62 +1,70 @@
 # Auth
 
-This is a quick guide to the auth files in `backend/crates/voting-app/src`, which mirrors [Terrier](https://github.com/ScottyLabs/terrier-old/):
+The backend now integrates with Better Auth via cookie-based session lookups instead of `axum-oidc` middleware.
 
-- `OidcAuthLayer` loads auth/session claims.
-- `OidcLoginLayer` requires login on selected routes.
-- User sync middleware maps OIDC identity to a local DB user.
-- Handlers serve login/callback/logout/status routes.
+## Overview
 
-## `src/server.rs`
+- Better Auth runs as a standalone Node service in `auth-service/`.
+- Better Auth config is exported from `auth-service/auth.mjs` (used by runtime and CLI migrations).
+- `auth-service/server.mjs` only boots the HTTP server and mounts handlers.
+- OAuth callback reuses existing backend route `{APP_BASE_URL}/auth/callback`, which then redirects to Better Auth callback endpoint.
+- Frontend signs users in through Better Auth client APIs.
+- Backend reads Better Auth session via `GET {BETTER_AUTH_BASE_URL}/get-session` using incoming cookies.
+- Backend syncs/creates local `user` records and exposes them as `SyncedUser` for domain handlers.
 
-Builds the server, middleware stack, and routes.
+## Better Auth database tables
 
-1. Loads config from env.
-2. Connects to DB.
-3. Runs migrations at startup.
-4. Creates the session layer (`tower-sessions` memory store).
-5. Discovers OIDC provider and creates `OidcAuthLayer`.
-6. Creates:
-   - `oidc_auth_service` (token/session validation)
-   - `oidc_login_service` (forces login redirects)
-7. Builds routers:
-   - Protected auth router (`/auth/callback`, `/auth/logout`)
-   - Public routes (`/`, `/auth/login`, `/auth/status`, `/health`)
-8. Starts the server.
+To avoid conflicts with existing app tables, Better Auth uses dedicated model/table names:
 
-- `OidcAuthLayer` is global.
-- `OidcLoginLayer` is only on protected routes.
-- `sync_user_middleware` runs on protected routes.
+- `auth_user`
+- `auth_session`
+- `auth_account`
+- `auth_verification`
 
-## `src/core/auth/middleware.rs`
+Apply/update these tables with:
 
-Syncs authenticated OIDC users into local DB users.
+```bash
+cd auth-service
+bun x auth@latest migrate --config ./auth.mjs
+```
 
-- `SyncedUser(pub Arc<user::Model>)`
-  - Request extension for the local user model.
-  - Supports required and optional extractors.
+## Backend flow
 
-- `sync_user_middleware(...)`
-  - Reads `OidcClaims`.
-  - Finds user by `user.name == oidc_sub`.
-  - Creates user if missing.
-  - Inserts `SyncedUser` into request extensions.
+### `src/core/auth/middleware.rs`
 
-## `src/domain/auth/handlers.rs`
+- Reads the request `Cookie` header.
+- Calls Better Auth `get-session` endpoint.
+- Extracts Better Auth user identity.
+- Finds/creates local DB user (`user.oidc_subject` stores Better Auth user id).
+- Inserts `SyncedUser` in request extensions.
 
-Auth handlers for these endpoints:
+### `src/domain/auth/handlers.rs`
 
-- `GET /auth/login`
-  - Starts login.
-  - Redirects to `/auth/callback`.
+- `GET /auth/status`: returns auth state derived from optional `SyncedUser`.
+- `GET /auth/callback`: bridges OIDC callback query params to Better Auth callback path (`{BETTER_AUTH_BASE_URL}/oauth2/callback/{provider}`).
+- `GET /auth/login`, `/auth/logout`: legacy compatibility redirects to frontend.
 
-- `GET /auth/callback`
-  - Authenticated callback route.
-  - Redirects to validated `redirect_uri` or `APP_BASE_URL`.
+### `src/server.rs`
 
-- `GET /auth/logout`
-  - Uses `OidcRpInitiatedLogout`.
-  - Sets post-logout redirect to `APP_BASE_URL`.
+- Removes OIDC/session-layer setup.
+- Keeps CORS and auth sync middleware globally.
+- Keeps existing API routes unchanged.
 
-- `GET /auth/status`
-  - Returns JSON auth state.
+## Required env vars
+
+- `BETTER_AUTH_BASE_URL` (backend to Better Auth API base; e.g. `http://localhost:3005/api/auth`)
+- `BETTER_AUTH_URL` (Better Auth service public base URL; e.g. `http://localhost:3005`)
+- `BETTER_AUTH_SECRET` (high-entropy secret used for signing/encryption)
+- `CORS_ALLOWED_ORIGINS` (comma-separated allowlist applied to backend CORS and auth-service CORS/trustedOrigins)
+- `VITE_BETTER_AUTH_BASE_URL` (frontend Better Auth API base)
+- `BETTER_AUTH_PROVIDER_ID` and `VITE_BETTER_AUTH_PROVIDER_ID`
+- Existing `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` are still used by `auth-service` to configure OAuth provider.
+- `OIDC_REDIRECT_URI` is optional. By default auth-service uses `{APP_BASE_URL}/auth/callback` to match existing allowed callbacks.
+
+## Troubleshooting
+
+- Error: `Invalid parameter: redirect_uri`
+	- Cause: the redirect URI sent to OIDC is not in the IdP client's allowed redirect URI list.
+- Default redirect URI sent to OIDC: `{APP_BASE_URL}/auth/callback` (e.g. `http://localhost:8080/auth/callback`).
+- That backend callback bridges to Better Auth callback internally.
+- Fix: ensure `{APP_BASE_URL}/auth/callback` is allowlisted on the IdP client, or set `OIDC_REDIRECT_URI` to an already-allowlisted URI.

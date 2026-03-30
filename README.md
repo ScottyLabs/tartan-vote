@@ -6,6 +6,7 @@ Poodle is a CMU Undergraduate Senate-commissioned, ScottyLabs-developed voting a
 - Svelte
 - Rust
 - PostgreSQL
+- Better Auth
 
 ## Assumptions about the reader
 Hello, reader! For the remainder of this README, and other documentation, we will assume that you are a developer or contributor, using WSL or a Unix development system, and have some familiarity with the command line. If you need any help, you are free to contact one of the codeowners found in .github/CODEOWNERS, or join the [discord](https://go.scottylabs.org/discord).
@@ -28,6 +29,15 @@ Install Bun, Cargo, and Docker (see links above).
 ```bash
 # Copy the .env.example
 $ cp .env.example .env
+
+# Install auth service dependencies
+auth-service $ bun install
+
+# Run Better Auth migrations (first run / after auth schema changes)
+auth-service $ bun x auth@latest migrate --config ./auth.mjs
+
+# Start Better Auth service (in a separate terminal)
+auth-service $ bun run dev
 
 # Start Docker
 backend $ docker compose up -d

@@ -1,5 +1,6 @@
 <script lang="ts">
     import { onMount } from "svelte";
+    import { authClient } from "../lib/auth-client";
 
     let {
         toVoter,
@@ -24,20 +25,30 @@
     let joining = $state<boolean>(false);
 
     const API_BASE = import.meta.env.VITE_API_BASE || "";
+    const BETTER_AUTH_PROVIDER_ID =
+        import.meta.env.VITE_BETTER_AUTH_PROVIDER_ID || "cmu-sso";
 
     onMount(() => {
         void (async () => {
             try {
-                const response = await fetch(`${API_BASE}/auth/status`, {
-                    cache: "no-store",
-                    credentials: "include",
-                });
-
-                if (!response.ok) {
-                    throw new Error(`Auth status failed: ${response.status}`);
+                const { data } = await authClient.getSession();
+                if (data?.user) {
+                    authStatus = {
+                        logged_in: true,
+                        user_id: -1,
+                        user_name: data.user.name ?? "Unknown User",
+                        user_andrew_id: data.user.email ?? "",
+                        oidc_subject: data.user.id,
+                    };
+                } else {
+                    authStatus = {
+                        logged_in: false,
+                        user_id: -1,
+                        user_name: "",
+                        user_andrew_id: "",
+                        oidc_subject: null,
+                    };
                 }
-
-                authStatus = await response.json();
             } catch (error) {
                 authStatusError = "Unable to load auth status.";
             }
@@ -62,9 +73,11 @@
         toVoter(sessionCode);
     }
 
-    function handleSignInClick() {
-        const redirectUri = encodeURIComponent(window.location.origin);
-        window.location.href = `${API_BASE}/auth/login?redirect_uri=${redirectUri}`;
+    async function handleSignInClick() {
+        await authClient.signIn.oauth2({
+            providerId: BETTER_AUTH_PROVIDER_ID,
+            callbackURL: window.location.origin,
+        });
     }
 
     async function handleCreateSessionClick() {

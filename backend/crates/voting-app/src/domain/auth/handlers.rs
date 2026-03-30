@@ -1,20 +1,12 @@
 use axum::{
     Json,
-    extract::{Query, State},
+    extract::{RawQuery, State},
     response::{Html, IntoResponse, Redirect},
 };
-use axum_oidc::{EmptyAdditionalClaims, OidcClaims, OidcRpInitiatedLogout};
-use http::Uri;
-use serde::{Deserialize, Serialize};
-use tower_sessions::Session;
+use serde::Serialize;
 
 use crate::AppState;
 use crate::core::auth::middleware::SyncedUser;
-
-#[derive(Debug, Deserialize)]
-pub struct LoginQuery {
-    pub redirect_uri: Option<String>,
-}
 
 #[derive(Debug, Serialize)]
 pub struct AuthStatusResponse {
@@ -24,59 +16,34 @@ pub struct AuthStatusResponse {
     pub user_andrew_id: Option<String>,
 }
 
-pub async fn login(
-    State(state): State<AppState>,
-    Query(params): Query<LoginQuery>,
-    session: Session,
-) -> impl IntoResponse {
-    let callback = format!(
-        "{}/auth/callback",
-        state.config.app_base_url.trim_end_matches('/')
-    );
-
-    if let Some(redirect_uri) = params.redirect_uri {
-        session
-            .insert("post_login_redirect", redirect_uri)
-            .await
-            .ok();
-    }
-
-    Redirect::to(&callback)
+pub async fn login(State(state): State<AppState>) -> impl IntoResponse {
+    Redirect::to(&state.config.frontend_base_url)
 }
 
 pub async fn callback(
-    _claims: OidcClaims<EmptyAdditionalClaims>,
-    _user: SyncedUser,
     State(state): State<AppState>,
-    session: Session,
+    RawQuery(raw_query): RawQuery,
 ) -> impl IntoResponse {
-    let redirect_to = session
-        .remove::<String>("post_login_redirect")
-        .await
-        .ok()
-        .flatten()
-        .unwrap_or_else(|| state.config.frontend_base_url.clone());
+    if let Some(query) = raw_query {
+        let target = format!(
+            "{}/oauth2/callback/{}?{}",
+            state.config.better_auth_base_url.trim_end_matches('/'),
+            state.config.better_auth_provider_id,
+            query
+        );
+        return Redirect::to(&target);
+    }
 
-    Redirect::to(&redirect_to)
+    Redirect::to(&state.config.frontend_base_url)
 }
 
-pub async fn logout(
-    logout: OidcRpInitiatedLogout,
-    State(state): State<AppState>,
-) -> impl IntoResponse {
-    logout
-        .with_post_logout_redirect(
-            Uri::from_maybe_shared(state.config.app_base_url.clone()).expect("valid APP_BASE_URL"),
-        )
-        .into_response()
+pub async fn logout(State(state): State<AppState>) -> impl IntoResponse {
+    Redirect::to(&state.config.frontend_base_url)
 }
 
-pub async fn auth_status(
-    claims: Option<OidcClaims<EmptyAdditionalClaims>>,
-    user: Option<SyncedUser>,
-) -> impl IntoResponse {
+pub async fn auth_status(user: Option<SyncedUser>) -> impl IntoResponse {
     let payload = AuthStatusResponse {
-        logged_in: claims.is_some(),
+        logged_in: user.is_some(),
         user_id: user.clone().map(|u| u.0.id),
         user_name: user.clone().map(|u| u.0.name.clone()),
         user_andrew_id: user.map(|u| u.0.andrew_id.clone()),
