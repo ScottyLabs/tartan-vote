@@ -388,6 +388,7 @@ pub async fn ret_vote_csv_with_db(db: &DatabaseConnection, session_code: &str) -
 }
 
 pub async fn export_session_data(
+    _user: SyncedUser,
     State(state): State<AppState>,
     Path((session_code, kind, format)): Path<(String, String, String)>,
 ) -> impl IntoResponse {

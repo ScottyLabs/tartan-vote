@@ -1,4 +1,5 @@
 use crate::AppState;
+use crate::core::auth::middleware::SyncedUser;
 use axum::{
     Json,
     extract::{Path, State},
@@ -44,6 +45,7 @@ pub async fn get_attendance(
 
 #[axum::debug_handler]
 pub async fn attendance(
+    _user: SyncedUser,
     State(state): State<AppState>,
     Path(session_code): Path<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
