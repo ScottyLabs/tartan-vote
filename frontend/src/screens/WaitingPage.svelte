@@ -3,9 +3,11 @@
 
     let {
         sessionCode,
+        notice,
         onEventFound,
     }: {
         sessionCode: string | null;
+        notice: string | null;
         onEventFound: (event: {
             id: number;
             name: string;
@@ -61,14 +63,16 @@
                 }
 
                 const voteInstances: VoteInstance[] = await voteInstancesResponse.json();
-                const hasRemainingVote = voteInstances.some((instance) => !instance.has_voted);
+                const proxyAllowed = payload.active_event.data?.proxy === true;
+                const hasRemainingVote = voteInstances.some(
+                    (instance) => !instance.has_voted && (proxyAllowed || !instance.is_proxy),
+                );
 
                 if (hasRemainingVote) {
                     onEventFound(payload.active_event);
                 }
             }
         } catch (error) {
-            console.error(error);
         }
     }
 
@@ -90,6 +94,9 @@
 <main>
     <h1>Waiting for Host to Start a Motion...</h1>
     <h2>Session Code: {sessionCode}</h2>
+    {#if notice}
+        <p class="notice">{notice}</p>
+    {/if}
     <div
         class="spinner"
         style="width: 40px; height: 40px; border-top-color: #FF3B3F;"
@@ -97,6 +104,26 @@
 </main>
 
 <style>
+    h1 {
+        color: var(--colors-primary);
+        margin-bottom: 0.5rem;
+    }
+
+    h2 {
+        color: var(--colors-text);
+        margin: 0.5rem 0 1rem 0;
+    }
+
+    .notice {
+        background: #e7f3ff;
+        border: 1px solid #b9dbff;
+        color: #123a66;
+        padding: 10px 12px;
+        border-radius: 6px;
+        margin: 0.5rem 0 1rem;
+        max-width: 680px;
+    }
+
     .spinner {
         border: 3px solid #ddd;
         border-radius: 50%;

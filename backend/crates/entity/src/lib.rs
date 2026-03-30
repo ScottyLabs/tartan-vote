@@ -10,4 +10,3 @@ pub mod session;
 pub mod user;
 pub mod user_session;
 pub mod vote;
-pub mod voter;

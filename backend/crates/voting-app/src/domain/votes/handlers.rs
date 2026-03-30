@@ -7,8 +7,8 @@ use axum::{
     response::IntoResponse,
 };
 use chrono::Utc;
-use entity::enums::StatusOption;
-use entity::{prelude::User, prelude::Vote, prelude::Voter, vote, voter};
+use entity::enums::{JoinLeft, StatusOption};
+use entity::{prelude::User, prelude::UserSession, prelude::Vote, user_session, vote};
 use sea_orm::ActiveValue::Set;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter};
 use serde::{Deserialize, Serialize};
@@ -113,17 +113,24 @@ fn compute_motion_totals(vote_records: &[VoteExportRecord], threshold: f64) -> M
     let mut reject = 0u32;
     let mut abstain = 0u32;
 
+    let classify_motion_vote = |value: &str| match value.trim().to_ascii_lowercase().as_str() {
+        "pass" | "yes" | "yay" | "approve" | "approved" | "for" => Some("pass"),
+        "reject" | "no" | "nay" | "deny" | "denied" | "against" => Some("reject"),
+        "abstain" | "abstained" | "abstention" => Some("abstain"),
+        _ => None,
+    };
+
     for record in vote_records {
         let response = record
             .vote_response
             .first()
-            .map(|value| value.to_ascii_lowercase())
+            .map(|value| value.to_string())
             .unwrap_or_default();
 
-        match response.as_str() {
-            "pass" => pass += 1,
-            "reject" => reject += 1,
-            "abstain" => abstain += 1,
+        match classify_motion_vote(&response) {
+            Some("pass") => pass += 1,
+            Some("reject") => reject += 1,
+            Some("abstain") => abstain += 1,
             _ => {}
         }
     }
@@ -186,9 +193,9 @@ fn compute_election_totals(
 }
 
 fn select_voter_instance(
-    voter_instances: &[voter::Model],
+    voter_instances: &[user_session::Model],
     requested_instance_id: Option<i32>,
-) -> Result<voter::Model, &'static str> {
+) -> Result<user_session::Model, &'static str> {
     if let Some(requested_id) = requested_instance_id {
         voter_instances
             .iter()
@@ -239,9 +246,10 @@ pub async fn cast_vote(
             .into_response();
     }
 
-    let voter_instances = match Voter::find()
-        .filter(voter::Column::EventId.eq(event_id))
-        .filter(voter::Column::VoterId.eq(user.0.id))
+    let voter_instances = match UserSession::find()
+        .filter(user_session::Column::SessionId.eq(event.session_id))
+        .filter(user_session::Column::UserId.eq(user.0.id))
+        .filter(user_session::Column::JoinLeft.eq(JoinLeft::Joined))
         .all(store.db())
         .await
     {
@@ -308,7 +316,11 @@ pub async fn cast_vote(
             .into_response();
     }
 
-    match store.votes().find_by_id(selected_voter.id).await {
+    match store
+        .votes()
+        .find_by_event_and_user_session(event.id, selected_voter.id)
+        .await
+    {
         Ok(Some(_)) => {
             return (
                 StatusCode::CONFLICT,
@@ -327,23 +339,26 @@ pub async fn cast_vote(
     }
 
     let new_vote = vote::ActiveModel {
-        id: Set(selected_voter.id),
+        event_id: Set(event.id),
+        user_session_id: Set(selected_voter.id),
         cast_time: Set(Utc::now().into()),
         data: Set(json!({
             "vote_type": vote_type,
             "proxy": selected_voter.proxy.is_some(),
             "proxy_for_user_id": parse_proxy_for_user_id(&selected_voter.proxy),
+            "proxy_for": selected_voter.proxy,
             "vote_response": body.vote_response,
         })),
         ..Default::default()
     };
 
     match store.votes().create(new_vote).await {
-        Ok(_) => (
+        Ok(created_vote) => (
             StatusCode::CREATED,
             Json(json!({
                 "message": "Vote cast successfully",
-                "voter_instance_id": selected_voter.id
+                "voter_instance_id": selected_voter.id,
+                "vote_id": created_vote.id
             })),
         )
             .into_response(),
@@ -404,8 +419,8 @@ pub async fn get_motion_results(
     }
 
     let votes = match Vote::find()
-        .find_also_related(voter::Entity)
-        .filter(voter::Column::EventId.eq(event_id))
+        .find_also_related(user_session::Entity)
+        .filter(vote::Column::EventId.eq(event_id))
         .all(store.db())
         .await
     {
@@ -431,8 +446,8 @@ pub async fn get_motion_results(
         .unwrap_or_default();
     let mut export_records = Vec::new();
 
-    for (vote, related_voter) in votes {
-        let Some(related_voter) = related_voter else {
+    for (vote, related_user_session) in votes {
+        let Some(related_user_session) = related_user_session else {
             continue;
         };
 
@@ -449,12 +464,12 @@ pub async fn get_motion_results(
             .unwrap_or_default();
 
         export_records.push(VoteExportRecord {
-            voter_instance_id: related_voter.id,
+            voter_instance_id: related_user_session.id,
             cast_time: vote.cast_time.to_rfc3339(),
-            voter_user_id: related_voter.voter_id,
+            voter_user_id: related_user_session.user_id,
             voter_name: None,
-            is_proxy: related_voter.proxy.is_some(),
-            proxied_senator_user_id: parse_proxy_for_user_id(&related_voter.proxy),
+            is_proxy: related_user_session.proxy.is_some(),
+            proxied_senator_user_id: parse_proxy_for_user_id(&related_user_session.proxy),
             proxied_senator_name: None,
             vote_response,
         });
@@ -519,14 +534,14 @@ pub async fn assign_proxy(
             .into_response();
     }
 
-    let holder_existing_proxy = match Voter::find()
-        .filter(voter::Column::EventId.eq(event_id))
-        .filter(voter::Column::VoterId.eq(body.proxy_holder_user_id))
-        .filter(voter::Column::Proxy.is_not_null())
+    let proxy_holder = match UserSession::find()
+        .filter(user_session::Column::SessionId.eq(event.session_id))
+        .filter(user_session::Column::UserId.eq(body.proxy_holder_user_id))
+        .filter(user_session::Column::JoinLeft.eq(JoinLeft::Joined))
         .one(store.db())
         .await
     {
-        Ok(proxy) => proxy,
+        Ok(user_session) => user_session,
         Err(_) => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -536,7 +551,15 @@ pub async fn assign_proxy(
         }
     };
 
-    if holder_existing_proxy.is_some() {
+    let Some(proxy_holder) = proxy_holder else {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "Proxy holder must be in the session"})),
+        )
+            .into_response();
+    };
+
+    if proxy_holder.proxy.is_some() {
         return (
             StatusCode::CONFLICT,
             Json(json!({"error": "One participant may hold at most one proxy"})),
@@ -545,9 +568,10 @@ pub async fn assign_proxy(
     }
 
     let proxied_marker = body.proxied_senator_user_id.to_string();
-    let already_proxied = match Voter::find()
-        .filter(voter::Column::EventId.eq(event_id))
-        .filter(voter::Column::Proxy.eq(proxied_marker.clone()))
+    let proxied_participant = match UserSession::find()
+        .filter(user_session::Column::SessionId.eq(event.session_id))
+        .filter(user_session::Column::UserId.eq(body.proxied_senator_user_id))
+        .filter(user_session::Column::JoinLeft.eq(JoinLeft::Joined))
         .one(store.db())
         .await
     {
@@ -561,7 +585,34 @@ pub async fn assign_proxy(
         }
     };
 
-    if already_proxied.is_some() {
+    if proxied_participant.is_none() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "Proxied participant must be in the session"})),
+        )
+            .into_response();
+    }
+
+    let already_proxied = match UserSession::find()
+        .filter(user_session::Column::SessionId.eq(event.session_id))
+        .filter(user_session::Column::JoinLeft.eq(JoinLeft::Joined))
+        .filter(user_session::Column::Proxy.eq(proxied_marker.clone()))
+        .one(store.db())
+        .await
+    {
+        Ok(proxy) => proxy,
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Database error"})),
+            )
+                .into_response();
+        }
+    };
+
+    if let Some(existing) = already_proxied
+        && existing.user_id != body.proxy_holder_user_id
+    {
         return (
             StatusCode::CONFLICT,
             Json(json!({"error": "This senator already has a proxy assignment"})),
@@ -569,18 +620,14 @@ pub async fn assign_proxy(
             .into_response();
     }
 
-    let proxy_instance = voter::ActiveModel {
-        event_id: Set(event_id),
-        voter_id: Set(body.proxy_holder_user_id),
-        proxy: Set(Some(proxied_marker)),
-        ..Default::default()
-    };
+    let mut holder_model: user_session::ActiveModel = proxy_holder.into();
+    holder_model.proxy = Set(Some(proxied_marker));
 
-    match proxy_instance.insert(store.db()).await {
-        Ok(created) => (
+    match holder_model.update(store.db()).await {
+        Ok(updated) => (
             StatusCode::CREATED,
             Json(json!(AssignProxyResponse {
-                voter_instance_id: created.id,
+                voter_instance_id: updated.id,
                 proxy_holder_user_id: body.proxy_holder_user_id,
                 proxied_senator_user_id: body.proxied_senator_user_id,
             })),
@@ -627,9 +674,10 @@ pub async fn list_proxy_assignments(
             .into_response();
     }
 
-    let proxy_voters = match Voter::find()
-        .filter(voter::Column::EventId.eq(event_id))
-        .filter(voter::Column::Proxy.is_not_null())
+    let proxy_voters = match UserSession::find()
+        .filter(user_session::Column::SessionId.eq(event.session_id))
+        .filter(user_session::Column::JoinLeft.eq(JoinLeft::Joined))
+        .filter(user_session::Column::Proxy.is_not_null())
         .all(store.db())
         .await
     {
@@ -652,8 +700,8 @@ pub async fn list_proxy_assignments(
 
         assignments.push(ProxyAssignment {
             voter_instance_id: instance.id,
-            proxy_holder_user_id: instance.voter_id,
-            proxy_holder_name: user_name_by_id(store, instance.voter_id).await,
+            proxy_holder_user_id: instance.user_id,
+            proxy_holder_name: user_name_by_id(store, instance.user_id).await,
             proxied_senator_user_id,
             proxied_senator_name: user_name_by_id(store, proxied_senator_user_id).await,
         });
@@ -684,9 +732,28 @@ pub async fn get_vote_instances(
             .into_response();
     }
 
-    let voter_instances = match Voter::find()
-        .filter(voter::Column::EventId.eq(event_id))
-        .filter(voter::Column::VoterId.eq(user.0.id))
+    let event = match store.events().find_by_id(event_id).await {
+        Ok(Some(event)) => event,
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({"error": "Event not found"})),
+            )
+                .into_response();
+        }
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Database error"})),
+            )
+                .into_response();
+        }
+    };
+
+    let voter_instances = match UserSession::find()
+        .filter(user_session::Column::SessionId.eq(event.session_id))
+        .filter(user_session::Column::UserId.eq(user.0.id))
+        .filter(user_session::Column::JoinLeft.eq(JoinLeft::Joined))
         .all(store.db())
         .await
     {
@@ -705,7 +772,7 @@ pub async fn get_vote_instances(
         let proxy_for_user_id = parse_proxy_for_user_id(&instance.proxy);
         let has_voted = store
             .votes()
-            .find_by_id(instance.id)
+            .find_by_event_and_user_session(event.id, instance.id)
             .await
             .ok()
             .flatten()
@@ -716,8 +783,10 @@ pub async fn get_vote_instances(
             is_proxy: instance.proxy.is_some(),
             proxy_for_user_id,
             proxy_for_name: match proxy_for_user_id {
-                Some(proxy_for_id) => user_name_by_id(store, proxy_for_id).await,
-                None => None,
+                Some(proxy_for_id) => user_name_by_id(store, proxy_for_id)
+                    .await
+                    .or_else(|| instance.proxy.clone()),
+                None => instance.proxy.clone(),
             },
             has_voted,
         });
@@ -760,8 +829,8 @@ pub async fn export_event_results(
     }
 
     let vote_rows = match Vote::find()
-        .find_also_related(voter::Entity)
-        .filter(voter::Column::EventId.eq(event_id))
+        .find_also_related(user_session::Entity)
+        .filter(vote::Column::EventId.eq(event_id))
         .all(store.db())
         .await
     {
@@ -778,16 +847,16 @@ pub async fn export_event_results(
     let mut user_name_cache: HashMap<i32, Option<String>> = HashMap::new();
     let mut votes = Vec::new();
 
-    for (vote_row, related_voter) in vote_rows {
-        let Some(voter_row) = related_voter else {
+    for (vote_row, related_user_session) in vote_rows {
+        let Some(voter_row) = related_user_session else {
             continue;
         };
 
-        let voter_name = if let Some(cached) = user_name_cache.get(&voter_row.voter_id) {
+        let voter_name = if let Some(cached) = user_name_cache.get(&voter_row.user_id) {
             cached.clone()
         } else {
-            let name = user_name_by_id(store, voter_row.voter_id).await;
-            user_name_cache.insert(voter_row.voter_id, name.clone());
+            let name = user_name_by_id(store, voter_row.user_id).await;
+            user_name_cache.insert(voter_row.user_id, name.clone());
             name
         };
 
@@ -819,7 +888,7 @@ pub async fn export_event_results(
         votes.push(VoteExportRecord {
             voter_instance_id: voter_row.id,
             cast_time: vote_row.cast_time.to_rfc3339(),
-            voter_user_id: voter_row.voter_id,
+            voter_user_id: voter_row.user_id,
             voter_name,
             is_proxy: voter_row.proxy.is_some(),
             proxied_senator_user_id,
@@ -863,6 +932,8 @@ pub async fn export_event_results(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::FixedOffset;
+    use entity::enums::JoinLeft;
 
     fn build_vote_record(response: &str) -> VoteExportRecord {
         VoteExportRecord {
@@ -919,12 +990,30 @@ mod tests {
     }
 
     #[test]
+    fn compute_motion_totals_counts_yes_no_labels() {
+        let vote_records = vec![
+            build_vote_record("Yes"),
+            build_vote_record("No"),
+            build_vote_record("Abstain"),
+        ];
+
+        let totals = compute_motion_totals(&vote_records, 0.5);
+
+        assert_eq!(totals.pass, 1);
+        assert_eq!(totals.reject, 1);
+        assert_eq!(totals.abstain, 1);
+        assert_eq!(totals.total, 3);
+    }
+
+    #[test]
     fn select_voter_instance_returns_single_instance_without_id() {
-        let voters = vec![voter::Model {
+        let voters = vec![user_session::Model {
             id: 11,
-            event_id: 1,
-            voter_id: 22,
+            user_id: 22,
+            session_id: 1,
             proxy: None,
+            join_left: JoinLeft::Joined,
+            timestamp: Utc::now().with_timezone(&FixedOffset::east_opt(0).unwrap()),
         }];
 
         let selected = select_voter_instance(&voters, None).expect("instance should be selected");
@@ -934,17 +1023,21 @@ mod tests {
     #[test]
     fn select_voter_instance_requires_id_for_multiple_instances() {
         let voters = vec![
-            voter::Model {
+            user_session::Model {
                 id: 11,
-                event_id: 1,
-                voter_id: 22,
+                user_id: 22,
+                session_id: 1,
                 proxy: None,
+                join_left: JoinLeft::Joined,
+                timestamp: Utc::now().with_timezone(&FixedOffset::east_opt(0).unwrap()),
             },
-            voter::Model {
+            user_session::Model {
                 id: 12,
-                event_id: 1,
-                voter_id: 22,
+                user_id: 22,
+                session_id: 1,
                 proxy: Some("33".to_string()),
+                join_left: JoinLeft::Joined,
+                timestamp: Utc::now().with_timezone(&FixedOffset::east_opt(0).unwrap()),
             },
         ];
 
@@ -958,17 +1051,21 @@ mod tests {
     #[test]
     fn select_voter_instance_picks_requested_instance() {
         let voters = vec![
-            voter::Model {
+            user_session::Model {
                 id: 11,
-                event_id: 1,
-                voter_id: 22,
+                user_id: 22,
+                session_id: 1,
                 proxy: None,
+                join_left: JoinLeft::Joined,
+                timestamp: Utc::now().with_timezone(&FixedOffset::east_opt(0).unwrap()),
             },
-            voter::Model {
+            user_session::Model {
                 id: 12,
-                event_id: 1,
-                voter_id: 22,
+                user_id: 22,
+                session_id: 1,
                 proxy: Some("33".to_string()),
+                join_left: JoinLeft::Joined,
+                timestamp: Utc::now().with_timezone(&FixedOffset::east_opt(0).unwrap()),
             },
         ];
 

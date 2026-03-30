@@ -3,9 +3,11 @@ use crate::core::auth::middleware::SyncedUser;
 use axum::{Json, extract::Path, extract::State, http::StatusCode, response::IntoResponse};
 use chrono::{FixedOffset, Utc};
 use entity::enums::{EventType, StatusOption};
-use entity::{event, voter};
+use entity::{event, user_session};
 use sea_orm::ActiveValue::Set;
-use sea_orm::{ActiveModelTrait, IntoActiveModel, TransactionTrait};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, TransactionTrait,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashSet;
@@ -34,19 +36,6 @@ pub struct CreateEventResponse {
 struct ProxyAssignmentInput {
     proxy_holder_user_id: i32,
     proxied_senator_user_id: i32,
-}
-
-fn parse_user_ids(value: Option<&serde_json::Value>) -> Vec<i32> {
-    value
-        .and_then(|v| v.as_array())
-        .map(|array| {
-            array
-                .iter()
-                .filter_map(|item| item.as_i64())
-                .filter_map(|id| i32::try_from(id).ok())
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default()
 }
 
 fn parse_proxy_assignments(value: Option<&serde_json::Value>) -> Vec<ProxyAssignmentInput> {
@@ -200,7 +189,6 @@ pub async fn create_event(
 
     event_data["session_code"] = json!(session_code);
 
-    let eligible_voter_user_ids = parse_user_ids(event_data.get("eligible_voter_user_ids"));
     let proxy_assignments = parse_proxy_assignments(event_data.get("proxy_assignments"));
 
     let event_model = event::ActiveModel {
@@ -237,42 +225,107 @@ pub async fn create_event(
         }
     };
 
-    let mut seeded_base_voters = HashSet::new();
-    for voter_id in eligible_voter_user_ids {
-        if seeded_base_voters.insert(voter_id) {
-            let base_voter = voter::ActiveModel {
-                event_id: Set(event.id),
-                voter_id: Set(voter_id),
-                proxy: Set(None),
-                ..Default::default()
-            };
-
-            if base_voter.insert(&txn).await.is_err() {
-                let _ = txn.rollback().await;
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(json!({"error": "Failed to seed voters for event"})),
-                )
-                    .into_response();
-            }
-        }
-    }
-
     let proxy_enabled = event.data["proxy"].as_bool().unwrap_or(false);
     if let Err(message) = validate_proxy_assignments(proxy_enabled, &proxy_assignments) {
         let _ = txn.rollback().await;
         return (StatusCode::BAD_REQUEST, Json(json!({"error": message}))).into_response();
     }
 
+    let mut seen_proxy_targets = HashSet::new();
+
     for assignment in proxy_assignments {
-        let proxy_voter = voter::ActiveModel {
-            event_id: Set(event.id),
-            voter_id: Set(assignment.proxy_holder_user_id),
-            proxy: Set(Some(assignment.proxied_senator_user_id.to_string())),
-            ..Default::default()
+        let holder = match entity::prelude::UserSession::find()
+            .filter(user_session::Column::SessionId.eq(session.id))
+            .filter(user_session::Column::UserId.eq(assignment.proxy_holder_user_id))
+            .one(&txn)
+            .await
+        {
+            Ok(Some(holder)) => holder,
+            Ok(None) => {
+                let _ = txn.rollback().await;
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({"error": "Proxy holder must be in the session"})),
+                )
+                    .into_response();
+            }
+            Err(_) => {
+                let _ = txn.rollback().await;
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({"error": "Database error"})),
+                )
+                    .into_response();
+            }
         };
 
-        if proxy_voter.insert(&txn).await.is_err() {
+        let proxied = match entity::prelude::UserSession::find()
+            .filter(user_session::Column::SessionId.eq(session.id))
+            .filter(user_session::Column::UserId.eq(assignment.proxied_senator_user_id))
+            .one(&txn)
+            .await
+        {
+            Ok(Some(proxied)) => proxied,
+            Ok(None) => {
+                let _ = txn.rollback().await;
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({"error": "Proxied participant must be in the session"})),
+                )
+                    .into_response();
+            }
+            Err(_) => {
+                let _ = txn.rollback().await;
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({"error": "Database error"})),
+                )
+                    .into_response();
+            }
+        };
+
+        let proxied_marker = proxied.user_id.to_string();
+        if !seen_proxy_targets.insert(proxied_marker.clone()) {
+            let _ = txn.rollback().await;
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": "A senator may only be proxied once per event"})),
+            )
+                .into_response();
+        }
+
+        let existing_target = match entity::prelude::UserSession::find()
+            .filter(user_session::Column::SessionId.eq(session.id))
+            .filter(user_session::Column::Proxy.eq(proxied_marker.clone()))
+            .one(&txn)
+            .await
+        {
+            Ok(existing) => existing,
+            Err(_) => {
+                let _ = txn.rollback().await;
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({"error": "Database error"})),
+                )
+                    .into_response();
+            }
+        };
+
+        if let Some(existing) = existing_target
+            && existing.user_id != holder.user_id
+        {
+            let _ = txn.rollback().await;
+            return (
+                StatusCode::CONFLICT,
+                Json(json!({"error": "A senator may only be proxied once per event"})),
+            )
+                .into_response();
+        }
+
+        let mut holder_model: user_session::ActiveModel = holder.into();
+        holder_model.proxy = Set(Some(proxied_marker));
+
+        if holder_model.update(&txn).await.is_err() {
             let _ = txn.rollback().await;
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -312,13 +365,6 @@ mod tests {
             proxy_holder_user_id: holder,
             proxied_senator_user_id: proxied,
         }
-    }
-
-    #[test]
-    fn parse_user_ids_reads_numeric_ids_only() {
-        let input = json!([1, 2, "3", null, 4]);
-        let parsed = parse_user_ids(Some(&input));
-        assert_eq!(parsed, vec![1, 2, 4]);
     }
 
     #[test]

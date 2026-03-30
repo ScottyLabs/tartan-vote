@@ -46,7 +46,6 @@
 
             onEnd();
         } catch (e) {
-            console.error(e);
             error = `Unable to end ${eventLabel.toLowerCase()}. Please try again.`;
         } finally {
             ending = false;
@@ -66,10 +65,11 @@
                 <div><strong>Status:</strong> Live</div>
             </div>
 
-            {#if eventLabel === "Motion"}
-                <hr />
-                <MotionLiveResults eventId={event.id} />
-            {/if}
+            <hr />
+            <MotionLiveResults
+                eventId={event.id}
+                eventType={event.event_type}
+            />
 
             <div class="row">
                 <button class="btn" onclick={onBack} disabled={ending}>

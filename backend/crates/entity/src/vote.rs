@@ -5,8 +5,10 @@ use sea_orm::entity::prelude::*;
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
 #[sea_orm(table_name = "vote")]
 pub struct Model {
-    #[sea_orm(primary_key, auto_increment = false)]
+    #[sea_orm(primary_key)]
     pub id: i32,
+    pub event_id: i32,
+    pub user_session_id: i32,
     pub cast_time: DateTimeWithTimeZone,
     #[sea_orm(column_type = "JsonBinary")]
     pub data: Json,
@@ -15,18 +17,32 @@ pub struct Model {
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
     #[sea_orm(
-        belongs_to = "super::voter::Entity",
-        from = "Column::Id",
-        to = "super::voter::Column::Id",
+        belongs_to = "super::event::Entity",
+        from = "Column::EventId",
+        to = "super::event::Column::Id",
         on_update = "NoAction",
         on_delete = "Cascade"
     )]
-    Voter,
+    Event,
+    #[sea_orm(
+        belongs_to = "super::user_session::Entity",
+        from = "Column::UserSessionId",
+        to = "super::user_session::Column::Id",
+        on_update = "NoAction",
+        on_delete = "Cascade"
+    )]
+    UserSession,
 }
 
-impl Related<super::voter::Entity> for Entity {
+impl Related<super::event::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::Voter.def()
+        Relation::Event.def()
+    }
+}
+
+impl Related<super::user_session::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::UserSession.def()
     }
 }
 

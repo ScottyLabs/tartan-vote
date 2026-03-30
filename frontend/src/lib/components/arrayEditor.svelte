@@ -2,9 +2,7 @@
     let { title = "List", items = $bindable([]) } = $props();
 
     function addItem() {
-        console.log("addItem called", items);
         items = [...items, ""];
-        console.log("after push", items);
     }
 
     function removeItem(i: number) {

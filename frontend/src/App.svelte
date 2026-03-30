@@ -8,6 +8,7 @@
     import ResultsAdmin from "./screens/ResultsAdmin.svelte";
     import ResultsVoter from "./screens/ResultsVoter.svelte";
     import MotionRunningAdmin from "./screens/MotionRunningAdmin.svelte";
+    import ProxySetup from "./screens/ProxySetup.svelte";
     import { Event } from "./lib/models/Event";
     import { User } from "./lib/models/User";
 
@@ -34,6 +35,7 @@
     } | null>(null);
     let createSessionPayload = $state<string | null>(null);
     let globalSessionCode = $state<string | null>(null);
+    let waitingNotice = $state<string | null>(null);
 
     let bgDark = getComputedStyle(document.documentElement)
         .getPropertyValue("--colors-backgroundDark")
@@ -70,16 +72,29 @@
 {:else if screen === "join"}
     <div transition:slide>
         <Home
-            toVoter={(sessionCode: string) => { globalSessionCode = sessionCode; screen = "waiting"}}
+            toVoter={(sessionCode: string) => { globalSessionCode = sessionCode; screen = "proxySetup"}}
             toAdmin={(sessionCode: string) => { createSessionPayload = sessionCode; screen = "SessionCreation"}}
+        />
+    </div>
+{:else if screen === "proxySetup"}
+    <div transition:slide>
+        <ProxySetup
+            sessionCode={globalSessionCode}
+            onBack={() => (screen = "join")}
+            onNext={(notice: string | null) => {
+                waitingNotice = notice;
+                screen = "waiting";
+            }}
         />
     </div>
 {:else if screen === "waiting"}
     <div transition:slide>
         <WaitingPage
             sessionCode={globalSessionCode}
+            notice={waitingNotice}
             onEventFound={(event: ActiveEvent) => {
                 currentEvent = event;
+                waitingNotice = null;
                 screen = "votingMotion";
             }}
         />
@@ -89,6 +104,7 @@
         <VotingMotion
             event={currentEvent}
             user={currentUser}
+            sessionCode={globalSessionCode}
             onNext={(destination: "results" | "session") => {
                 if (destination === "results") {
                     screen = "ResultsVoter";
@@ -96,6 +112,7 @@
                 }
 
                 currentEvent = null;
+                waitingNotice = null;
                 screen = "waiting";
             }}
         />
@@ -144,8 +161,17 @@
         <ResultsVoter
             event={currentEvent}
             user={currentUser}
-            onNext={() => {
+            sessionCode={globalSessionCode}
+            onNext={(destination: "session" | "join") => {
                 currentEvent = null;
+                waitingNotice = null;
+
+                if (destination === "join") {
+                    globalSessionCode = null;
+                    screen = "join";
+                    return;
+                }
+
                 screen = "waiting";
             }}
         />

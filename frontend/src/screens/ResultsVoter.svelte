@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount } from "svelte";
+    import { onDestroy, onMount } from "svelte";
     import { User } from "../lib/models/User";
 
     type ActiveEvent = {
@@ -12,11 +12,13 @@
     let {
         event,
         user,
+        sessionCode,
         onNext,
     }: {
         event: ActiveEvent | null;
         user: User | null;
-        onNext: () => void;
+        sessionCode: string | null;
+        onNext: (destination: "session" | "join") => void;
     } = $props();
 
     type MotionResults = {
@@ -47,22 +49,67 @@
     let heading = $state("Results");
     let summary = $state("");
     let barColor = $state("#ffa500");
+    let sessionPollId: number | null = null;
+    let resultsPollId: number | null = null;
+    let leavingResults = $state(false);
 
     function handleClick() {
-        onNext();
+        onNext("session");
     }
 
     onMount(() => {
         void loadResults();
+        resultsPollId = window.setInterval(() => {
+            void loadResults(false);
+        }, 3000);
+        sessionPollId = window.setInterval(() => {
+            void checkSessionStatus();
+        }, 3000);
     });
 
-    async function loadResults() {
+    onDestroy(() => {
+        if (resultsPollId !== null) {
+            window.clearInterval(resultsPollId);
+            resultsPollId = null;
+        }
+
+        if (sessionPollId !== null) {
+            window.clearInterval(sessionPollId);
+            sessionPollId = null;
+        }
+    });
+
+    async function checkSessionStatus() {
+        if (!sessionCode || leavingResults) return;
+
+        try {
+            const response = await fetch(`${API_BASE}/session/${sessionCode}/status`, {
+                cache: "no-store",
+                credentials: "include",
+            });
+
+            if (!response.ok) {
+                return;
+            }
+
+            const payload: { session_ended: boolean } = await response.json();
+            if (payload.session_ended) {
+                leavingResults = true;
+                onNext("join");
+            }
+        } catch {
+        }
+    }
+
+    async function loadResults(showLoading = true) {
         if (!event) {
             error = "No event selected.";
             return;
         }
 
-        loading = true;
+        if (showLoading) {
+            loading = true;
+        }
         error = null;
 
         try {
@@ -117,10 +164,11 @@
                 summary = "Motion is tied.";
             }
         } catch (e) {
-            console.error(e);
             error = "Unable to load results right now.";
         } finally {
-            loading = false;
+            if (showLoading) {
+                loading = false;
+            }
         }
     }
 </script>

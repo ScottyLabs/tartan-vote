@@ -31,6 +31,7 @@ impl MigrationTrait for Migration {
                     )
                     .col(ColumnDef::new(UserSession::UserId).integer().not_null())
                     .col(ColumnDef::new(UserSession::SessionId).integer().not_null())
+                    .col(ColumnDef::new(UserSession::Proxy).string())
                     .col(
                         ColumnDef::new(UserSession::JoinLeft)
                             .custom(JoinLeft::Enum)
@@ -77,6 +78,7 @@ pub enum UserSession {
     Id,
     UserId,
     SessionId,
+    Proxy,
     JoinLeft,
     Timestamp,
 }

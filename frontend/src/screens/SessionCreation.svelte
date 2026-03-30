@@ -7,7 +7,6 @@
     import ArrayEditor from "../lib/components/arrayEditor.svelte";
     import TimeScroller from "../lib/components/timeScroller.svelte";
     import HoverCard from "../lib/components/hoverCard.svelte";
-    import { User } from "../lib/models/User";
 
     type CreatedEvent = {
         id: number;
@@ -33,7 +32,17 @@
             id: number;
             name: string;
             andrew_id: string;
+            is_proxy_holder: boolean;
+            proxy_for: string[];
         }>;
+    };
+
+    type Participant = {
+        id: number;
+        name: string;
+        andrew_id: string;
+        is_proxy_holder: boolean;
+        proxy_for: string[];
     };
 
     function eventDraft_new(vote_type: "motion" | "election") {
@@ -75,7 +84,10 @@
         onNext?.();
     }
 
-    let users: User[] = $state([]);
+    let users: Participant[] = $state([]);
+    let proxyHolders = $derived(
+        users.filter((user) => user.is_proxy_holder && user.proxy_for.length > 0),
+    );
 
     let electionStyleOptions: string[] = [
         "Plurality Election",
@@ -127,7 +139,7 @@
     // Popup Booleans
     let creatingMotion = $state(false);
     let creatingElection = $state(false);
-    let inspectingUser = $state<User | null>(null);
+    let inspectingUser = $state<Participant | null>(null);
     let inspectingAllUsers = $state(false);
     let timerEnded = $state(false);
     let endingMeeting = $state(false);
@@ -165,7 +177,7 @@
         endMeetingError = null;
     }
 
-    function inspectUser(user: User) {
+    function inspectUser(user: Participant) {
         inspectingUser = user;
     }
 
@@ -265,19 +277,15 @@
             }
 
             const payload: AttendanceResponse = await response.json();
-            users = payload.attendees.map(
-                (attendee) =>
-                    new User({
-                        id: attendee.id,
-                        name: attendee.name,
-                        andrew_id: attendee.andrew_id,
-                        oidc_client: "",
-                        created_at: "",
-                    }),
-            );
+            users = payload.attendees.map((attendee) => ({
+                id: attendee.id,
+                name: attendee.name,
+                andrew_id: attendee.andrew_id,
+                is_proxy_holder: attendee.is_proxy_holder,
+                proxy_for: attendee.proxy_for,
+            }));
             participantsError = null;
         } catch (error) {
-            console.error(error);
             participantsError = "Unable to refresh participants right now.";
         } finally {
             loadingParticipants = false;
@@ -315,7 +323,6 @@
             anchor.click();
             URL.revokeObjectURL(url);
         } catch (error) {
-            console.error(error);
         }
     }
 
@@ -362,11 +369,9 @@
             if (!response.ok) throw new Error(`Failed: ${response.status}`);
             const event: CreatedEvent = await response.json();
             latestEventId = event.id;
-            console.log("Event created:", event);
             onPopupClose();
             onEventStarted?.(event);
         } catch (error) {
-            console.error(error);
         }
     }
 
@@ -389,7 +394,6 @@
             onPopupClose();
             goNext();
         } catch (error) {
-            console.error(error);
             endMeetingError = "Unable to end meeting. Please try again.";
         } finally {
             endingMeeting = false;
@@ -452,6 +456,11 @@
                         <div>Name: {user.name}</div>
                         <div>UserID: {user.id}</div>
                         <div>Time Created: {user.id}</div>
+                        <div>
+                            Proxy: {user.is_proxy_holder
+                                ? `Yes (${user.proxy_for.join(", ")})`
+                                : "No"}
+                        </div>
                     </div>
                 </HoverCard>
             </div>
@@ -636,7 +645,11 @@
                                 <div class="col">
                                     <div>Name: {user.name}</div>
                                     <div>UserID: {user.id}</div>
-                                    <div>Time Created: {user.created_at}</div>
+                                    <div>
+                                        Proxy: {user.is_proxy_holder
+                                            ? `Yes (${user.proxy_for.join(", ")})`
+                                            : "No"}
+                                    </div>
                                 </div>
                             </HoverCard>
                         </div>
@@ -653,6 +666,22 @@
         {#if participantsError}
             <p class="error">{participantsError}</p>
         {/if}
+        <div class="proxy-overview">
+            <h1>Active Proxies</h1>
+            {#if proxyHolders.length === 0}
+                <p class="proxy-overview-empty">No active proxies in this session.</p>
+            {:else}
+                <div class="proxy-overview-list">
+                    {#each proxyHolders as holder}
+                        <div class="proxy-overview-item">
+                            <strong>{holder.name}</strong>
+                            <span>(ID: {holder.id})</span>
+                            <span>→ {holder.proxy_for.join(", ")}</span>
+                        </div>
+                    {/each}
+                </div>
+            {/if}
+        </div>
         <hr />
         <div class="row" style="margin-bottom: 0em">
             <button onclick={pushMotion} class="btn">Push a Motion</button>
@@ -767,6 +796,39 @@
         color: #666;
         font-size: 0.9rem;
     }
+
+    .proxy-overview {
+        margin-top: 0.75em;
+        border: 2px solid #ccc;
+        border-radius: 8px;
+        padding: 0.75rem;
+        background: #f8f8f8;
+        text-align: left;
+    }
+
+    .proxy-overview h1 {
+        margin: 0 0 0.5em 0;
+        font-size: 1.25rem;
+    }
+
+    .proxy-overview-empty {
+        margin: 0;
+        color: #666;
+    }
+
+    .proxy-overview-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+    }
+
+    .proxy-overview-item {
+        display: flex;
+        gap: 0.4rem;
+        flex-wrap: wrap;
+        align-items: baseline;
+    }
+
     .container {
         border: 2px solid #ccc;
         padding: 8px;

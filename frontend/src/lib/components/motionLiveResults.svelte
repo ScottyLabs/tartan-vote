@@ -1,7 +1,13 @@
 <script lang="ts">
     import { onDestroy, onMount } from "svelte";
 
-    let { eventId = 0 }: { eventId: number } = $props();
+    let {
+        eventId = 0,
+        eventType = "motion",
+    }: {
+        eventId: number;
+        eventType: string;
+    } = $props();
 
     const API_BASE = import.meta.env.VITE_API_BASE || "";
 
@@ -14,9 +20,20 @@
         passed: boolean;
     };
 
+    type ElectionResults = {
+        vote_type: "election";
+        total: number;
+        options: Array<{
+            label: string;
+            count: number;
+            percent: number;
+        }>;
+    };
+
     let pollError = $state<string | null>(null);
     let loadingResults = $state(false);
     let motionResults = $state<MotionResults | null>(null);
+    let electionResults = $state<ElectionResults | null>(null);
     let pollId: number | null = null;
 
     function pct(value: number, total: number) {
@@ -24,7 +41,7 @@
         return Math.round((value / total) * 100);
     }
 
-    async function loadMotionResults() {
+    async function loadResults() {
         loadingResults = true;
 
         try {
@@ -42,20 +59,25 @@
                 throw new Error(`Failed to get results: ${response.status}`);
             }
 
-            motionResults = await response.json();
+            if (eventType.toLowerCase() === "election") {
+                electionResults = await response.json();
+                motionResults = null;
+            } else {
+                motionResults = await response.json();
+                electionResults = null;
+            }
             pollError = null;
         } catch (error) {
-            console.error(error);
-            pollError = "Unable to refresh motion results right now.";
+            pollError = "Unable to refresh live results right now.";
         } finally {
             loadingResults = false;
         }
     }
 
     onMount(() => {
-        void loadMotionResults();
+        void loadResults();
         pollId = window.setInterval(() => {
-            void loadMotionResults();
+            void loadResults();
         }, 3000);
     });
 
@@ -87,6 +109,17 @@
             <div class="resultRow total">
                 <span>Total</span>
                 <span>{motionResults.total}</span>
+            </div>
+        {:else if electionResults}
+            {#each electionResults.options as option}
+                <div class="resultRow">
+                    <span>{option.label}</span>
+                    <span>{option.count} ({option.percent}%)</span>
+                </div>
+            {/each}
+            <div class="resultRow total">
+                <span>Total</span>
+                <span>{electionResults.total}</span>
             </div>
         {:else if loadingResults}
             <p>Loading live results...</p>

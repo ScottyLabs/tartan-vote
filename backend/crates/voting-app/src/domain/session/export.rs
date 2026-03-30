@@ -7,6 +7,7 @@ use axum::{
     http::{HeaderValue, StatusCode, header},
     response::IntoResponse,
 };
+use entity::enums::JoinLeft;
 use entity::event;
 use entity::session::{self, Entity as Session};
 use genpdf::elements::FrameCellDecorator;
@@ -14,6 +15,7 @@ use sea_orm::{
     ColumnTrait, DatabaseConnection, DbBackend, EntityTrait, FromQueryResult, QueryFilter,
     QueryOrder, Statement,
 };
+use std::collections::HashMap;
 use voting_app_store::Store;
 
 #[cfg(test)]
@@ -106,6 +108,12 @@ pub struct SessionEventsExportResponse {
     pub events: Vec<SessionEventExportItem>,
 }
 
+#[derive(Debug, Clone)]
+struct AttendanceRow {
+    user: entity::user::Model,
+    proxy_for: Vec<String>,
+}
+
 async fn get_vote_counts(
     session_code: &str,
     db: &DatabaseConnection,
@@ -121,8 +129,7 @@ async fn get_vote_counts(
         r#"
         SELECT vote.data->'vote_response'->>0 AS option, COUNT(*) AS count
         FROM vote
-        JOIN voter ON vote.id = voter.id
-        JOIN event ON voter.event_id = event.id
+        JOIN event ON vote.event_id = event.id
         WHERE event.session_id = $1
         GROUP BY vote.data->'vote_response'->>0
         "#,
@@ -164,10 +171,23 @@ fn load_font_family() -> genpdf::fonts::FontFamily<genpdf::fonts::FontData> {
     }
 }
 
-fn build_attendance_csv(users: &[entity::user::Model]) -> Vec<u8> {
-    let mut csv = String::from("User ID,Name,Andrew ID\n");
-    for user in users {
-        csv.push_str(&format!("{},{},{}\n", user.id, user.name, user.andrew_id));
+fn build_attendance_csv(rows: &[AttendanceRow]) -> Vec<u8> {
+    let mut csv = String::from("User ID,Name,Andrew ID,Is Proxy Holder,Proxy For\n");
+    for row in rows {
+        let proxy_for = if row.proxy_for.is_empty() {
+            String::new()
+        } else {
+            row.proxy_for.join("; ")
+        };
+
+        csv.push_str(&format!(
+            "{},{},{},{},{}\n",
+            row.user.id,
+            row.user.name,
+            row.user.andrew_id,
+            !row.proxy_for.is_empty(),
+            proxy_for
+        ));
     }
     csv.into_bytes()
 }
@@ -182,7 +202,7 @@ fn build_vote_csv(counts: &[(String, i64)]) -> Vec<u8> {
     csv.into_bytes()
 }
 
-fn build_attendance_pdf(session_code: &str, users: &[entity::user::Model]) -> Vec<u8> {
+fn build_attendance_pdf(session_code: &str, rows: &[AttendanceRow]) -> Vec<u8> {
     let mut doc = genpdf::Document::new(load_font_family());
     doc.set_title(format!("Session Attendance: {}", session_code));
     let mut decorator = genpdf::SimplePageDecorator::new();
@@ -195,12 +215,12 @@ fn build_attendance_pdf(session_code: &str, users: &[entity::user::Model]) -> Ve
     )));
     doc.push(genpdf::elements::Paragraph::new(format!(
         "Total Attendees: {}",
-        users.len()
+        rows.len()
     )));
     doc.push(genpdf::elements::Break::new(1));
 
     doc.push(genpdf::elements::Paragraph::new("--- Attendance ---"));
-    let mut table = genpdf::elements::TableLayout::new(vec![1, 2, 2]);
+    let mut table = genpdf::elements::TableLayout::new(vec![1, 2, 2, 1, 3]);
     table.set_cell_decorator(FrameCellDecorator::new(true, true, false));
     let cell = |text: &str| {
         genpdf::elements::PaddedElement::new(
@@ -213,14 +233,22 @@ fn build_attendance_pdf(session_code: &str, users: &[entity::user::Model]) -> Ve
     header.push_element(cell("User ID"));
     header.push_element(cell("Name"));
     header.push_element(cell("Andrew ID"));
+    header.push_element(cell("Proxy Holder"));
+    header.push_element(cell("Proxy For"));
     header.push().expect("Failed to push header row");
 
-    for user in users {
-        let mut row = table.row();
-        row.push_element(cell(&user.id.to_string()));
-        row.push_element(cell(&user.name));
-        row.push_element(cell(&user.andrew_id));
-        row.push().expect("Failed to push row");
+    for attendance_row in rows {
+        let mut table_row = table.row();
+        table_row.push_element(cell(&attendance_row.user.id.to_string()));
+        table_row.push_element(cell(&attendance_row.user.name));
+        table_row.push_element(cell(&attendance_row.user.andrew_id));
+        table_row.push_element(cell(if attendance_row.proxy_for.is_empty() {
+            "No"
+        } else {
+            "Yes"
+        }));
+        table_row.push_element(cell(&attendance_row.proxy_for.join(", ")));
+        table_row.push().expect("Failed to push row");
     }
     doc.push(table);
 
@@ -287,18 +315,66 @@ fn build_vote_pdf(session_code: &str, counts: &[(String, i64)]) -> Vec<u8> {
     buf
 }
 
-pub async fn ret_attendance_pdf_with_store(store: &Store, session_code: &str) -> Vec<u8> {
-    let users = get_attendance(&store, session_code)
+async fn get_attendance_rows_with_store(store: &Store, session_code: &str) -> Vec<AttendanceRow> {
+    let users = get_attendance(store, session_code)
         .await
         .unwrap_or_default();
-    build_attendance_pdf(session_code, &users)
+
+    let Some(session) = store
+        .sessions()
+        .find_by_join_code(session_code.to_string())
+        .await
+        .ok()
+        .flatten()
+    else {
+        return users
+            .into_iter()
+            .map(|user| AttendanceRow {
+                user,
+                proxy_for: Vec::new(),
+            })
+            .collect();
+    };
+
+    let user_session_rows = store
+        .user_sessions()
+        .fetch_by_session_id(session.id)
+        .await
+        .unwrap_or_default();
+
+    let mut proxy_map: HashMap<i32, Vec<String>> = HashMap::new();
+    for session_row in user_session_rows {
+        if session_row.join_left != JoinLeft::Joined {
+            continue;
+        }
+
+        let Some(proxy_for) = session_row.proxy else {
+            continue;
+        };
+
+        proxy_map
+            .entry(session_row.user_id)
+            .or_default()
+            .push(proxy_for);
+    }
+
+    users
+        .into_iter()
+        .map(|user| AttendanceRow {
+            proxy_for: proxy_map.remove(&user.id).unwrap_or_default(),
+            user,
+        })
+        .collect()
+}
+
+pub async fn ret_attendance_pdf_with_store(store: &Store, session_code: &str) -> Vec<u8> {
+    let rows = get_attendance_rows_with_store(store, session_code).await;
+    build_attendance_pdf(session_code, &rows)
 }
 
 pub async fn ret_attendance_csv_with_store(store: &Store, session_code: &str) -> Vec<u8> {
-    let users = get_attendance(&store, session_code)
-        .await
-        .unwrap_or_default();
-    build_attendance_csv(&users)
+    let rows = get_attendance_rows_with_store(store, session_code).await;
+    build_attendance_csv(&rows)
 }
 
 pub async fn ret_vote_pdf_with_db(db: &DatabaseConnection, session_code: &str) -> Vec<u8> {
@@ -443,8 +519,7 @@ pub async fn export_session_events_json(
 
     for session_event in events {
         let vote_rows = match entity::prelude::Vote::find()
-            .find_also_related(entity::voter::Entity)
-            .filter(entity::voter::Column::EventId.eq(session_event.id))
+            .filter(entity::vote::Column::EventId.eq(session_event.id))
             .all(&state.db)
             .await
         {
@@ -477,7 +552,7 @@ pub async fn export_session_events_json(
 
         let mut total_votes = 0u32;
 
-        for (vote_row, _related_voter) in vote_rows {
+        for vote_row in vote_rows {
             let Some(selected_option) = vote_row
                 .data
                 .get("vote_response")
@@ -555,7 +630,7 @@ mod integration_tests {
     use super::*;
     use chrono::Utc;
     use entity::enums::{EventType, JoinLeft, SessionStatus, StatusOption};
-    use entity::{event, session, user, user_session, vote, voter};
+    use entity::{event, session, user, user_session, vote};
     use sea_orm::{ActiveModelTrait, ActiveValue::Set, Database, EntityTrait};
     use serde_json::json;
 
@@ -573,7 +648,7 @@ mod integration_tests {
             .one(db)
             .await
         {
-            // Deleting the creator user cascades: session → events → voters → votes, user_sessions
+            // Deleting the creator user cascades: session → events → votes, user_sessions
             let _ = entity::user::Entity::delete_by_id(s.created_by_user_id)
                 .exec(db)
                 .await;
@@ -661,11 +736,24 @@ mod integration_tests {
         .await
         .expect("Failed to insert user_session");
 
+        user_session::ActiveModel {
+            user_id: Set(user.id),
+            session_id: Set(sess.id),
+            join_left: Set(JoinLeft::Joined),
+            proxy: Set(Some("Proxy Target".to_string())),
+            timestamp: Set(Utc::now().fixed_offset()),
+            ..Default::default()
+        }
+        .insert(&db)
+        .await
+        .expect("Failed to insert proxy user_session");
+
         let bytes = ret_attendance_csv(code).await;
         let csv = String::from_utf8(bytes).unwrap();
-        assert!(csv.starts_with("User ID,Name,Andrew ID\n"));
+        assert!(csv.starts_with("User ID,Name,Andrew ID,Is Proxy Holder,Proxy For\n"));
         assert!(csv.contains(&user.id.to_string()));
         assert!(csv.contains("tbob"));
+        assert!(csv.contains("true,Proxy Target"));
 
         entity::user::Entity::delete_by_id(user.id)
             .exec(&db)
@@ -713,25 +801,35 @@ mod integration_tests {
         .expect("Failed to insert event")
     }
 
-    async fn insert_vote_for(db: &DatabaseConnection, event_id: i32, user_id: i32, response: &str) {
-        let v = voter::ActiveModel {
-            event_id: Set(event_id),
-            voter_id: Set(user_id),
+    async fn insert_vote_for(
+        db: &DatabaseConnection,
+        session_id: i32,
+        event_id: i32,
+        user_id: i32,
+        response: &str,
+    ) {
+        let user_session_row = user_session::ActiveModel {
+            user_id: Set(user_id),
+            session_id: Set(session_id),
             proxy: Set(None),
+            join_left: Set(JoinLeft::Joined),
+            timestamp: Set(Utc::now().fixed_offset()),
             ..Default::default()
         }
         .insert(db)
         .await
-        .expect("Failed to insert voter");
+        .expect("Failed to insert user_session");
 
         vote::ActiveModel {
-            id: Set(v.id),
+            event_id: Set(event_id),
+            user_session_id: Set(user_session_row.id),
             cast_time: Set(Utc::now().fixed_offset()),
             data: Set(json!({
                 "vote_type": "motion",
                 "proxy": false,
                 "vote_response": [response]
             })),
+            ..Default::default()
         }
         .insert(db)
         .await
@@ -750,7 +848,7 @@ mod integration_tests {
         let user = insert_user(&db, "Test Voter", "tvoter").await;
         let sess = insert_session(&db, code, user.id).await;
         let evt = insert_event(&db, sess.id, user.id).await;
-        insert_vote_for(&db, evt.id, user.id, "pass").await;
+        insert_vote_for(&db, sess.id, evt.id, user.id, "pass").await;
 
         let bytes = ret_vote_pdf(code).await;
         assert!(!bytes.is_empty());
@@ -778,7 +876,7 @@ mod integration_tests {
         let user = insert_user(&db, "Test Voter2", "tvoter2").await;
         let sess = insert_session(&db, code, user.id).await;
         let evt = insert_event(&db, sess.id, user.id).await;
-        insert_vote_for(&db, evt.id, user.id, "pass").await;
+        insert_vote_for(&db, sess.id, evt.id, user.id, "pass").await;
 
         let bytes = ret_vote_csv(code).await;
         let csv = String::from_utf8(bytes).unwrap();
@@ -810,7 +908,7 @@ mod integration_tests {
             for _ in 0..count {
                 i += 1;
                 let u = insert_user(&db, &format!("Voter{i}"), &format!("v{i}03")).await;
-                insert_vote_for(&db, evt.id, u.id, response).await;
+                insert_vote_for(&db, sess.id, evt.id, u.id, response).await;
                 all_users.push(u.id);
             }
         }
@@ -847,7 +945,7 @@ mod integration_tests {
             for _ in 0..count {
                 i += 1;
                 let u = insert_user(&db, &format!("Voter{i}"), &format!("v{i}04")).await;
-                insert_vote_for(&db, evt.id, u.id, response).await;
+                insert_vote_for(&db, sess.id, evt.id, u.id, response).await;
                 all_users.push(u.id);
             }
         }
@@ -906,7 +1004,7 @@ mod integration_tests {
 
         let bytes = ret_attendance_csv(code).await;
         let csv = String::from_utf8(bytes).unwrap();
-        assert!(csv.starts_with("User ID,Name,Andrew ID\n"));
+        assert!(csv.starts_with("User ID,Name,Andrew ID,Is Proxy Holder,Proxy For\n"));
         assert!(csv.contains("tbob"));
 
         entity::user::Entity::delete_by_id(user.id)
@@ -1003,7 +1101,7 @@ mod integration_tests {
             for _ in 0..count {
                 i += 1;
                 let u = insert_user(&db, &format!("Voter{i}"), &format!("v{i}05")).await;
-                insert_vote_for(&db, evt.id, u.id, response).await;
+                insert_vote_for(&db, sess.id, evt.id, u.id, response).await;
                 all_users.push(u.id);
             }
         }
@@ -1038,37 +1136,52 @@ mod tests {
         }
     }
 
+    fn mock_attendance_row(
+        id: i32,
+        name: &str,
+        andrew_id: &str,
+        proxy_for: Vec<&str>,
+    ) -> AttendanceRow {
+        AttendanceRow {
+            user: mock_user(id, name, andrew_id),
+            proxy_for: proxy_for.into_iter().map(str::to_string).collect(),
+        }
+    }
+
     // --- attendance CSV ---
 
     #[test]
     fn test_attendance_csv_header_only() {
         let bytes = build_attendance_csv(&[]);
         let csv = String::from_utf8(bytes).unwrap();
-        assert_eq!(csv, "User ID,Name,Andrew ID\n");
+        assert_eq!(csv, "User ID,Name,Andrew ID,Is Proxy Holder,Proxy For\n");
     }
 
     #[test]
     fn test_attendance_csv_single_user() {
-        let users = vec![mock_user(1, "Alice", "alice1")];
-        let bytes = build_attendance_csv(&users);
+        let rows = vec![mock_attendance_row(1, "Alice", "alice1", vec![])];
+        let bytes = build_attendance_csv(&rows);
         let csv = String::from_utf8(bytes).unwrap();
-        assert_eq!(csv, "User ID,Name,Andrew ID\n1,Alice,alice1\n");
+        assert_eq!(
+            csv,
+            "User ID,Name,Andrew ID,Is Proxy Holder,Proxy For\n1,Alice,alice1,false,\n"
+        );
     }
 
     #[test]
     fn test_attendance_csv_multiple_users() {
-        let users = vec![
-            mock_user(1, "Alice", "alice1"),
-            mock_user(2, "Bob", "bob2"),
-            mock_user(3, "Carol", "carol3"),
+        let rows = vec![
+            mock_attendance_row(1, "Alice", "alice1", vec![]),
+            mock_attendance_row(2, "Bob", "bob2", vec!["Senator Zed"]),
+            mock_attendance_row(3, "Carol", "carol3", vec![]),
         ];
-        let bytes = build_attendance_csv(&users);
+        let bytes = build_attendance_csv(&rows);
         let csv = String::from_utf8(bytes).unwrap();
         let lines: Vec<&str> = csv.lines().collect();
-        assert_eq!(lines[0], "User ID,Name,Andrew ID");
-        assert_eq!(lines[1], "1,Alice,alice1");
-        assert_eq!(lines[2], "2,Bob,bob2");
-        assert_eq!(lines[3], "3,Carol,carol3");
+        assert_eq!(lines[0], "User ID,Name,Andrew ID,Is Proxy Holder,Proxy For");
+        assert_eq!(lines[1], "1,Alice,alice1,false,");
+        assert_eq!(lines[2], "2,Bob,bob2,true,Senator Zed");
+        assert_eq!(lines[3], "3,Carol,carol3,false,");
         assert_eq!(lines.len(), 4);
     }
 
@@ -1118,8 +1231,11 @@ mod tests {
     #[test]
     #[ignore = "requires LiberationSans font files in ./fonts directory"]
     fn test_attendance_pdf_returns_bytes() {
-        let users = vec![mock_user(1, "Alice", "alice1"), mock_user(2, "Bob", "bob2")];
-        let bytes = build_attendance_pdf("ABC123", &users);
+        let rows = vec![
+            mock_attendance_row(1, "Alice", "alice1", vec![]),
+            mock_attendance_row(2, "Bob", "bob2", vec!["Senator A"]),
+        ];
+        let bytes = build_attendance_pdf("ABC123", &rows);
         assert!(!bytes.is_empty());
         assert_eq!(&bytes[..4], b"%PDF");
     }
@@ -1135,12 +1251,12 @@ mod tests {
     #[test]
     #[ignore = "preview only — writes pdf to /tmp and does not clean up"]
     fn test_attendance_pdf_preview() {
-        let users = vec![
-            mock_user(1, "Alice", "alice1"),
-            mock_user(2, "Bob", "bob2"),
-            mock_user(3, "Carol", "carol3"),
+        let rows = vec![
+            mock_attendance_row(1, "Alice", "alice1", vec![]),
+            mock_attendance_row(2, "Bob", "bob2", vec!["Senator A"]),
+            mock_attendance_row(3, "Carol", "carol3", vec!["Senator B", "Senator C"]),
         ];
-        let bytes = build_attendance_pdf("ABC123", &users);
+        let bytes = build_attendance_pdf("ABC123", &rows);
         std::fs::write("/tmp/test_attendance.pdf", &bytes).expect("Failed to write PDF");
     }
 

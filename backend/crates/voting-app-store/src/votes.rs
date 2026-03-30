@@ -14,6 +14,18 @@ impl<'a> VoteRepository<'a> {
         Vote::find_by_id(id).one(self.db).await
     }
 
+    pub async fn find_by_event_and_user_session(
+        &self,
+        event_id: i32,
+        user_session_id: i32,
+    ) -> Result<Option<vote::Model>, DbErr> {
+        Vote::find()
+            .filter(vote::Column::EventId.eq(event_id))
+            .filter(vote::Column::UserSessionId.eq(user_session_id))
+            .one(self.db)
+            .await
+    }
+
     pub async fn create(&self, vote: vote::ActiveModel) -> Result<vote::Model, DbErr> {
         vote.insert(self.db).await
     }

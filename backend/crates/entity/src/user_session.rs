@@ -10,6 +10,7 @@ pub struct Model {
     pub id: i32,
     pub user_id: i32,
     pub session_id: i32,
+    pub proxy: Option<String>,
     pub join_left: JoinLeft,
     pub timestamp: DateTimeWithTimeZone,
 }
@@ -32,6 +33,8 @@ pub enum Relation {
         on_delete = "Cascade"
     )]
     User,
+    #[sea_orm(has_many = "super::vote::Entity")]
+    Vote,
 }
 
 impl Related<super::session::Entity> for Entity {
@@ -43,6 +46,12 @@ impl Related<super::session::Entity> for Entity {
 impl Related<super::user::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::User.def()
+    }
+}
+
+impl Related<super::vote::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Vote.def()
     }
 }
 

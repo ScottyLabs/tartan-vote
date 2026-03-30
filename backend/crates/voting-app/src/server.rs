@@ -102,6 +102,10 @@ pub async fn setup() {
             get(crate::domain::session::handlers::join_session),
         )
         .route(
+            "/session/{session_code}/proxy",
+            axum::routing::post(crate::domain::session::handlers::set_session_proxy),
+        )
+        .route(
             "/session/{session_code}/end",
             axum::routing::get(crate::domain::session::handlers::end_session),
         )

@@ -13,12 +13,16 @@ The `vote.data` field stores the submitted voting payload for a single vote reco
 ```typescript
 type VoteData = {
   vote_type: string,
+  proxy: boolean,
+  proxy_for_user_id: number | null,
   vote_response: string[]
 }
 ```
 
 ### Field Descriptions
 - `vote_type`: Specifies the type of vote represented by this response. Examples include `"motion"` and `"election"`.
+- `proxy`: Whether this vote was cast as a proxy vote instance.
+- `proxy_for_user_id`: If `proxy` is true, this stores the proxied user's id; otherwise `null`.
 - `vote_response`: Stores the participant’s submitted response as an array.
   - For a standard motion, this array typically contains a single value.
   - For a ranked-choice election, this array stores the ranked selections in order of preference.
@@ -28,6 +32,8 @@ type VoteData = {
 ```json
 {
   "vote_type": "motion",
+  "proxy": false,
+  "proxy_for_user_id": null,
   "vote_response": ["choice1", "choice2"]
 }
 ```
