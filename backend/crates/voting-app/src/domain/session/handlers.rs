@@ -3,13 +3,13 @@ use crate::core::auth::middleware::SyncedUser;
 use axum::{Json, extract::Path, extract::State, http::StatusCode, response::IntoResponse};
 use entity::enums::{JoinLeft, SessionStatus};
 use entity::{session, user_session};
-use random_string::generate;
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter,
 };
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::json;
+use std::iter::repeat_with;
 
 #[derive(Serialize)]
 pub struct CreateSessionResponse {
@@ -45,8 +45,7 @@ pub struct SetSessionProxyResponse {
 pub async fn create_session(user: SyncedUser, State(state): State<AppState>) -> impl IntoResponse {
     let store = &state.store;
 
-    let charset = "ABCDEFGHIJKLMOPQRSTUVWXYZ0123456789";
-    let session_code = generate(6, charset);
+    let session_code = repeat_with(fastrand::uppercase).take(6).collect();
 
     // logic should be implemented to verify that the join code is actually unique
     // but as of right now this is low priority because 36^6 > 2 billion
