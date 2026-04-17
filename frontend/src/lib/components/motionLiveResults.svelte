@@ -166,7 +166,7 @@
     }
 
     .error {
-        color: #b00020;
+        color: var(--color-danger);
         margin: 0;
     }
 </style>

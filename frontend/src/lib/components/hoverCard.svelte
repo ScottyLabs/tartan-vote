@@ -17,8 +17,8 @@
         left: 60%;
         transform: translateX(-50%);
 
-        background: white;
-        border: 1px solid #ccc;
+        background: var(--color-surface);
+        border: 1px solid var(--color-border);
         border-radius: 6px;
         padding: 6px 6px;
 
@@ -37,6 +37,6 @@
 
         border-left: 6px solid transparent;
         border-right: 6px solid transparent;
-        border-bottom: 6px solid white;
+        border-bottom: 6px solid var(--color-surface);
     }
 </style>

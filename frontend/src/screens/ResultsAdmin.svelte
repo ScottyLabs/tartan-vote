@@ -6,16 +6,17 @@
     let percentYay: number = 60;
     let percentNay: number = 100 - percentYay - percentAbst;
 
-    let barColor = $derived("#ffa500");
-    let message = $derived(" resulted in a tie");
+    let barColor = $derived.by(() => {
+        if (percentNay < percentYay) return "var(--chart-positive)";
+        if (percentNay > percentYay) return "var(--chart-negative)";
+        return "var(--chart-warn)";
+    });
 
-    if (percentNay < percentYay) {
-        barColor = "#3fb991";
-        message = " is passed";
-    } else if (percentNay > percentYay) {
-        barColor = "#ff7563";
-        message = " is rejected";
-    }
+    let message = $derived.by(() => {
+        if (percentNay < percentYay) return " is passed";
+        if (percentNay > percentYay) return " is rejected";
+        return " resulted in a tie";
+    });
 
     let motion: string = $state("Motion description here");
 
@@ -23,11 +24,11 @@
         onNext();
     }
 
-    const bars = [
-        { label: "Pass", percent: percentYay, color: "#3fb991" },
-        { label: "Reject", percent: percentNay, color: "#ff7563" },
-        { label: "Abstain", percent: percentAbst, color: "#ffa500" },
-    ];
+    let bars = $derived([
+        { label: "Pass", percent: percentYay, color: "var(--chart-positive)" },
+        { label: "Reject", percent: percentNay, color: "var(--chart-negative)" },
+        { label: "Abstain", percent: percentAbst, color: "var(--chart-warn)" },
+    ]);
 </script>
 
 <main>
@@ -86,9 +87,9 @@
 
         padding: 2rem;
         border-radius: 12px;
-        background: #e0e0e0;
+        background: var(--color-surface);
 
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        box-shadow: var(--shadow-card);
         position: relative;
     }
 
@@ -101,7 +102,7 @@
     hr {
         width: 100%;
         border: none;
-        border-top: 1px solid black;
+        border-top: 1px solid var(--color-divider);
         margin: 0.5em 0;
     }
 
@@ -111,7 +112,7 @@
         border-left: 4px solid var(--colors-secondary);
         padding-left: 12px;
         margin: 0rem 0;
-        color: #555;
+        color: var(--color-text-secondary);
         font-style: italic;
     }
 
@@ -132,7 +133,7 @@
     .progress {
         flex: 1;
         height: 24px;
-        background: var(--colors-text);
+        background: var(--color-surface-raised);
         border-radius: 12px;
         overflow: hidden;
         position: relative;
@@ -145,7 +146,7 @@
         justify-content: flex-end;
         padding-right: 6px;
         font-weight: bold;
-        color: white;
+        color: var(--color-on-primary);
         transition: width 0.5s ease;
     }
 
@@ -169,7 +170,7 @@
 
     .btn {
         background-color: var(--colors-secondary);
-        color: black;
+        color: var(--color-text);
         border: none;
         border-radius: 4px;
         cursor: pointer;

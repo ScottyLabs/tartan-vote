@@ -48,7 +48,7 @@
     let totalVotes = $state(0);
     let heading = $state("Results");
     let summary = $state("");
-    let barColor = $state("#ffa500");
+    let barColor = $state("var(--chart-warn)");
     let sessionPollId: number | null = null;
     let resultsPollId: number | null = null;
     let leavingResults = $state(false);
@@ -130,14 +130,19 @@
                     label: option.label,
                     percent: option.percent,
                     count: option.count,
-                    color: ["#3fb991", "#4f8ef7", "#ffa500", "#ff7563"][index % 4],
+                    color: [
+                        "var(--chart-positive)",
+                        "var(--chart-info)",
+                        "var(--chart-warn)",
+                        "var(--chart-negative)",
+                    ][index % 4],
                 }));
 
                 const leading = payload.options.reduce((best, option) =>
                     option.count > best.count ? option : best
                 , payload.options[0] ?? { label: "No winner", count: 0, percent: 0 });
 
-                barColor = "#4f8ef7";
+                barColor = "var(--chart-info)";
                 summary = payload.total > 0
                     ? `${leading.label} is currently leading.`
                     : "No votes have been cast yet.";
@@ -148,19 +153,19 @@
             heading = "Motion Results";
             totalVotes = payload.total;
             bars = [
-                { label: "Pass", percent: payload.total > 0 ? Math.round((payload.pass / payload.total) * 100) : 0, color: "#3fb991", count: payload.pass },
-                { label: "Reject", percent: payload.total > 0 ? Math.round((payload.reject / payload.total) * 100) : 0, color: "#ff7563", count: payload.reject },
-                { label: "Abstain", percent: payload.total > 0 ? Math.round((payload.abstain / payload.total) * 100) : 0, color: "#ffa500", count: payload.abstain },
+                { label: "Pass", percent: payload.total > 0 ? Math.round((payload.pass / payload.total) * 100) : 0, color: "var(--chart-positive)", count: payload.pass },
+                { label: "Reject", percent: payload.total > 0 ? Math.round((payload.reject / payload.total) * 100) : 0, color: "var(--chart-negative)", count: payload.reject },
+                { label: "Abstain", percent: payload.total > 0 ? Math.round((payload.abstain / payload.total) * 100) : 0, color: "var(--chart-warn)", count: payload.abstain },
             ];
 
             if (payload.pass > payload.reject) {
-                barColor = "#3fb991";
+                barColor = "var(--chart-positive)";
                 summary = "Motion is passed.";
             } else if (payload.pass < payload.reject) {
-                barColor = "#ff7563";
+                barColor = "var(--chart-negative)";
                 summary = "Motion is rejected.";
             } else {
-                barColor = "#ffa500";
+                barColor = "var(--chart-warn)";
                 summary = "Motion is tied.";
             }
         } catch (e) {
@@ -234,9 +239,9 @@
 
         padding: 2rem;
         border-radius: 12px;
-        background: #e0e0e0;
+        background: var(--color-surface);
 
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        box-shadow: var(--shadow-card);
         position: relative;
     }
 
@@ -249,7 +254,7 @@
     hr {
         width: 100%;
         border: none;
-        border-top: 1px solid black;
+        border-top: 1px solid var(--color-divider);
         margin: 0.5em 0;
     }
 
@@ -259,7 +264,7 @@
         border-left: 4px solid var(--colors-secondary);
         padding-left: 12px;
         margin: 0rem 0;
-        color: #555;
+        color: var(--color-text-secondary);
         font-style: italic;
     }
 
@@ -280,7 +285,7 @@
     .progress {
         flex: 1;
         height: 24px;
-        background: var(--colors-text);
+        background: var(--color-surface-raised);
         border-radius: 12px;
         overflow: hidden;
         position: relative;
@@ -293,7 +298,7 @@
         justify-content: flex-end;
         padding-right: 6px;
         font-weight: bold;
-        color: white;
+        color: var(--color-on-primary);
         transition: width 0.5s ease;
     }
 
@@ -317,7 +322,7 @@
 
     .btn {
         background-color: var(--colors-secondary);
-        color: black;
+        color: var(--color-text);
         border: none;
         border-radius: 4px;
         cursor: pointer;

@@ -99,7 +99,7 @@
     {/if}
     <div
         class="spinner"
-        style="width: 40px; height: 40px; border-top-color: #FF3B3F;"
+        style="width: 40px; height: 40px; border-top-color: var(--colors-primary);"
     ></div>
 </main>
 
@@ -115,9 +115,9 @@
     }
 
     .notice {
-        background: #e7f3ff;
-        border: 1px solid #b9dbff;
-        color: #123a66;
+        background: var(--color-info-surface);
+        border: 1px solid var(--color-info-border);
+        color: var(--color-info-text);
         padding: 10px 12px;
         border-radius: 6px;
         margin: 0.5rem 0 1rem;
@@ -125,9 +125,9 @@
     }
 
     .spinner {
-        border: 3px solid #ddd;
+        border: 3px solid var(--color-border-subtle);
         border-radius: 50%;
-        border-top-color: #555;
+        border-top-color: var(--color-text-secondary);
         animation: spin 1s linear infinite;
         position: fixed;
         top: 20px;

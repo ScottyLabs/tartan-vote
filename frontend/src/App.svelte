@@ -36,33 +36,6 @@
     let createSessionPayload = $state<string | null>(null);
     let globalSessionCode = $state<string | null>(null);
     let waitingNotice = $state<string | null>(null);
-
-    let bgDark = getComputedStyle(document.documentElement)
-        .getPropertyValue("--colors-backgroundDark")
-        .trim();
-    let bgLight = getComputedStyle(document.documentElement)
-        .getPropertyValue("--colors-background")
-        .trim();
-
-    $effect(() => {
-        if (screen === "auth") {
-            document.body.style.backgroundColor = bgLight;
-        } else if (screen === "join") {
-            document.body.style.backgroundColor = bgLight;
-        } else if (screen === "voting") {
-            document.body.style.backgroundColor = bgDark;
-        } else if (screen === "votingMotion") {
-            document.body.style.backgroundColor = bgDark;
-        } else if (screen === "SessionCreation") {
-            document.body.style.backgroundColor = bgDark;
-        } else if (screen === "MotionRunningAdmin") {
-            document.body.style.backgroundColor = bgDark;
-        } else if (screen === "ResultsAdmin") {
-            document.body.style.backgroundColor = bgLight;
-        } else {
-            document.body.style.backgroundColor = bgLight;
-        }
-    });
 </script>
 
 {#if screen === "auth"}

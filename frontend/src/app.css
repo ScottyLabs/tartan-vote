@@ -3,31 +3,75 @@
   line-height: 1.5;
   font-weight: 400;
 
-  color-scheme: light dark;
-  color: #213547;
-  background-color: #ffffff;
+  color-scheme: light;
+  color: var(--color-text);
+  background-color: var(--color-page);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
-  --colors-primary: #ff3b3f;
-  --colors-secondary: #caebf2;
-  --colors-background: #efefef;
-  --colors-text: #a9a9a9;
-  --colors-backgroundDark: #252525;
-}
+  /* Brand (legacy names kept for existing components) */
+  --colors-primary: #e53935;
+  --colors-secondary: #d4eaf2;
 
+  /* Surfaces & layout */
+  --color-page: #eef1f5;
+  --colors-background: var(--color-page);
+  --color-surface: #ffffff;
+  --color-surface-muted: #f4f6f9;
+  --color-surface-raised: #e8ecf2;
+  --color-border: #c5ced9;
+  --color-border-subtle: #dde3eb;
+  --color-divider: #b0bac8;
+
+  /* Typography */
+  --color-text: #1a2332;
+  --color-text-secondary: #4a5568;
+  --color-text-muted: #6b7280;
+  --colors-text: var(--color-text-muted);
+
+  /* Primary “on” colors */
+  --color-on-primary: #ffffff;
+
+  /* Links */
+  --color-link: #c62828;
+  --color-link-hover: #8e0000;
+
+  /* Semantic */
+  --color-danger: #b00020;
+  --color-danger-hover: #8d001a;
+  --color-danger-surface: #fef2f3;
+  --color-danger-border: #f5c2c7;
+  --color-neutral: #5f6f82;
+  --color-neutral-hover: #4d5a6a;
+
+  /* Info / notice callouts */
+  --color-info-surface: #e8f1ff;
+  --color-info-border: #b8d4f0;
+  --color-info-text: #153a66;
+
+  /* Result charts (motion + election) */
+  --chart-positive: #2d9d78;
+  --chart-info: #3d7dd6;
+  --chart-warn: #e5912e;
+  --chart-negative: #e85d4c;
+
+  /* Deprecated: same as page — all screens use light mode */
+  --colors-backgroundDark: var(--color-page);
+
+  --shadow-card: 0 4px 24px rgba(22, 34, 48, 0.08);
+}
 
 a {
   font-weight: 500;
-  color: #646cff;
+  color: var(--color-link);
   text-decoration: inherit;
 }
 
 a:hover {
-  color: #535bf2;
+  color: var(--color-link-hover);
 }
 
 body {
@@ -36,6 +80,7 @@ body {
   place-items: center;
   min-width: 320px;
   min-height: 100vh;
+  background-color: var(--color-page);
 }
 
 h1 {
@@ -52,9 +97,9 @@ h1 {
 
   padding: 2rem;
   border-radius: 12px;
-  background: #e0e0e0;
+  background: var(--color-surface);
 
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-card);
 }
 
 #app {
@@ -71,16 +116,20 @@ button {
   font-size: 1em;
   font-weight: 500;
   font-family: inherit;
-  background-color: #1a1a1a;
+  background-color: var(--colors-primary);
+  color: var(--color-on-primary);
   cursor: pointer;
-  transition: border-color 0.25s;
+  transition:
+    background-color 0.2s,
+    border-color 0.2s;
 }
 
 button:hover {
-  border-color: #646cff;
+  background-color: color-mix(in srgb, var(--colors-primary), black 12%);
 }
 
 button:focus,
 button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  outline: 2px solid color-mix(in srgb, var(--colors-primary), black 25%);
+  outline-offset: 2px;
 }

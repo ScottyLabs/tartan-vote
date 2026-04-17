@@ -95,7 +95,7 @@
 
 <style>
     h1 {
-        color: white;
+        color: var(--colors-primary);
     }
 
     .card {
@@ -105,8 +105,8 @@
         gap: 1em;
         padding: 2rem;
         border-radius: 12px;
-        background: #e0e0e0;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        background: var(--color-surface);
+        box-shadow: var(--shadow-card);
         max-height: 80vh;
         overflow-y: auto;
     }
@@ -120,7 +120,7 @@
     hr {
         width: 100%;
         border: none;
-        border-top: 1px solid #bdbdbd;
+        border-top: 1px solid var(--color-divider);
         margin: 0;
     }
 
@@ -139,7 +139,7 @@
     .btn {
         margin-top: 0.5em;
         background-color: var(--colors-primary);
-        color: white;
+        color: var(--color-on-primary);
         border: none;
         border-radius: 4px;
         font-size: 18px;
@@ -152,11 +152,11 @@
     }
 
     .danger {
-        background-color: #b00020;
+        background-color: var(--color-danger);
     }
 
     .danger:hover {
-        background-color: color-mix(in srgb, #b00020, black 10%);
+        background-color: var(--color-danger-hover);
     }
 
     .btn:disabled {
@@ -165,7 +165,7 @@
     }
 
     .error {
-        color: #b00020;
+        color: var(--color-danger);
         margin: 0;
     }
 </style>

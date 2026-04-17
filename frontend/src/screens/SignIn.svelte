@@ -58,7 +58,7 @@
     .authBtn {
         margin-top: 1em;
         background-color: var(--colors-primary);
-        color: white;
+        color: var(--color-on-primary);
         border: none;
         border-radius: 8px;
         font-size: 20px;

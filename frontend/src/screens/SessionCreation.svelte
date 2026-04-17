@@ -66,9 +66,10 @@
                 },
                 proxy: false,
                 ballot_style: vote_type === "motion" ? "standard" : "default",
-                meeting_display: vote_type === "motion"
-                    ? "named_by_category"
-                    : "totals_only",
+                meeting_display:
+                    vote_type === "motion"
+                        ? "named_by_category"
+                        : "totals_only",
                 export_scope: "totals_only",
                 vote_options:
                     vote_type === "motion" ? ["Yes", "No", "Abstain"] : [],
@@ -86,7 +87,9 @@
 
     let users: Participant[] = $state([]);
     let proxyHolders = $derived(
-        users.filter((user) => user.is_proxy_holder && user.proxy_for.length > 0),
+        users.filter(
+            (user) => user.is_proxy_holder && user.proxy_for.length > 0,
+        ),
     );
 
     let electionStyleOptions: string[] = [
@@ -119,7 +122,10 @@
 
     let exportScopeOptions: { label: string; value: string }[] = [
         { label: "Save only totals in meeting export", value: "totals_only" },
-        { label: "Save detailed ballots in meeting export", value: "full_ballots" },
+        {
+            label: "Save detailed ballots in meeting export",
+            value: "full_ballots",
+        },
     ];
 
     let voteThresholds: { label: string; value: number }[] = [
@@ -213,13 +219,19 @@
 
     function addProxyAssignment() {
         proxyAssignmentError = "";
-        const proxy_holder_user_id = Number.parseInt(proxyHolderIdInput.trim(), 10);
+        const proxy_holder_user_id = Number.parseInt(
+            proxyHolderIdInput.trim(),
+            10,
+        );
         const proxied_senator_user_id = Number.parseInt(
             proxiedSenatorIdInput.trim(),
             10,
         );
 
-        if (!Number.isFinite(proxy_holder_user_id) || !Number.isFinite(proxied_senator_user_id)) {
+        if (
+            !Number.isFinite(proxy_holder_user_id) ||
+            !Number.isFinite(proxied_senator_user_id)
+        ) {
             proxyAssignmentError = "Both IDs must be valid numbers.";
             return;
         }
@@ -273,7 +285,9 @@
             );
 
             if (!response.ok) {
-                throw new Error(`Failed to fetch participants: ${response.status}`);
+                throw new Error(
+                    `Failed to fetch participants: ${response.status}`,
+                );
             }
 
             const payload: AttendanceResponse = await response.json();
@@ -306,14 +320,18 @@
         }
     });
 
-    async function exportFile(kind: "attendance" | "votes", format: "pdf" | "csv") {
+    async function exportFile(
+        kind: "attendance" | "votes",
+        format: "pdf" | "csv",
+    ) {
         try {
             const response = await fetch(
                 `${API_BASE}/session/${sessionCode}/export/${kind}/${format}`,
-                { method: "GET", credentials: "include" }
+                { method: "GET", credentials: "include" },
             );
 
-            if (!response.ok) throw new Error(`Export failed: ${response.status}`);
+            if (!response.ok)
+                throw new Error(`Export failed: ${response.status}`);
 
             const blob = await response.blob();
             const url = URL.createObjectURL(blob);
@@ -322,8 +340,7 @@
             anchor.download = `${sessionCode}-${kind}.${format}`;
             anchor.click();
             URL.revokeObjectURL(url);
-        } catch (error) {
-        }
+        } catch (error) {}
     }
 
     function timerToEndTime(timer: Time): string {
@@ -341,38 +358,40 @@
             const backendEventType =
                 draft.event_type === "motion" ? "Motion" : "Election";
 
-            const response = await fetch(`${API_BASE}/events/create/${sessionCode}`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                credentials: "include",
-                body: JSON.stringify({
-                    name: draft.name,
-                    event_type: backendEventType,
-                    start_time: new Date().toISOString(),
-                    end_time: timerToEndTime(draftTime),
-                    data: {
-                        vote_type: draft.event_type,
-                        description: draft.data.description,
-                        threshold: draft.data.threshold,
-                        vote_options: draft.data.vote_options,
-                        proxy: draft.data.proxy,
-                        ballot_style: draft.data.ballot_style,
-                        meeting_display: draft.data.meeting_display,
-                        export_scope: draft.data.export_scope,
-                        anonymous: draft.data.ballot_style === "secret",
-                        visibility: draft.data.visibility.participants,
-                        eligible_voter_user_ids: users.map((u) => u.id),
-                        proxy_assignments: proxyAssignments,
-                    },
-                }),
-            });
+            const response = await fetch(
+                `${API_BASE}/events/create/${sessionCode}`,
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: "include",
+                    body: JSON.stringify({
+                        name: draft.name,
+                        event_type: backendEventType,
+                        start_time: new Date().toISOString(),
+                        end_time: timerToEndTime(draftTime),
+                        data: {
+                            vote_type: draft.event_type,
+                            description: draft.data.description,
+                            threshold: draft.data.threshold,
+                            vote_options: draft.data.vote_options,
+                            proxy: draft.data.proxy,
+                            ballot_style: draft.data.ballot_style,
+                            meeting_display: draft.data.meeting_display,
+                            export_scope: draft.data.export_scope,
+                            anonymous: draft.data.ballot_style === "secret",
+                            visibility: draft.data.visibility.participants,
+                            eligible_voter_user_ids: users.map((u) => u.id),
+                            proxy_assignments: proxyAssignments,
+                        },
+                    }),
+                },
+            );
             if (!response.ok) throw new Error(`Failed: ${response.status}`);
             const event: CreatedEvent = await response.json();
             latestEventId = event.id;
             onPopupClose();
             onEventStarted?.(event);
-        } catch (error) {
-        }
+        } catch (error) {}
     }
 
     async function endMeeting() {
@@ -382,10 +401,13 @@
         endMeetingError = null;
 
         try {
-            const response = await fetch(`${API_BASE}/session/${sessionCode}/end`, {
-                cache: "no-store",
-                credentials: "include",
-            });
+            const response = await fetch(
+                `${API_BASE}/session/${sessionCode}/end`,
+                {
+                    cache: "no-store",
+                    credentials: "include",
+                },
+            );
 
             if (!response.ok) {
                 throw new Error(`Failed to end session: ${response.status}`);
@@ -551,8 +573,10 @@
                         placeholder="Proxied Senator User ID"
                         bind:value={proxiedSenatorIdInput}
                     />
-                    <button type="button" class="proxy-add" onclick={addProxyAssignment}
-                        >Add</button
+                    <button
+                        type="button"
+                        class="proxy-add"
+                        onclick={addProxyAssignment}>Add</button
                     >
                 </div>
                 {#if proxyAssignmentError}
@@ -566,7 +590,8 @@
                         {#each proxyAssignments as assignment, i}
                             <div class="proxy-item">
                                 <span>
-                                    Holder #{assignment.proxy_holder_user_id} → Senator #{assignment.proxied_senator_user_id}
+                                    Holder #{assignment.proxy_holder_user_id} → Senator
+                                    #{assignment.proxied_senator_user_id}
                                 </span>
                                 <button
                                     type="button"
@@ -669,7 +694,9 @@
         <div class="proxy-overview">
             <h1>Active Proxies</h1>
             {#if proxyHolders.length === 0}
-                <p class="proxy-overview-empty">No active proxies in this session.</p>
+                <p class="proxy-overview-empty">
+                    No active proxies in this session.
+                </p>
             {:else}
                 <div class="proxy-overview-list">
                     {#each proxyHolders as holder}
@@ -689,12 +716,26 @@
         </div>
         <div class="row" style="marging-top=0em">
             <button onclick={endTimer} class="btn">END MEETING</button>
-            <button class="btn export-btn" onclick={() => exportFile("attendance", "csv")}>ATTENDANCE CSV</button>
-            <button class="btn export-btn" onclick={() => exportFile("attendance", "pdf")}>ATTENDANCE PDF</button>
+            <button
+                class="btn export-btn"
+                onclick={() => exportFile("attendance", "csv")}
+                >ATTENDANCE CSV</button
+            >
+            <button
+                class="btn export-btn"
+                onclick={() => exportFile("attendance", "pdf")}
+                >ATTENDANCE PDF</button
+            >
         </div>
         <div class="row">
-            <button class="btn export-btn" onclick={() => exportFile("votes", "csv")}>VOTES CSV</button>
-            <button class="btn export-btn" onclick={() => exportFile("votes", "pdf")}>VOTES PDF</button>
+            <button
+                class="btn export-btn"
+                onclick={() => exportFile("votes", "csv")}>VOTES CSV</button
+            >
+            <button
+                class="btn export-btn"
+                onclick={() => exportFile("votes", "pdf")}>VOTES PDF</button
+            >
         </div>
     </div>
     {#if !creatingElection && !creatingMotion && !inspectingAllUsers}
@@ -712,7 +753,7 @@
     .btn {
         margin-top: 1em;
         background-color: var(--colors-primary);
-        color: white;
+        color: var(--color-on-primary);
         border: none;
         border-radius: 4px;
         font-size: 20px;
@@ -731,20 +772,21 @@
         padding: 6px 24px;
     }
     .error {
-        color: #b00020;
+        color: var(--color-danger);
         margin-top: 0.5em;
     }
     .card {
         width: fit-content;
         padding: 1.5rem;
         border-radius: 12px;
-        background: #e0e0e0;
+        background: var(--color-surface);
+        box-shadow: var(--shadow-card);
     }
 
     .proxy-panel {
-        border: 1px solid #ccc;
+        border: 1px solid var(--color-border);
         border-radius: 8px;
-        background: #f8f8f8;
+        background: var(--color-surface-muted);
         padding: 0.75rem;
     }
 
@@ -758,7 +800,7 @@
         flex: 1;
         min-width: 0;
         padding: 8px;
-        border: 1px solid #ccc;
+        border: 1px solid var(--color-border);
         border-radius: 6px;
     }
 
@@ -769,7 +811,7 @@
         padding: 8px 12px;
         cursor: pointer;
         background-color: var(--colors-primary);
-        color: white;
+        color: var(--color-on-primary);
     }
 
     .proxy-list {
@@ -788,32 +830,33 @@
 
     .proxy-error {
         margin-top: 0.5rem;
-        color: #b00020;
+        color: var(--color-danger);
         font-size: 0.9rem;
     }
 
     .proxy-empty {
-        color: #666;
+        color: var(--color-text-secondary);
         font-size: 0.9rem;
     }
 
     .proxy-overview {
         margin-top: 0.75em;
-        border: 2px solid #ccc;
+        border: 2px solid var(--color-border);
         border-radius: 8px;
         padding: 0.75rem;
-        background: #f8f8f8;
+        background: var(--color-surface-muted);
         text-align: left;
     }
 
     .proxy-overview h1 {
         margin: 0 0 0.5em 0;
         font-size: 1.25rem;
+        color: var(--color-text);
     }
 
     .proxy-overview-empty {
         margin: 0;
-        color: #666;
+        color: var(--color-text-secondary);
     }
 
     .proxy-overview-list {
@@ -830,11 +873,11 @@
     }
 
     .container {
-        border: 2px solid #ccc;
+        border: 2px solid var(--color-border);
         padding: 8px;
         border-radius: 8px;
         width: fit-content;
-        background: #f8f8f8;
+        background: var(--color-surface-muted);
         overflow: visible;
     }
     .row {
@@ -859,16 +902,16 @@
         height: 28px;
         min-width: 28px;
         font-size: 0.8rem;
-        border: 1px solid #aaa;
+        border: 1px solid var(--color-border);
         border-radius: 4px;
-        background: white;
+        background: var(--color-surface);
         cursor: pointer;
 
         display: flex;
         align-items: center;
         justify-content: center;
+        color: var(--colors-text);
     }
-
 
     .plus {
         font-weight: bold;
@@ -877,13 +920,13 @@
     hr {
         width: 100%;
         border: none;
-        border-top: 2px solid var(--colors-text);
+        border-top: 2px solid var(--color-divider);
         margin-top: 1em;
         margin-bottom: 1em;
     }
 
     h1 {
-        color: var(--colors-text);
+        color: var(--colors-primary);
         margin-bottom: 0.5em;
     }
 
@@ -922,7 +965,7 @@
         height: 50px;
         padding: 10px;
         border-radius: 6px;
-        border: 1px solid #ccc;
+        border: 1px solid var(--color-border);
         box-sizing: border-box;
         font-size: 20px;
         margin-bottom: 0em;
@@ -960,7 +1003,7 @@
     .submitBtn {
         margin-top: 1em;
         background-color: var(--colors-primary);
-        color: white;
+        color: var(--color-on-primary);
         border: none;
         border-radius: 4px;
         font-size: 20px;
@@ -971,7 +1014,7 @@
     .presetBtn {
         margin-top: 0.3em;
         background-color: var(--colors-secondary);
-        color: black;
+        color: var(--color-text);
         border: none;
         border-radius: 4px;
         font-size: 18px;

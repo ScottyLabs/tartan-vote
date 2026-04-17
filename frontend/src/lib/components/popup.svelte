@@ -25,14 +25,14 @@
 
     .card {
         position: relative;
-        background: white;
+        background: var(--color-surface);
         padding: 1.5rem;
         border-radius: 12px;
         max-width: 500px;
         width: 90%;
         max-height: 90vh;
         overflow-y: auto;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        box-shadow: var(--shadow-card);
     }
 
     h2 {

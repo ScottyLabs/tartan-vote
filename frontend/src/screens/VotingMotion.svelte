@@ -252,7 +252,7 @@
 
 <style>
     h1 {
-        color: white;
+        color: var(--colors-primary);
     }
 
     h2 {
@@ -263,7 +263,7 @@
 
     h3 {
         text-align: left;
-        color: black;
+        color: var(--color-text);
         margin-bottom: 0.5em;
         font-weight: normal;
     }
@@ -281,7 +281,7 @@
         height: 50px;
         padding: 10px;
         border-radius: 6px;
-        border: 1px solid #ccc;
+        border: 1px solid var(--color-border);
         box-sizing: border-box;
         font-size: 20px;
         margin-bottom: 0em;
@@ -290,7 +290,7 @@
     hr {
         width: 100%;
         border: none;
-        border-top: 1px solid #bdbdbd;
+        border-top: 1px solid var(--color-divider);
         margin: 0 0;
     }
 
@@ -300,14 +300,14 @@
         border-left: 4px solid var(--colors-primary);
         padding-left: 12px;
         margin: 1rem 0;
-        color: #555;
+        color: var(--color-text-secondary);
         font-style: italic;
     }
 
     .submitBtn {
         margin-top: 1em;
         background-color: var(--colors-primary);
-        color: white;
+        color: var(--color-on-primary);
         border: none;
         border-radius: 4px;
         font-size: 20px;
@@ -324,13 +324,13 @@
 
         padding: 2rem;
         border-radius: 12px;
-        background: #e0e0e0;
+        background: var(--color-surface);
 
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        box-shadow: var(--shadow-card);
     }
 
     .error {
-        color: #b00020;
+        color: var(--color-danger);
         margin: 0;
     }
 </style>

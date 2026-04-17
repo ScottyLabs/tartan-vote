@@ -52,7 +52,7 @@
         text-align: center;
         font-size: 18px;
         border-radius: 6px;
-        border: 1px solid #ccc;
+        border: 1px solid var(--color-border);
     }
 
     span {

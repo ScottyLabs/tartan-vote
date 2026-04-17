@@ -60,9 +60,9 @@
         resize: none;
         padding: 0.5rem;
         border-radius: 6px;
-        border: 1px solid #ccc;
-        background: white;
-        color: black;
+        border: 1px solid var(--color-border);
+        background: var(--color-surface);
+        color: var(--color-text);
     }
 
     .delete {
@@ -72,8 +72,8 @@
         justify-content: center;
         align-items: center;
         border: none;
-        background: #ff4d4d;
-        color: white;
+        background: var(--colors-primary);
+        color: var(--color-on-primary);
         border-radius: 6px;
         cursor: pointer;
     }
@@ -85,7 +85,7 @@
         font-size: 18px;
         border-radius: 6px;
         cursor: pointer;
-        background: #e0e0e0;
-        color: black;
+        background: var(--color-surface-raised);
+        color: var(--color-text);
     }
 </style>

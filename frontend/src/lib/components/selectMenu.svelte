@@ -40,7 +40,7 @@
         height: 50px;
         padding: 10px;
         border-radius: 6px;
-        border: 1px solid #ccc;
+        border: 1px solid var(--color-border);
         box-sizing: border-box;
         font-size: 20px;
         margin-bottom: 0em;

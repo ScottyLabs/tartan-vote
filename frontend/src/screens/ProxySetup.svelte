@@ -159,8 +159,8 @@
         gap: 1rem;
         padding: 2rem;
         border-radius: 12px;
-        background: #e0e0e0;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        background: var(--color-surface);
+        box-shadow: var(--shadow-card);
     }
 
     h2 {
@@ -170,7 +170,7 @@
 
     h3 {
         margin: 0 0 0.4rem 0;
-        color: black;
+        color: var(--color-text);
         font-weight: normal;
     }
 
@@ -184,7 +184,7 @@
         height: 48px;
         padding: 10px;
         border-radius: 6px;
-        border: 1px solid #ccc;
+        border: 1px solid var(--color-border);
         box-sizing: border-box;
         font-size: 18px;
     }
@@ -197,7 +197,7 @@
 
     .btn {
         background-color: var(--colors-primary);
-        color: white;
+        color: var(--color-on-primary);
         border: none;
         border-radius: 4px;
         font-size: 16px;
@@ -210,11 +210,11 @@
     }
 
     .secondary {
-        background-color: #777;
+        background-color: var(--color-neutral);
     }
 
     .secondary:hover {
-        background-color: color-mix(in srgb, #777, black 10%);
+        background-color: var(--color-neutral-hover);
     }
 
     .btn:disabled {
@@ -223,9 +223,9 @@
     }
 
     .error {
-        color: #b00020;
-        background: #ffebee;
-        border: 1px solid #ffcdd2;
+        color: var(--color-danger);
+        background: var(--color-danger-surface);
+        border: 1px solid var(--color-danger-border);
         padding: 10px 12px;
         border-radius: 6px;
         margin-top: 0.5rem;

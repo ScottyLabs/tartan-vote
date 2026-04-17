@@ -163,7 +163,7 @@
         height: 50px;
         padding: 10px;
         border-radius: 6px;
-        border: 1px solid #ccc;
+        border: 1px solid var(--color-border);
         box-sizing: border-box;
         font-size: 20px;
         margin-bottom: 0em;
@@ -178,9 +178,9 @@
 
         padding: 2rem;
         border-radius: 12px;
-        background: #e0e0e0;
+        background: var(--color-surface);
 
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        box-shadow: var(--shadow-card);
     }
 
     .row {
@@ -203,7 +203,7 @@
     .joinBtn {
         margin-top: 0em;
         background-color: var(--colors-primary);
-        color: white;
+        color: var(--color-on-primary);
         border: none;
         border-radius: 4px;
         font-size: 20px;
@@ -221,14 +221,14 @@
     }
 
     .error {
-        color: #b00020;
+        color: var(--color-danger);
         margin: 0.5em 0 0;
     }
 
     .session {
         margin-top: 1em;
         margin-bottom: 1em;
-        color: black;
+        color: var(--color-text);
     }
 
     h1 {
