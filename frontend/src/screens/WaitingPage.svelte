@@ -104,6 +104,12 @@
 </main>
 
 <style>
+    main {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
     h1 {
         color: var(--colors-primary);
         margin-bottom: 0.5rem;
