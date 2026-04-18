@@ -1,4 +1,4 @@
-{ pkgs, config, inputs, ... }:
+{ pkgs, lib, config, inputs, ... }:
 
 {
   cachix.pull = [ "scottylabs" ];
@@ -53,18 +53,20 @@
     };
     cargo-nix-update = {
       enable = true;
-      name = "cargo-nix-update";
+      name = "crate2nix (backend/Cargo.nix)";
+      description = "Regenerate backend/Cargo.nix when backend/Cargo.toml or Cargo.lock are staged";
       entry = "${pkgs.writeShellScript "cargo-nix-update" ''
-        if git diff --cached --name-only | grep -q 'backend/Cargo\.\(toml\|lock\)'; then
-          cd backend
-          ${pkgs.crate2nix}/bin/crate2nix generate
-          cd ..
-          git add backend/Cargo.nix
+        set -euo pipefail
+        root=${lib.escapeShellArg config.devenv.root}
+        if git diff --cached --name-only | grep -qE '^backend/Cargo\.(toml|lock)$'; then
+          (cd "''${root}/backend" && ${pkgs.crate2nix}/bin/crate2nix generate)
+          git add "''${root}/backend/Cargo.nix"
         fi
       ''}";
-      files = "backend/Cargo\\.(toml|lock)$";
+      files = "^backend/Cargo\\.(toml|lock)$";
       language = "system";
       pass_filenames = false;
+      extraPackages = [ config.languages.rust.toolchainPackage ];
     };
   };
 }

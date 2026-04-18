@@ -14,7 +14,7 @@ interface EventData {
     description: string;
     session_code: string;
     vote_type: "motion" | "election";
-    threshold: number;        // float, not string
+    threshold: number; // float, not string
     visibility: {
         participants: "hidden_until_release" | "live";
     };
@@ -36,16 +36,16 @@ interface User {
 }
 
 interface Vote {
-    id: i32,
-    cast_time: string,
-    data: Json,
+    id: i32;
+    cast_time: string;
+    data: Json;
 }
 
 interface VoteData {
-    vote_type: string,
-    vote_response: string[],
-    proxy?: boolean,
-    proxy_for_user_id?: number
+    vote_type: string;
+    vote_response: string[];
+    proxy?: boolean;
+    proxy_for_user_id?: number;
 }
 
 interface Time {
