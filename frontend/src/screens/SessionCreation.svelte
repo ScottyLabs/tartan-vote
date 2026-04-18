@@ -683,62 +683,64 @@
         </div>
         <hr />
 
-        <div class="row">
-            <h1>Participants</h1>
-            <div class="container">
-                <div class="button-list">
-                    {#each users.slice(0, 30 - 1) as user}
-                        <div
-                            class="slot-wrapper"
-                            role="group"
-                            onmouseenter={() => inspectUser(user)}
-                            onmouseleave={clearInspect}
-                        >
-                            <button class="slot">
-                                {user.name?.charAt(0)}
-                            </button>
-                            <HoverCard
-                                open={inspectingUser?.id === user.id &&
-                                    !inspectingAllUsers}
+        <div class="card-sections">
+            <h1 class="card-section-label">Participants</h1>
+            <div class="participants-slot">
+                <div class="container">
+                    <div class="button-list">
+                        {#each users.slice(0, 30 - 1) as user}
+                            <div
+                                class="slot-wrapper"
+                                role="group"
+                                onmouseenter={() => inspectUser(user)}
+                                onmouseleave={clearInspect}
                             >
-                                <div class="col">
-                                    <div>Name: {user.name}</div>
-                                    <div>UserID: {user.id}</div>
-                                    <div>
-                                        Proxy: {user.is_proxy_holder
-                                            ? `Yes (${user.proxy_for.join(", ")})`
-                                            : "No"}
+                                <button class="slot">
+                                    {user.name?.charAt(0)}
+                                </button>
+                                <HoverCard
+                                    open={inspectingUser?.id === user.id &&
+                                        !inspectingAllUsers}
+                                >
+                                    <div class="col">
+                                        <div>Name: {user.name}</div>
+                                        <div>UserID: {user.id}</div>
+                                        <div>
+                                            Proxy: {user.is_proxy_holder
+                                                ? `Yes (${user.proxy_for.join(", ")})`
+                                                : "No"}
+                                        </div>
                                     </div>
-                                </div>
-                            </HoverCard>
-                        </div>
-                    {/each}
-                    <button onclick={inspectAllUsers} class="slot plus"
-                        >+</button
-                    >
+                                </HoverCard>
+                            </div>
+                        {/each}
+                        <button onclick={inspectAllUsers} class="slot plus"
+                            >+</button
+                        >
+                    </div>
                 </div>
             </div>
-        </div>
-        {#if participantsError}
-            <p class="error">{participantsError}</p>
-        {/if}
-        <div class="proxy-overview">
-            <h1>Active Proxies</h1>
-            {#if proxyHolders.length === 0}
-                <p class="proxy-overview-empty">
-                    No active proxies in this session.
-                </p>
-            {:else}
-                <div class="proxy-overview-list">
-                    {#each proxyHolders as holder}
-                        <div class="proxy-overview-item">
-                            <strong>{holder.name}</strong>
-                            <span>(ID: {holder.id})</span>
-                            <span>→ {holder.proxy_for.join(", ")}</span>
-                        </div>
-                    {/each}
-                </div>
+            {#if participantsError}
+                <p class="error card-sections-full">{participantsError}</p>
             {/if}
+            <h1 class="card-section-label">Active Proxies</h1>
+            <div class="container proxy-overview-body">
+                {#if proxyHolders.length === 0}
+                    <p class="proxy-overview-empty">
+                        No active proxies in this session.
+                    </p>
+                {:else}
+                    <div class="proxy-overview-list">
+                        {#each proxyHolders as holder}
+                            <div class="proxy-overview-item">
+                                <strong>{holder.name}</strong>
+                                <span>(ID: {holder.id})</span>
+                                <span>→ {holder.proxy_for.join(", ")}</span>
+                            </div>
+                        {/each}
+                    </div>
+                {/if}
+            </div>
         </div>
         <hr />
         <div class="session-actions">
@@ -1002,19 +1004,37 @@
         font-size: 0.9rem;
     }
 
-    .proxy-overview {
-        margin-top: 0.75em;
-        border: 2px solid var(--color-border);
-        border-radius: 8px;
-        padding: 0.75rem;
-        background: var(--color-surface-muted);
-        text-align: left;
+    .card-sections {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        gap: 1em;
+        align-items: start;
+        margin-top: 0.5em;
     }
 
-    .proxy-overview h1 {
-        margin: 0 0 0.5em 0;
+    .card-section-label {
+        margin: 0;
+        align-self: center;
         font-size: 1.25rem;
-        color: var(--color-text);
+        color: var(--colors-primary);
+    }
+
+    .card-sections-full {
+        grid-column: 1 / -1;
+        margin: 0;
+    }
+
+    .participants-slot {
+        display: flex;
+        justify-content: center;
+        justify-self: stretch;
+        min-width: 0;
+        width: 100%;
+    }
+
+    .proxy-overview-body {
+        min-width: 0;
+        text-align: left;
     }
 
     .proxy-overview-empty {
