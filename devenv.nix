@@ -27,6 +27,11 @@
 
   treefmt = {
     enable = true;
+    # Paths are relative to repo root; globs supported. Root-only "Cargo.nix" / "bun.nix" do not match subdirs.
+    config.settings.excludes = lib.mkAfter [
+      "backend/Cargo.nix"
+      "frontend/bun.nix"
+    ];
     config.programs = {
       nixpkgs-fmt = {
         enable = true;
@@ -42,7 +47,15 @@
   };
 
   git-hooks.hooks = {
-    treefmt.enable = true;
+    treefmt = {
+      enable = true;
+      # pre-commit passes staged paths as CLI args; treefmt formats them anyway, so
+      # treefmt.toml `excludes` alone does not help — skip these files at the hook level.
+      excludes = [
+        "^backend/Cargo\\.nix$"
+        "^frontend/bun\\.nix$"
+      ];
+    };
     clippy = {
       enable = true;
       packageOverrides.cargo = config.languages.rust.toolchainPackage;
