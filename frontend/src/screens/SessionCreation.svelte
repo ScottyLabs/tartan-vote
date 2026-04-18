@@ -758,7 +758,6 @@
                 </button>
                 <div class="export-toolbar">
                     <label class="export-field" for="session-export-select">
-                        <span class="export-field-label">Download report</span>
                         <select
                             id="session-export-select"
                             class="export-select"
@@ -767,7 +766,10 @@
                         >
                             {#each exportMenuOptions as opt}
                                 <option
-                                    value={exportMenuValue(opt.kind, opt.format)}
+                                    value={exportMenuValue(
+                                        opt.kind,
+                                        opt.format,
+                                    )}
                                 >
                                     {opt.label}
                                 </option>
@@ -923,8 +925,13 @@
     }
 
     .export-select:focus-visible {
-        border-color: color-mix(in srgb, var(--colors-primary), var(--color-border) 35%);
-        box-shadow: 0 0 0 3px color-mix(in srgb, var(--colors-primary), transparent 78%);
+        border-color: color-mix(
+            in srgb,
+            var(--colors-primary),
+            var(--color-border) 35%
+        );
+        box-shadow: 0 0 0 3px
+            color-mix(in srgb, var(--colors-primary), transparent 78%);
     }
 
     .export-select:disabled {
