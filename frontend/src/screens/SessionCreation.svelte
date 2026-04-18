@@ -685,9 +685,6 @@
                 </div>
             </div>
         </div>
-        {#if loadingParticipants && users.length === 0}
-            <p>Loading participants...</p>
-        {/if}
         {#if participantsError}
             <p class="error">{participantsError}</p>
         {/if}
