@@ -1,12 +1,17 @@
 <script lang="ts">
-    let { title = "Popup", value = $bindable(), emptyPlaceholder } = $props();
+    let {
+        title = "Popup",
+        value = $bindable(),
+        emptyPlaceholder,
+        required = false,
+    } = $props();
 </script>
 
 <main>
     <h3>{title}</h3>
     <textarea
         bind:value
-        required
+        {required}
         placeholder={emptyPlaceholder}
         oninput={(e) => {
             const el = e.target as HTMLTextAreaElement;

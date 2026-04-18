@@ -11,7 +11,7 @@ interface Event {
 }
 
 interface EventData {
-    description: string;
+    description?: string;
     session_code: string;
     vote_type: "motion" | "election";
     threshold: number;        // float, not string
