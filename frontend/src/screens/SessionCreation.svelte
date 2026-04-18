@@ -1015,13 +1015,12 @@
         display: grid;
         grid-template-columns: max-content 1fr;
         gap: 1em;
-        align-items: start;
+        align-items: center;
         margin-top: 0.5em;
     }
 
     .card-section-label {
         margin: 0;
-        align-self: center;
         font-size: 1.25rem;
         color: var(--colors-primary);
     }
@@ -1034,9 +1033,19 @@
     .participants-slot {
         display: flex;
         justify-content: center;
+        align-items: center;
         justify-self: stretch;
         min-width: 0;
         width: 100%;
+    }
+
+    .participants-slot .button-list {
+        display: flex;
+        flex-wrap: wrap;
+        align-content: center;
+        gap: 1rem;
+        margin-right: 0;
+        min-width: calc(10 * 32px + 9 * 1rem);
     }
 
     .proxy-overview-body {
