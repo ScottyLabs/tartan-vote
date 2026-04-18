@@ -159,6 +159,46 @@
     let participantsError = $state<string | null>(null);
     let participantsPollId: number | null = null;
 
+    type ExportKind = "attendance" | "votes";
+    type ExportFormat = "pdf" | "csv";
+
+    const exportMenuOptions: {
+        label: string;
+        kind: ExportKind;
+        format: ExportFormat;
+    }[] = [
+        { label: "Attendance — PDF", kind: "attendance", format: "pdf" },
+        { label: "Attendance — CSV", kind: "attendance", format: "csv" },
+        { label: "Votes — PDF", kind: "votes", format: "pdf" },
+        { label: "Votes — CSV", kind: "votes", format: "csv" },
+    ];
+
+    let exporting = $state(false);
+    let exportError = $state<string | null>(null);
+
+    function exportMenuValue(kind: ExportKind, format: ExportFormat) {
+        return `${kind}:${format}`;
+    }
+
+    let exportMenuSelection = $state(exportMenuValue("attendance", "pdf"));
+
+    async function downloadExport() {
+        if (!sessionCode || exporting) return;
+        exportError = null;
+        const [kind, format] = exportMenuSelection.split(":") as [
+            ExportKind,
+            ExportFormat,
+        ];
+        exporting = true;
+        try {
+            await exportFile(kind, format);
+        } catch {
+            exportError = "Download failed. Please try again.";
+        } finally {
+            exporting = false;
+        }
+    }
+
     function pushMotion() {
         draft = eventDraft_new("motion");
         motionPreset = "standard";
@@ -320,27 +360,21 @@
         }
     });
 
-    async function exportFile(
-        kind: "attendance" | "votes",
-        format: "pdf" | "csv",
-    ) {
-        try {
-            const response = await fetch(
-                `${API_BASE}/session/${sessionCode}/export/${kind}/${format}`,
-                { method: "GET", credentials: "include" },
-            );
+    async function exportFile(kind: ExportKind, format: ExportFormat) {
+        const response = await fetch(
+            `${API_BASE}/session/${sessionCode}/export/${kind}/${format}`,
+            { method: "GET", credentials: "include" },
+        );
 
-            if (!response.ok)
-                throw new Error(`Export failed: ${response.status}`);
+        if (!response.ok) throw new Error(`Export failed: ${response.status}`);
 
-            const blob = await response.blob();
-            const url = URL.createObjectURL(blob);
-            const anchor = document.createElement("a");
-            anchor.href = url;
-            anchor.download = `${sessionCode}-${kind}.${format}`;
-            anchor.click();
-            URL.revokeObjectURL(url);
-        } catch (error) {}
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = `${sessionCode}-${kind}.${format}`;
+        anchor.click();
+        URL.revokeObjectURL(url);
     }
 
     function timerToEndTime(timer: Time): string {
@@ -707,33 +741,51 @@
             {/if}
         </div>
         <hr />
-        <div class="row" style="margin-bottom: 0em">
-            <button onclick={pushMotion} class="btn">Push a Motion</button>
-            <button onclick={pushElection} class="btn">Push an Election</button>
+        <div class="session-actions">
+            <div class="session-actions-row">
+                <button onclick={pushMotion} class="btn session-action-btn">
+                    Push a Motion
+                </button>
+                <button onclick={pushElection} class="btn session-action-btn">
+                    Push an Election
+                </button>
+            </div>
+            <div class="session-actions-row">
+                <button onclick={endTimer} class="btn end-meeting-btn">
+                    END MEETING
+                </button>
+                <div class="export-toolbar">
+                    <label class="export-field" for="session-export-select">
+                        <span class="export-field-label">Download report</span>
+                        <select
+                            id="session-export-select"
+                            class="export-select"
+                            bind:value={exportMenuSelection}
+                            disabled={exporting}
+                        >
+                            {#each exportMenuOptions as opt}
+                                <option
+                                    value={exportMenuValue(opt.kind, opt.format)}
+                                >
+                                    {opt.label}
+                                </option>
+                            {/each}
+                        </select>
+                    </label>
+                    <button
+                        type="button"
+                        class="btn export-btn"
+                        onclick={downloadExport}
+                        disabled={exporting || !sessionCode}
+                    >
+                        {exporting ? "Downloading…" : "Download"}
+                    </button>
+                </div>
+            </div>
         </div>
-        <div class="row" style="marging-top=0em">
-            <button onclick={endTimer} class="btn">END MEETING</button>
-            <button
-                class="btn export-btn"
-                onclick={() => exportFile("attendance", "csv")}
-                >ATTENDANCE CSV</button
-            >
-            <button
-                class="btn export-btn"
-                onclick={() => exportFile("attendance", "pdf")}
-                >ATTENDANCE PDF</button
-            >
-        </div>
-        <div class="row">
-            <button
-                class="btn export-btn"
-                onclick={() => exportFile("votes", "csv")}>VOTES CSV</button
-            >
-            <button
-                class="btn export-btn"
-                onclick={() => exportFile("votes", "pdf")}>VOTES PDF</button
-            >
-        </div>
+        {#if exportError}
+            <p class="error export-error">{exportError}</p>
+        {/if}
     </div>
     {#if !creatingElection && !creatingMotion && !inspectingAllUsers}
         <button onclick={onBack} class="backBtn">
@@ -766,7 +818,121 @@
     }
     .export-btn {
         font-size: 14px;
-        padding: 6px 24px;
+        font-weight: 600;
+        padding: 10px 22px;
+        border-radius: 6px;
+        margin-top: 0;
+        flex-shrink: 0;
+        box-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
+    }
+
+    .session-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        width: 100%;
+        margin-top: 0.5em;
+    }
+
+    .session-actions-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        align-items: stretch;
+        gap: 1em;
+        width: 100%;
+        margin-top: 0;
+    }
+
+    .session-actions .session-action-btn,
+    .session-actions .end-meeting-btn {
+        margin-top: 0;
+        width: 100%;
+        box-sizing: border-box;
+        min-height: 3.25rem;
+        border-radius: 6px;
+        box-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
+    }
+
+    .end-meeting-btn {
+        padding: 10px 1.25rem;
+    }
+
+    .export-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        align-self: stretch;
+        gap: 0.75rem;
+        padding: 0 0.9rem;
+        border-radius: 10px;
+        border: 1px solid var(--color-border);
+        background: var(--color-surface-muted);
+        box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.65);
+        box-sizing: border-box;
+        min-width: 0;
+    }
+
+    .export-field {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 0.65rem;
+        margin: 0;
+        flex: 1 1 12rem;
+        min-width: 0;
+    }
+
+    .export-field-label {
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+        color: var(--color-text-secondary);
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+
+    .export-select {
+        flex: 1 1 auto;
+        min-width: 0;
+        width: 100%;
+        max-width: 22rem;
+        height: 42px;
+        padding: 0 12px;
+        border-radius: 8px;
+        border: 1px solid var(--color-border);
+        background: var(--color-surface);
+        color: var(--color-text);
+        font-size: 14px;
+        line-height: 1.3;
+        cursor: pointer;
+        box-sizing: border-box;
+        transition:
+            border-color 0.15s ease,
+            box-shadow 0.15s ease;
+    }
+
+    .export-select:hover:not(:disabled) {
+        border-color: var(--color-border-subtle);
+    }
+
+    .export-select:focus {
+        outline: none;
+    }
+
+    .export-select:focus-visible {
+        border-color: color-mix(in srgb, var(--colors-primary), var(--color-border) 35%);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--colors-primary), transparent 78%);
+    }
+
+    .export-select:disabled {
+        opacity: 0.65;
+        cursor: not-allowed;
+    }
+
+    .export-error {
+        margin-top: 0.35em;
+        margin-bottom: 0;
     }
     .error {
         color: var(--color-danger);
