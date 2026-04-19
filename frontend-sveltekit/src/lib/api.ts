@@ -28,7 +28,9 @@ async function request<T>(
     throw Object.assign(new Error(message), { status: res.status });
   }
   if (res.status === 204) return undefined as T;
-  return (await res.json()) as T;
+  const text = await res.text();
+  if (!text || !text.trim()) return undefined as T;
+  return JSON.parse(text) as T;
 }
 
 export const api = {

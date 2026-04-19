@@ -16,6 +16,7 @@
   let evt = $state<Event | null>(null);
   let loading = $state(true);
   let ending = $state(false);
+  let autoEnded = $state(false);
   let error = $state('');
   let pollId: ReturnType<typeof setInterval> | null = null;
 
@@ -67,13 +68,25 @@
     pollId = setInterval(() => {
       nowTick = Date.now();
       load();
+      // Auto-end event when the timer expires (backend may not expire it automatically)
+      if (evt?.end_time && !ending && !autoEnded) {
+        const msLeft = new Date(evt.end_time).getTime() - Date.now();
+        if (msLeft <= 0) {
+          autoEnded = true;
+          endMotion();
+        }
+      }
     }, 1000);
   });
   onDestroy(() => {
     if (pollId) clearInterval(pollId);
   });
 
-  const kind = $derived<'motion' | 'election'>(evt?.event_type?.toLowerCase() === 'election' ? 'election' : 'motion');
+  const kind = $derived<'motion' | 'election'>(
+    evt?.event_type?.toLowerCase() === 'election' || evt?.data?.vote_type === 'election'
+      ? 'election'
+      : 'motion'
+  );
 </script>
 
 <HostShell sessionCode={code} active="motions">
@@ -92,8 +105,8 @@
     <div class="card p-6 text-sm text-ink-500">Loading…</div>
   {:else if !evt}
     <div class="card p-6">
-      <div class="serif text-[28px]">Motion closed</div>
-      <div class="text-sm text-ink-500 mt-1">This motion is no longer active. Review the final tally below.</div>
+      <div class="serif text-[28px]">{kind === 'election' ? 'Election closed' : 'Motion closed'}</div>
+      <div class="text-sm text-ink-500 mt-1">This {kind} is no longer active. Review the final tally below.</div>
       <div class="mt-6"><MotionLiveResults eventId={eventId} eventType={kind} /></div>
       <div class="flex items-center gap-2 mt-6">
         <Button variant="ghost" size="sm" onclick={() => goto(`/host/${code}`)}>Back to meeting</Button>

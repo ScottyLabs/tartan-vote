@@ -18,15 +18,15 @@ bun run check        # svelte-check
 
 Uses the same backend + better-auth setup as the original app. It reads its `.env` from the monorepo root (`envDir: '..'` in `vite.config.ts`), matching the original.
 
-Public variables (must be prefixed `PUBLIC_` for SvelteKit):
+Public variables — either `VITE_*` (default in the monorepo `.env`) or `PUBLIC_*` are accepted; `src/lib/config.ts` reads both:
 
 | Variable | Purpose | Default |
 | --- | --- | --- |
-| `PUBLIC_API_BASE` | Backend base URL | empty (same-origin) |
-| `PUBLIC_BETTER_AUTH_BASE_URL` | better-auth endpoint | `http://localhost:3005/api/auth` |
-| `PUBLIC_BETTER_AUTH_PROVIDER_ID` | OAuth provider id | `cmu-sso` |
+| `VITE_API_BASE` / `PUBLIC_API_BASE` | Backend base URL | empty (same-origin) |
+| `VITE_BETTER_AUTH_BASE_URL` / `PUBLIC_BETTER_AUTH_BASE_URL` | better-auth endpoint | `http://localhost:3005/api/auth` |
+| `VITE_BETTER_AUTH_PROVIDER_ID` / `PUBLIC_BETTER_AUTH_PROVIDER_ID` | OAuth provider id | `cmu-sso` |
 
-> The original app uses `VITE_` prefixes. If your `.env` currently uses those, either add `PUBLIC_` aliases or update the deployment. See `.env.example`.
+> The monorepo's root `.env` already ships the `VITE_*` versions used by the original frontend, so this app works without any additional setup. See `.env.example`.
 
 ## Routes
 

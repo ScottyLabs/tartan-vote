@@ -218,17 +218,15 @@
       </div>
     </div>
     <div class="flex items-center gap-2">
-      <div class="flex">
-        <select class="input text-[13px] rounded-r-none border-r-0 py-2.5" bind:value={exportKind}>
-          <option value="attendance-pdf">Attendance — PDF</option>
-          <option value="attendance-csv">Attendance — CSV</option>
-          <option value="votes-pdf">Votes — PDF</option>
-          <option value="votes-csv">Votes — CSV</option>
-        </select>
-        <Button onclick={doExport} disabled={exporting} class="rounded-l-none">
-          {exporting ? 'Working…' : 'Download'}
-        </Button>
-      </div>
+      <select class="input text-[13px] py-2.5" bind:value={exportKind}>
+        <option value="attendance-pdf">Attendance — PDF</option>
+        <option value="attendance-csv">Attendance — CSV</option>
+        <option value="votes-pdf">Votes — PDF</option>
+        <option value="votes-csv">Votes — CSV</option>
+      </select>
+      <Button onclick={doExport} disabled={exporting}>
+        {exporting ? 'Working…' : 'Download'}
+      </Button>
     </div>
   </div>
 
@@ -270,7 +268,7 @@
                 <div class="text-sm font-semibold">{person.name ?? 'Unknown'}</div>
                 <div class="text-[11px] text-ink-500">
                   {person.role ?? 'Member'}
-                  {#if person.proxy_for}
+                  {#if person.proxy_for?.toString().trim()}
                     · proxy for {person.proxy_for}
                   {/if}
                 </div>

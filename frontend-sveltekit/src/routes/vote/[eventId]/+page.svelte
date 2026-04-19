@@ -76,7 +76,7 @@
         selectedInstanceId = availableInstances[0].voter_instance_id;
       }
     } catch (e: any) {
-      error = e?.message ?? 'Failed to load motion.';
+      error = e?.message ?? 'Failed to load ballot.';
     } finally {
       loading = false;
     }
@@ -139,7 +139,7 @@
     {#if loading}
       <div class="card p-6 text-sm text-ink-500">Loading ballot…</div>
     {:else if !evt}
-      <div class="card p-6 text-sm text-scarlet-500">Motion not found.</div>
+      <div class="card p-6 text-sm text-scarlet-500">Ballot not found.</div>
     {:else}
       <div class="card p-6">
         <div class="flex items-center gap-2 mb-2">
@@ -165,7 +165,7 @@
           <div
             class="soft-card p-3 mt-3 text-sm italic text-ink-500 border-l-4 border-l-scarlet-500"
           >
-            No motion details provided.
+            No details provided.
           </div>
         {/if}
 
@@ -180,7 +180,11 @@
           </select>
         {/if}
 
-        <div class="label mt-5 mb-2">Concerning this motion, I vote</div>
+        <div class="label mt-5 mb-2">
+          {evt.event_type?.toLowerCase() === 'election' || evt.data?.vote_type === 'election'
+            ? 'For this election, I vote for'
+            : 'Concerning this motion, I vote'}
+        </div>
         <div class="space-y-2">
           {#each voteOptions as opt}
             <VoteOption
