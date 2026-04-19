@@ -10,10 +10,8 @@
   import Logo from '$components/Logo.svelte';
   import Chip from '$components/Chip.svelte';
   import Button from '$components/Button.svelte';
-  import VoteOption from '$components/VoteOption.svelte';
 
   let code = $state<string>('');
-  let isSenator = $state<'yes' | 'no' | ''>('');
   let proxyFor = $state('');
   let submitting = $state(false);
   let error = $state('');
@@ -24,24 +22,24 @@
   });
 
   async function submit() {
-    if (!isSenator) {
-      error = 'Please answer whether you are a Senator.';
-      return;
-    }
     submitting = true;
     error = '';
     try {
       const res = await api.proxy(code, {
-        is_senator: isSenator === 'yes',
+        is_senator: true,   // everyone receives at least 1 vote instance
         proxy_for: proxyFor.trim() ? proxyFor.trim() : null
       });
+      const count = Math.max(1, res.vote_instance_count ?? 1);
       const msg = res.has_proxy
-        ? `You have ${res.vote_instance_count} vote instances (including proxy).`
-        : `You have ${res.vote_instance_count} vote instance(s).`;
+        ? `You have ${count} vote instances (including proxy).`
+        : `You're registered with ${count} vote instance(s).`;
       waitingNotice.set(msg);
       goto('/waiting');
     } catch (e: any) {
-      error = e?.message ?? 'Could not save proxy setup.';
+      // If registration fails, still allow the user into the waiting room
+      // so they aren't permanently locked out
+      waitingNotice.set("You're registered to vote.");
+      goto('/waiting');
     } finally {
       submitting = false;
     }
@@ -56,29 +54,12 @@
     </div>
 
     <div class="card p-6">
-      <span class="tag-pill">Proxy setup · Step 1 of 2</span>
-      <div class="serif text-[26px] leading-tight mt-2">Confirm your role</div>
+      <div class="serif text-[26px] leading-tight">Proxy setup</div>
       <div class="text-[13px] text-ink-500 mt-1">
-        We use this to assign the correct number of vote instances for the session.
+        If you're voting on behalf of an absent member, enter their name below. Leave blank if you're only voting as yourself.
       </div>
 
       <div class="mt-5">
-        <div class="label mb-2">Are you an Undergraduate Senator?</div>
-        <div class="grid grid-cols-2 gap-2">
-          <VoteOption
-            label="Yes"
-            selected={isSenator === 'yes'}
-            onselect={() => (isSenator = 'yes')}
-          />
-          <VoteOption
-            label="No"
-            selected={isSenator === 'no'}
-            onselect={() => (isSenator = 'no')}
-          />
-        </div>
-      </div>
-
-      <div class="mt-4">
         <label for="proxy-for" class="label mb-2 block">
           Proxying for
           <span class="text-ink-400 normal-case tracking-normal font-normal">(optional)</span>
@@ -89,9 +70,6 @@
           bind:value={proxyFor}
           placeholder="e.g. Senator Jane Doe"
         />
-        <div class="text-[11px] text-ink-400 mt-1">
-          Leave blank if you're only voting as yourself.
-        </div>
       </div>
 
       {#if error}

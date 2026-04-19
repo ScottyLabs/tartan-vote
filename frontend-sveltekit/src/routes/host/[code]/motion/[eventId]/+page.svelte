@@ -3,6 +3,8 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { api } from '$lib/api';
+  import { get } from 'svelte/store';
+  import { currentEventEndTime } from '$stores/session';
   import Chip from '$components/Chip.svelte';
   import Button from '$components/Button.svelte';
   import StatCard from '$components/StatCard.svelte';
@@ -17,6 +19,8 @@
   let loading = $state(true);
   let ending = $state(false);
   let autoEnded = $state(false);
+  let releasing = $state(false);
+  let resultsReleased = $state(false);
   let error = $state('');
   let pollId: ReturnType<typeof setInterval> | null = null;
 
@@ -28,8 +32,8 @@
       const { active_event } = await api.checkEvent(code);
       if (active_event && String(active_event.id) === eventId) {
         evt = active_event as unknown as Event;
-      } else if (!evt) {
-        // event may have ended; fetch results but no active data
+      } else {
+        // Event is no longer active (ended or a different event is running)
         evt = null;
       }
       loading = false;
@@ -51,13 +55,32 @@
     }
   }
 
+  async function releaseResults() {
+    releasing = true;
+    try {
+      await api.releaseResults(eventId);
+      resultsReleased = true;
+    } catch (e: any) {
+      error = e?.message ?? 'Could not release results.';
+    } finally {
+      releasing = false;
+    }
+  }
+
+  // Whether the results are set to hidden-until-release
+  let isHiddenResults = $derived(evt?.data?.visibility?.participants === 'hidden_until_release');
+
   function formatRemaining(): string {
-    if (!evt?.end_time) return '—';
-    const ms = new Date(evt.end_time).getTime() - nowTick;
+    // Use end_time from the event response, or fall back to what the host stored on creation
+    const endTime = evt?.end_time ?? get(currentEventEndTime);
+    if (!endTime) return '—';
+    const ms = new Date(endTime).getTime() - nowTick;
     if (ms <= 0) return '00:00';
     const total = Math.floor(ms / 1000);
-    const m = Math.floor(total / 60);
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
     const s = total % 60;
+    if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   }
 
@@ -69,8 +92,9 @@
       nowTick = Date.now();
       load();
       // Auto-end event when the timer expires (backend may not expire it automatically)
-      if (evt?.end_time && !ending && !autoEnded) {
-        const msLeft = new Date(evt.end_time).getTime() - Date.now();
+      const endTime = evt?.end_time ?? get(currentEventEndTime);
+      if (endTime && !ending && !autoEnded) {
+        const msLeft = new Date(endTime).getTime() - Date.now();
         if (msLeft <= 0) {
           autoEnded = true;
           endMotion();
@@ -89,7 +113,7 @@
   );
 </script>
 
-<HostShell sessionCode={code} active="motions">
+<HostShell sessionCode={code} active={kind === 'election' ? 'elections' : 'motions'}>
   <div class="flex items-center gap-2 mb-3">
     <Chip variant="live" pulse>{kind === 'election' ? 'Election running' : 'Motion running'}</Chip>
     <span class="tag-pill">
@@ -110,6 +134,18 @@
       <div class="mt-6"><MotionLiveResults eventId={eventId} eventType={kind} /></div>
       <div class="flex items-center gap-2 mt-6">
         <Button variant="ghost" size="sm" onclick={() => goto(`/host/${code}`)}>Back to meeting</Button>
+        {#if !resultsReleased}
+          <div class="ml-auto">
+            <Button onclick={releaseResults} disabled={releasing}>
+              {releasing ? 'Releasing…' : 'Release results to voters'}
+            </Button>
+          </div>
+        {:else}
+          <div class="ml-auto flex items-center gap-1.5 text-sm font-medium" style="color: var(--accent-emerald, #10b981);">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 12l4 4L19 6"/></svg>
+            Results released
+          </div>
+        {/if}
       </div>
     </div>
   {:else}
@@ -141,8 +177,18 @@
         <div class="mt-4 text-sm text-scarlet-500">{error}</div>
       {/if}
 
-      <div class="flex items-center gap-2 mt-6">
+      <div class="flex items-center gap-2 mt-6 flex-wrap">
         <Button variant="ghost" size="sm" onclick={() => goto(`/host/${code}`)}>Back to meeting</Button>
+        {#if isHiddenResults && !resultsReleased}
+          <Button variant="ghost" size="sm" onclick={releaseResults} disabled={releasing}>
+            {releasing ? 'Releasing…' : 'Release results'}
+          </Button>
+        {:else if resultsReleased}
+          <span class="text-sm font-medium flex items-center gap-1" style="color: var(--accent-emerald, #10b981);">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 12l4 4L19 6"/></svg>
+            Results released
+          </span>
+        {/if}
         <div class="ml-auto">
           <Button onclick={endMotion} disabled={ending}>
             {ending ? 'Ending…' : 'End early'}

@@ -20,6 +20,7 @@
   let passed = $state<boolean | null>(null);
   let loading = $state(true);
   let error = $state('');
+  let resultsHidden = $state(false);
   let pollId: ReturnType<typeof setInterval> | null = null;
 
   async function load() {
@@ -49,7 +50,11 @@
       }
       loading = false;
     } catch (e: any) {
-      error = e?.message ?? 'Failed to load results.';
+      if (e?.status === 403) {
+        resultsHidden = true;
+      } else {
+        error = e?.message ?? 'Failed to load results.';
+      }
       loading = false;
     }
 
@@ -109,6 +114,16 @@
 
         {#if loading}
           <div class="mt-6 text-sm text-ink-500">Tallying…</div>
+        {:else if resultsHidden}
+          <div class="mt-6 soft-card p-4 border-l-4 border-l-ink-400">
+            <div class="text-sm font-semibold text-ink-700">Results are hidden</div>
+            <div class="text-[12px] text-ink-500 mt-1">
+              The host has chosen to keep results private until they release them. Check back soon.
+            </div>
+          </div>
+          <div class="mt-5 flex justify-end">
+            <Button variant="ghost" size="sm" onclick={() => goto('/waiting')}>Back to session</Button>
+          </div>
         {:else if error}
           <div class="mt-6 text-sm text-scarlet-500">{error}</div>
         {:else}

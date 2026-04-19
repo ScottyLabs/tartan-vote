@@ -7,6 +7,7 @@
     sessionCode: string;
     active?: 'overview' | 'motions' | 'elections' | 'participants' | 'exports';
     motionCount?: number;
+    electionCount?: number;
     participantCount?: number;
     onEndMeeting?: () => void;
     children: Snippet;
@@ -15,26 +16,74 @@
     sessionCode,
     active = 'overview',
     motionCount = 0,
+    electionCount = 0,
     participantCount = 0,
     onEndMeeting,
     children
   }: Props = $props();
 
+  let sidebarOpen = $state(false);
+
   function copyLink() {
     const url = `${window.location.origin}/join?code=${sessionCode}`;
     navigator.clipboard.writeText(url);
   }
+
+  function nav(path: string) {
+    sidebarOpen = false;
+    goto(path);
+  }
 </script>
 
-<div class="min-h-screen grid" style="grid-template-columns: 230px 1fr;">
-  <aside class="bg-ink-900 text-[#C3C9D6] p-4 flex flex-col">
-    <div class="px-2 py-3"><Logo size={30} tone="muted" /></div>
+<!-- Mobile top bar -->
+<div class="lg:hidden fixed top-0 left-0 right-0 z-40 flex items-center gap-3 px-4 h-14 bg-ink-900 border-b border-white/5">
+  <button
+    class="text-[#C3C9D6] hover:text-white p-1"
+    onclick={() => (sidebarOpen = !sidebarOpen)}
+    aria-label="Toggle sidebar"
+  >
+    {#if sidebarOpen}
+      <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path d="M6 6l12 12M18 6L6 18" />
+      </svg>
+    {:else}
+      <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path d="M4 6h16M4 12h16M4 18h16" />
+      </svg>
+    {/if}
+  </button>
+  <Logo size={22} tone="muted" />
+  <span class="ml-auto font-mono text-[15px] tracking-widest text-white">{sessionCode}</span>
+</div>
+
+<!-- Mobile backdrop -->
+{#if sidebarOpen}
+  <div
+    class="lg:hidden fixed inset-0 z-30 bg-black/50 backdrop-blur-sm"
+    onclick={() => (sidebarOpen = false)}
+  ></div>
+{/if}
+
+<!-- Page layout -->
+<div class="min-h-screen lg:grid" style="grid-template-columns: 230px 1fr;">
+
+  <!-- Sidebar -->
+  <aside
+    class="fixed top-0 left-0 z-40 h-full w-[230px] bg-ink-900 text-[#C3C9D6] p-4 flex flex-col
+           transform transition-transform duration-200 ease-in-out
+           {sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+           lg:translate-x-0 lg:static lg:h-auto"
+  >
+    <div class="px-2 py-3 hidden lg:block"><Logo size={30} tone="muted" /></div>
+    <!-- Mobile close area top padding -->
+    <div class="h-14 lg:hidden shrink-0"></div>
+
     <div class="h-px bg-white/5 my-3"></div>
     <div class="text-[10px] uppercase tracking-widest text-[#7A8299] px-3 mb-2">Meeting</div>
 
     <button
       class="nav-item {active === 'overview' ? 'active' : ''}"
-      onclick={() => goto(`/host/${sessionCode}`)}
+      onclick={() => nav(`/host/${sessionCode}`)}
     >
       <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
         <rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 10h18" />
@@ -53,20 +102,21 @@
         <path d="M16 4v16" /><path d="M8 4v16" /><path d="M4 12h16" />
       </svg>
       Elections
+      <span class="ml-auto text-[10px] bg-white/10 px-1.5 py-0.5 rounded">{electionCount}</span>
     </button>
-    <button class="nav-item {active === 'participants' ? 'active' : ''}">
+    <div class="nav-item-static">
       <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
         <circle cx="9" cy="8" r="4" /><path d="M17 11l2 2 4-4" /><path d="M2 20c1.5-3 4-4 7-4s5.5 1 7 4" />
       </svg>
       Participants
       <span class="ml-auto text-[10px] bg-white/10 px-1.5 py-0.5 rounded">{participantCount}</span>
-    </button>
-    <button class="nav-item {active === 'exports' ? 'active' : ''}">
+    </div>
+    <div class="nav-item-static">
       <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
         <path d="M14 3v5h5" /><path d="M6 3h8l5 5v13H6z" />
       </svg>
       Exports
-    </button>
+    </div>
 
     <div class="h-px bg-white/5 my-3"></div>
     <div class="text-[10px] uppercase tracking-widest text-[#7A8299] px-3 mb-2">Session</div>
@@ -90,7 +140,8 @@
     </div>
   </aside>
 
-  <main class="p-8 bg-[#F7F8FC]">
+  <!-- Main content — mt-14 offsets the fixed mobile top bar; lg resets to zero -->
+  <main class="mt-14 lg:mt-0 p-5 md:p-8 bg-[#F7F8FC] min-h-screen lg:min-h-0">
     {@render children()}
   </main>
 </div>
@@ -118,5 +169,19 @@
     background: rgba(200, 16, 46, 0.12);
     color: #fff;
     box-shadow: inset 0 0 0 1px rgba(200, 16, 46, 0.35);
+  }
+  :global(.nav-item-static) {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #5a6278;
+    width: 100%;
+    text-align: left;
+    cursor: default;
+    opacity: 0.6;
   }
 </style>

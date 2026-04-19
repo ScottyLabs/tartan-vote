@@ -13,3 +13,6 @@ export const currentEvent = writable<null | {
   event_type: string;
   data: EventData;
 }>(null);
+
+/** ISO string of the end time for the currently active event (set by host on creation). */
+export const currentEventEndTime = writable<string | null>(null);

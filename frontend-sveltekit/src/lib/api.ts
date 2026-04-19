@@ -114,6 +114,8 @@ export const api = {
     }),
   endEvent: (eventId: number | string) =>
     request<Json>(`/events/${eventId}/end`),
+  releaseResults: (eventId: number | string) =>
+    request<Json>(`/events/${eventId}/release`, { method: 'POST' }),
   eventResults: (eventId: number | string) =>
     request<Record<string, unknown>>(`/events/${eventId}/results`),
   vote: (
