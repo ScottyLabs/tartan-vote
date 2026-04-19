@@ -1,0 +1,1408 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TartanVote — UI Redesign Proposal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Instrument+Serif&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<style>
+  :root {
+    /* Refined CMU scarlet palette */
+    --scarlet-50:  #FFF1F0;
+    --scarlet-100: #FFE0DC;
+    --scarlet-200: #FFBCB3;
+    --scarlet-300: #FF8E80;
+    --scarlet-400: #F15A49;
+    --scarlet-500: #C8102E;   /* primary */
+    --scarlet-600: #A50E27;
+    --scarlet-700: #7B0A1D;
+
+    --ink-900: #0F1117;
+    --ink-800: #1A1D27;
+    --ink-700: #2A2F3D;
+    --ink-500: #5B6477;
+    --ink-400: #828CA0;
+    --ink-300: #B7BECD;
+    --ink-200: #E2E6EF;
+    --ink-100: #F1F3F9;
+    --ink-50:  #F7F8FC;
+
+    --accent-emerald: #10A36B;
+    --accent-amber:   #E5A100;
+  }
+  html, body { font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; background: #EEF0F6; color: var(--ink-900); }
+  .serif { font-family: 'Instrument Serif', serif; letter-spacing: -0.01em; }
+
+  /* Browser-frame around each mockup */
+  .frame {
+    background: #FFFFFF;
+    border: 1px solid var(--ink-200);
+    border-radius: 18px;
+    overflow: hidden;
+    box-shadow:
+      0 1px 0 rgba(15,17,23,0.04),
+      0 20px 50px -20px rgba(15,17,23,0.18),
+      0 8px 24px -12px rgba(15,17,23,0.1);
+  }
+  .frame-bar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 14px;
+    background: linear-gradient(180deg, #F7F8FC 0%, #EEF0F6 100%);
+    border-bottom: 1px solid var(--ink-200);
+  }
+  .dot { width:10px; height:10px; border-radius: 999px; }
+  .dot-r{ background:#FF5F56 } .dot-y{ background:#FFBD2E } .dot-g{ background:#27C93F }
+  .url {
+    flex: 1; text-align:center; font-size: 12px; color: var(--ink-500);
+    background: #FFFFFF; border: 1px solid var(--ink-200);
+    border-radius: 8px; padding: 4px 10px; margin: 0 60px;
+  }
+
+  /* Brand button */
+  .btn-primary {
+    background: linear-gradient(180deg, #D41A39 0%, #A50E27 100%);
+    color:#fff; font-weight: 600; letter-spacing: -0.01em;
+    border-radius: 12px;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.35) inset, 0 1px 2px rgba(124,10,29,0.35), 0 8px 20px -10px rgba(200,16,46,0.55);
+    transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
+  }
+  .btn-primary:hover { filter: brightness(1.05); transform: translateY(-1px); }
+
+  .btn-ghost {
+    background:#fff; color: var(--ink-800); font-weight:600;
+    border: 1px solid var(--ink-200); border-radius: 12px;
+    transition: all .15s ease;
+  }
+  .btn-ghost:hover { border-color: var(--ink-300); background: var(--ink-50); }
+
+  .btn-dark {
+    background: var(--ink-900); color: #fff; font-weight: 600; border-radius: 12px;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.05) inset, 0 8px 20px -10px rgba(15,17,23,0.45);
+  }
+
+  .input {
+    background: #FFFFFF;
+    border: 1px solid var(--ink-200);
+    border-radius: 12px;
+    padding: 12px 14px;
+    font-size: 14px;
+    transition: border-color .15s ease, box-shadow .15s ease;
+  }
+  .input:focus { outline: none; border-color: var(--scarlet-400); box-shadow: 0 0 0 4px rgba(241,90,73,0.12); }
+  .input-lg { padding: 14px 16px; font-size: 16px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 600; }
+
+  .label { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-500); }
+
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px; border-radius: 999px;
+    font-size: 12px; font-weight: 600;
+  }
+  .chip-live { background: rgba(16,163,107,.10); color: var(--accent-emerald); }
+  .chip-muted { background: var(--ink-100); color: var(--ink-500); }
+  .pulse-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--accent-emerald); box-shadow: 0 0 0 0 rgba(16,163,107,.5); animation: pulse 1.6s ease-out infinite; }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(16,163,107,.5);} 70% { box-shadow: 0 0 0 10px rgba(16,163,107,0);} 100% { box-shadow: 0 0 0 0 rgba(16,163,107,0);} }
+
+  .card {
+    background:#fff; border:1px solid var(--ink-200); border-radius: 16px;
+    box-shadow: 0 1px 2px rgba(15,17,23,0.04), 0 10px 30px -20px rgba(15,17,23,0.12);
+  }
+  .soft-card { background: var(--ink-50); border: 1px solid var(--ink-200); border-radius: 14px; }
+
+  /* Host app chrome */
+  .sidebar {
+    background: #0F1117;
+    color: #C3C9D6;
+    border-radius: 0 18px 18px 0;
+  }
+  .nav-item {
+    display:flex; align-items:center; gap:10px;
+    padding: 10px 12px; border-radius: 10px; font-size: 14px; font-weight: 500;
+    color: #A7B0C4; cursor: pointer;
+  }
+  .nav-item:hover { background: rgba(255,255,255,0.04); color: #fff; }
+  .nav-item.active { background: rgba(200,16,46,0.12); color: #fff; box-shadow: inset 0 0 0 1px rgba(200,16,46,0.35); }
+
+  .stat-card {
+    border-radius: 14px; padding: 18px; border: 1px solid var(--ink-200);
+    background: linear-gradient(180deg, #FFFFFF 0%, #FAFBFE 100%);
+  }
+
+  /* Modal */
+  .modal-backdrop {
+    position: relative;
+    background: linear-gradient(180deg, rgba(15,17,23,0.42) 0%, rgba(15,17,23,0.55) 100%);
+  }
+  .modal {
+    background: #fff; border-radius: 20px;
+    box-shadow: 0 40px 80px -20px rgba(15,17,23,0.35), 0 10px 30px -10px rgba(15,17,23,0.2);
+    border: 1px solid rgba(255,255,255,0.6);
+  }
+
+  .tag-pill {
+    display:inline-flex; align-items:center; gap:6px;
+    padding: 6px 10px; background: var(--ink-100); color: var(--ink-700);
+    border-radius: 999px; font-size: 12px; font-weight: 500;
+  }
+
+  .progress-track { background: var(--ink-100); border-radius: 999px; overflow: hidden; }
+  .progress-bar { height: 100%; border-radius: 999px; }
+
+  /* Section number labels */
+  .section-label {
+    display:inline-flex; align-items:center; gap:10px;
+    font-size: 12px; font-weight:700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-500);
+  }
+  .section-label::before {
+    content:""; width: 28px; height: 1px; background: var(--ink-300);
+  }
+
+  .screen-title {
+    font-size: 28px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: var(--ink-900);
+  }
+  .screen-desc { color: var(--ink-500); font-size: 14px; max-width: 560px; }
+
+  .grid-bg {
+    background-image:
+      radial-gradient(circle at 1px 1px, rgba(15,17,23,0.06) 1px, transparent 0);
+    background-size: 24px 24px;
+  }
+
+  /* Seal / logo mark */
+  .logo-mark {
+    width: 36px; height: 36px; border-radius: 10px;
+    background: linear-gradient(135deg, #D41A39 0%, #7B0A1D 100%);
+    display: grid; place-items: center; color: #fff;
+    box-shadow: 0 6px 16px -8px rgba(200,16,46,.6);
+  }
+
+  /* Swatches */
+  .swatch { border-radius: 12px; height: 72px; border: 1px solid rgba(15,17,23,0.06); }
+
+  /* Radio buttons styled like pills */
+  .vote-option {
+    display:flex; align-items:center; justify-content:space-between;
+    padding: 16px 18px; border: 1px solid var(--ink-200); border-radius: 14px;
+    cursor: pointer; transition: all .15s ease; background:#fff;
+  }
+  .vote-option:hover { border-color: var(--ink-300); background: var(--ink-50); }
+  .vote-option.selected { border-color: var(--scarlet-500); background: var(--scarlet-50); box-shadow: 0 0 0 3px rgba(200,16,46,0.08); }
+
+  .radio-mark {
+    width: 20px; height: 20px; border-radius: 999px; border: 2px solid var(--ink-300); display:grid; place-items:center;
+  }
+  .vote-option.selected .radio-mark { border-color: var(--scarlet-500); }
+  .vote-option.selected .radio-mark::after { content:""; width: 10px; height: 10px; border-radius:999px; background: var(--scarlet-500); }
+
+  /* Little divider */
+  .divider { height:1px; background: var(--ink-200); }
+
+  /* Typography scale preview */
+  .type-sample { display:flex; align-items: baseline; gap: 18px; padding: 12px 0; border-bottom: 1px dashed var(--ink-200); }
+</style>
+</head>
+<body class="antialiased">
+
+<!-- =========================== HERO =========================== -->
+<header class="max-w-[1240px] mx-auto px-8 pt-16 pb-10">
+  <div class="flex items-center gap-3 mb-10">
+    <div class="logo-mark">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+    </div>
+    <div class="leading-tight">
+      <div class="text-[15px] font-semibold tracking-tight text-[var(--ink-900)]">TartanVote</div>
+      <div class="text-[11px] text-[var(--ink-500)] tracking-wider uppercase">UI Redesign Proposal · v1</div>
+    </div>
+    <div class="ml-auto flex items-center gap-2">
+      <span class="tag-pill"><span class="pulse-dot"></span> Visual only — no code changed</span>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-12 gap-10 items-end">
+    <div class="col-span-12 lg:col-span-8">
+      <div class="section-label mb-4">Concept</div>
+      <h1 class="serif text-[68px] leading-[1.02] tracking-tight">
+        A calmer, more <span class="text-[var(--scarlet-500)]">official-feeling</span> voting experience — built for clarity under pressure.
+      </h1>
+      <p class="mt-5 text-[var(--ink-500)] text-[17px] max-w-[720px] leading-relaxed">
+        The current UI keeps all the right entries and actions, but the red-on-red stacked buttons and flat modals make it feel unfinished. This proposal keeps every feature intact and re-skins the app with a considered type system, a governance-grade color palette, and layouts that emphasize <em>what's happening right now</em>.
+      </p>
+    </div>
+    <div class="col-span-12 lg:col-span-4">
+      <div class="card p-5">
+        <div class="label mb-3">Design principles</div>
+        <ul class="space-y-3 text-[14px] text-[var(--ink-700)]">
+          <li class="flex gap-3"><span class="w-5 h-5 rounded-full bg-[var(--scarlet-50)] text-[var(--scarlet-500)] grid place-items-center text-[10px] font-bold">1</span><div><b>Stay official.</b> CMU scarlet, but refined and used with restraint.</div></li>
+          <li class="flex gap-3"><span class="w-5 h-5 rounded-full bg-[var(--scarlet-50)] text-[var(--scarlet-500)] grid place-items-center text-[10px] font-bold">2</span><div><b>Reduce modal anxiety.</b> Structured forms with hierarchy and previews.</div></li>
+          <li class="flex gap-3"><span class="w-5 h-5 rounded-full bg-[var(--scarlet-50)] text-[var(--scarlet-500)] grid place-items-center text-[10px] font-bold">3</span><div><b>Show live state.</b> Status chips, pulses, and motion timers are first-class.</div></li>
+          <li class="flex gap-3"><span class="w-5 h-5 rounded-full bg-[var(--scarlet-50)] text-[var(--scarlet-500)] grid place-items-center text-[10px] font-bold">4</span><div><b>Same entries.</b> Every field and control from the current app is preserved.</div></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- =========================== DESIGN SYSTEM =========================== -->
+<section class="max-w-[1240px] mx-auto px-8 py-14">
+  <div class="flex items-end justify-between mb-8">
+    <div>
+      <div class="section-label mb-3">01 · Design System</div>
+      <h2 class="serif text-[42px] leading-none tracking-tight">Foundations</h2>
+    </div>
+    <p class="screen-desc">A tight palette and a hierarchy of two typefaces: <b>Instrument Serif</b> for display moments, <b>Inter</b> for UI.</p>
+  </div>
+
+  <div class="grid grid-cols-12 gap-6">
+    <!-- Palette -->
+    <div class="col-span-12 lg:col-span-7 card p-6">
+      <div class="label mb-4">Color</div>
+      <div class="grid grid-cols-6 gap-3">
+        <div>
+          <div class="swatch" style="background: var(--scarlet-500)"></div>
+          <div class="mt-2 text-[12px] font-semibold">Scarlet 500</div>
+          <div class="text-[11px] text-[var(--ink-500)]">#C8102E · brand</div>
+        </div>
+        <div>
+          <div class="swatch" style="background: var(--scarlet-700)"></div>
+          <div class="mt-2 text-[12px] font-semibold">Scarlet 700</div>
+          <div class="text-[11px] text-[var(--ink-500)]">#7B0A1D · press</div>
+        </div>
+        <div>
+          <div class="swatch" style="background: var(--ink-900)"></div>
+          <div class="mt-2 text-[12px] font-semibold">Ink 900</div>
+          <div class="text-[11px] text-[var(--ink-500)]">#0F1117 · text</div>
+        </div>
+        <div>
+          <div class="swatch" style="background: var(--ink-500)"></div>
+          <div class="mt-2 text-[12px] font-semibold">Ink 500</div>
+          <div class="text-[11px] text-[var(--ink-500)]">#5B6477 · muted</div>
+        </div>
+        <div>
+          <div class="swatch" style="background: var(--accent-emerald)"></div>
+          <div class="mt-2 text-[12px] font-semibold">Emerald</div>
+          <div class="text-[11px] text-[var(--ink-500)]">#10A36B · pass</div>
+        </div>
+        <div>
+          <div class="swatch" style="background: var(--accent-amber)"></div>
+          <div class="mt-2 text-[12px] font-semibold">Amber</div>
+          <div class="text-[11px] text-[var(--ink-500)]">#E5A100 · abstain</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Type -->
+    <div class="col-span-12 lg:col-span-5 card p-6">
+      <div class="label mb-4">Typography</div>
+      <div class="type-sample">
+        <div class="serif text-[44px] leading-none">Motion Results</div>
+        <div class="text-[11px] text-[var(--ink-500)] ml-auto">Instrument Serif · 44/48</div>
+      </div>
+      <div class="type-sample">
+        <div class="text-[22px] font-semibold tracking-tight">Vote on current motion</div>
+        <div class="text-[11px] text-[var(--ink-500)] ml-auto">Inter 600 · 22</div>
+      </div>
+      <div class="type-sample">
+        <div class="text-[14px] text-[var(--ink-700)]">Threshold is majority of voting members present.</div>
+        <div class="text-[11px] text-[var(--ink-500)] ml-auto">Inter 400 · 14</div>
+      </div>
+      <div class="type-sample" style="border:none">
+        <div class="label">Session · BUBMGC</div>
+        <div class="text-[11px] text-[var(--ink-500)] ml-auto">Inter 600 · 12 · tracked</div>
+      </div>
+    </div>
+
+    <!-- Components preview -->
+    <div class="col-span-12 card p-6">
+      <div class="label mb-5">Components</div>
+      <div class="grid grid-cols-12 gap-6 items-start">
+        <div class="col-span-12 md:col-span-3">
+          <div class="text-[12px] text-[var(--ink-500)] mb-2">Buttons</div>
+          <div class="flex flex-col gap-3">
+            <button class="btn-primary px-5 py-3">Push Motion</button>
+            <button class="btn-dark px-5 py-3">End Meeting</button>
+            <button class="btn-ghost px-5 py-3">Back to session</button>
+          </div>
+        </div>
+        <div class="col-span-12 md:col-span-3">
+          <div class="text-[12px] text-[var(--ink-500)] mb-2">Inputs</div>
+          <div class="flex flex-col gap-3">
+            <input class="input" placeholder="Title" />
+            <input class="input input-lg" value="BUBMGC" />
+          </div>
+        </div>
+        <div class="col-span-12 md:col-span-3">
+          <div class="text-[12px] text-[var(--ink-500)] mb-2">Status</div>
+          <div class="flex flex-col gap-2 items-start">
+            <span class="chip chip-live"><span class="pulse-dot"></span> Live motion</span>
+            <span class="chip chip-muted">Queued</span>
+            <span class="tag-pill"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> 02:14 remaining</span>
+          </div>
+        </div>
+        <div class="col-span-12 md:col-span-3">
+          <div class="text-[12px] text-[var(--ink-500)] mb-2">Vote option</div>
+          <div class="vote-option selected">
+            <div class="flex items-center gap-3">
+              <div class="radio-mark"></div>
+              <div>
+                <div class="font-semibold text-[14px]">Yes</div>
+                <div class="text-[12px] text-[var(--ink-500)]">In favor of the motion</div>
+              </div>
+            </div>
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-[var(--scarlet-500)]"><path d="M5 12l4 4L19 6"/></svg>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =========================== SIGN IN =========================== -->
+<section class="max-w-[1240px] mx-auto px-8 py-10">
+  <div class="flex items-end justify-between mb-6">
+    <div>
+      <div class="section-label mb-3">02 · Entry</div>
+      <h2 class="serif text-[36px] leading-none tracking-tight">Sign in & Join</h2>
+    </div>
+    <p class="screen-desc">Replaces the building-silhouette landing with a confident, editorial split-panel. Same two actions: CMU SSO, or join a session with a code.</p>
+  </div>
+
+  <div class="grid grid-cols-12 gap-6">
+
+    <!-- Sign in screen -->
+    <div class="col-span-12 lg:col-span-6">
+      <div class="frame">
+        <div class="frame-bar">
+          <span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span>
+          <div class="url">tartan.vote</div>
+        </div>
+        <div class="grid grid-cols-2">
+          <!-- Left editorial panel -->
+          <div class="p-10 grid-bg relative" style="background: linear-gradient(160deg, #FFF1F0 0%, #FFFFFF 60%);">
+            <div class="flex items-center gap-2">
+              <div class="logo-mark" style="width:28px;height:28px;border-radius:8px;">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>
+              </div>
+              <div class="font-semibold text-[14px]">TartanVote</div>
+            </div>
+            <div class="mt-16 serif text-[42px] leading-[1.05]">
+              Governance, <br/>clearly <span class="text-[var(--scarlet-500)]">decided</span>.
+            </div>
+            <div class="text-[13px] text-[var(--ink-500)] mt-4 max-w-[260px]">
+              Motions, elections, and proxies for CMU Student Senate — in one quiet place.
+            </div>
+            <div class="mt-10 tag-pill"><span class="pulse-dot"></span> Powered by ScottyLabs</div>
+          </div>
+
+          <!-- Right form -->
+          <div class="p-10">
+            <div class="label">Welcome back</div>
+            <div class="mt-2 text-[24px] font-semibold tracking-tight">Sign in to continue</div>
+            <div class="text-[13px] text-[var(--ink-500)] mt-2">Use your Carnegie Mellon credentials. You'll be returned here after authenticating.</div>
+
+            <button class="btn-primary w-full mt-8 py-3 flex items-center justify-center gap-2">
+              <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 17.93A8 8 0 015.07 13H9v1a2 2 0 002 2v3.93zm6.73-4.93A8 8 0 0113 19.93V17a2 2 0 002-2v-1h2.73a8.04 8.04 0 002 1z"/></svg>
+              Sign in with CMU SSO
+            </button>
+
+            <div class="flex items-center gap-2 mt-5 p-3 rounded-xl border border-[var(--ink-200)] bg-[var(--ink-50)]">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-[var(--ink-500)] shrink-0"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
+              <div class="text-[12px] text-[var(--ink-500)] leading-snug">CMU authentication is required to vote. Only <b class="text-[var(--ink-800)]">@andrew.cmu.edu</b> accounts can join sessions.</div>
+            </div>
+
+            <div class="mt-8 text-[12px] text-[var(--ink-400)]">By continuing you agree to ScottyLabs' usage policy.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Join session screen -->
+    <div class="col-span-12 lg:col-span-6">
+      <div class="frame">
+        <div class="frame-bar">
+          <span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span>
+          <div class="url">tartan.vote/join</div>
+        </div>
+        <div class="p-10" style="background: #F7F8FC;">
+          <div class="flex items-center gap-2 mb-10">
+            <div class="logo-mark" style="width:28px;height:28px;border-radius:8px;">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>
+            </div>
+            <div class="font-semibold text-[14px]">TartanVote</div>
+            <span class="chip chip-muted ml-auto">John Cao</span>
+          </div>
+
+          <div class="max-w-[440px] mx-auto">
+            <div class="label text-center">Step 1 of 1</div>
+            <div class="serif text-center text-[40px] leading-tight mt-2">Welcome, <span class="text-[var(--scarlet-500)]">John</span>.</div>
+            <div class="text-center text-[14px] text-[var(--ink-500)] mt-2">Enter a session code to join, or host your own.</div>
+
+            <div class="card p-6 mt-8">
+              <div class="label mb-2">Session code</div>
+              <input class="input input-lg w-full tracking-[0.25em] text-center" value="BUBMGC" />
+              <button class="btn-primary w-full mt-4 py-3">Join session</button>
+
+              <div class="flex items-center gap-3 my-5">
+                <div class="h-px flex-1 bg-[var(--ink-200)]"></div>
+                <div class="text-[11px] text-[var(--ink-400)] uppercase tracking-widest">or</div>
+                <div class="h-px flex-1 bg-[var(--ink-200)]"></div>
+              </div>
+
+              <button class="btn-ghost w-full py-3">Create a new session</button>
+            </div>
+
+            <div class="text-center mt-6 text-[12px] text-[var(--ink-500)]">
+              Recently joined · <b class="text-[var(--ink-700)]">SENATE-24</b> · <b class="text-[var(--ink-700)]">GBM-APR08</b>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+
+<!-- =========================== HOST DASHBOARD =========================== -->
+<section class="max-w-[1240px] mx-auto px-8 py-14">
+  <div class="flex items-end justify-between mb-6">
+    <div>
+      <div class="section-label mb-3">03 · Host</div>
+      <h2 class="serif text-[36px] leading-none tracking-tight">Meeting dashboard</h2>
+    </div>
+    <p class="screen-desc">A dark rail anchors the host. Live meeting state, participants, proxies, and the existing <b>Push motion</b>, <b>Push election</b>, <b>End meeting</b>, and <b>Download</b> actions — now with structure.</p>
+  </div>
+
+  <div class="frame">
+    <div class="frame-bar">
+      <span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span>
+      <div class="url">tartan.vote/session/BUBMGC</div>
+    </div>
+    <div class="grid" style="grid-template-columns: 230px 1fr; min-height: 640px;">
+      <!-- Sidebar -->
+      <aside class="sidebar p-4" style="border-radius: 0;">
+        <div class="flex items-center gap-2 px-2 py-3">
+          <div class="logo-mark" style="width:30px;height:30px;border-radius:8px;">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>
+          </div>
+          <div class="leading-tight">
+            <div class="font-semibold text-[13px] text-white">TartanVote</div>
+            <div class="text-[10px] text-[#7A8299] uppercase tracking-widest">Host console</div>
+          </div>
+        </div>
+        <div class="h-px bg-white/5 my-3"></div>
+        <div class="text-[10px] uppercase tracking-widest text-[#7A8299] px-3 mb-2">Meeting</div>
+        <div class="nav-item active"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/></svg> Overview</div>
+        <div class="nav-item"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 6l9 6 9-6"/><rect x="3" y="6" width="18" height="12" rx="2"/></svg> Motions <span class="ml-auto text-[10px] bg-white/10 px-1.5 py-0.5 rounded">3</span></div>
+        <div class="nav-item"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M16 4v16"/><path d="M8 4v16"/><path d="M4 12h16"/></svg> Elections</div>
+        <div class="nav-item"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M17 11l2 2 4-4"/><path d="M2 20c1.5-3 4-4 7-4s5.5 1 7 4"/></svg> Participants <span class="ml-auto text-[10px] bg-white/10 px-1.5 py-0.5 rounded">27</span></div>
+        <div class="nav-item"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 3v5h5"/><path d="M6 3h8l5 5v13H6z"/></svg> Exports</div>
+
+        <div class="h-px bg-white/5 my-3"></div>
+        <div class="text-[10px] uppercase tracking-widest text-[#7A8299] px-3 mb-2">Session</div>
+        <div class="px-3 py-2 rounded-lg bg-white/[0.03] border border-white/5">
+          <div class="text-[10px] uppercase tracking-widest text-[#7A8299]">Meeting code</div>
+          <div class="font-mono text-[18px] tracking-[0.2em] text-white mt-0.5">BUBMGC</div>
+          <button class="text-[11px] text-[var(--scarlet-300)] mt-1 hover:text-white">Copy link</button>
+        </div>
+
+        <div class="mt-auto pt-6">
+          <button class="btn-dark w-full py-2.5 text-[13px] border border-white/10 flex items-center justify-center gap-2" style="background: rgba(255,255,255,0.04)">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 3h6v6"/><path d="M10 14L21 3"/><path d="M21 14v7H3V3h7"/></svg>
+            End meeting
+          </button>
+        </div>
+      </aside>
+
+      <!-- Main -->
+      <div class="p-8" style="background: #F7F8FC;">
+        <div class="flex items-start justify-between gap-4 mb-6">
+          <div>
+            <div class="flex items-center gap-2 mb-1">
+              <span class="chip chip-live"><span class="pulse-dot"></span> Live</span>
+              <span class="tag-pill">Hosted by John Cao</span>
+              <span class="tag-pill">Started 7:12 PM</span>
+            </div>
+            <h1 class="serif text-[40px] leading-[1.05] tracking-tight">Spring General Body Meeting</h1>
+            <div class="text-[13px] text-[var(--ink-500)] mt-1">Meeting code <b class="text-[var(--ink-900)]">BUBMGC</b> · 27 in attendance · 3 motions so far</div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button class="btn-ghost px-4 py-2.5 text-[13px] flex items-center gap-2">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+              Invite
+            </button>
+            <div class="flex">
+              <select class="input text-[13px] rounded-r-none border-r-0" style="padding: 9px 12px;">
+                <option>Attendance — PDF</option><option>Attendance — CSV</option>
+                <option>Votes — PDF</option><option>Votes — CSV</option>
+              </select>
+              <button class="btn-primary px-4 rounded-l-none">Download</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="grid grid-cols-4 gap-4 mb-6">
+          <div class="stat-card">
+            <div class="label">Participants</div>
+            <div class="flex items-end justify-between mt-2">
+              <div class="text-[28px] font-semibold tracking-tight">27</div>
+              <div class="text-[11px] text-[var(--accent-emerald)] font-semibold">+4 since start</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="label">Voting weight</div>
+            <div class="flex items-end justify-between mt-2">
+              <div class="text-[28px] font-semibold tracking-tight">31</div>
+              <div class="text-[11px] text-[var(--ink-500)]">27 members + 4 proxy</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="label">Active motion</div>
+            <div class="flex items-end justify-between mt-2">
+              <div class="text-[18px] font-semibold tracking-tight truncate pr-2">Approve Q2 budget</div>
+              <span class="chip chip-live"><span class="pulse-dot"></span> 02:14</span>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="label">Quorum</div>
+            <div class="flex items-end justify-between mt-2">
+              <div class="text-[28px] font-semibold tracking-tight text-[var(--accent-emerald)]">Met</div>
+              <div class="text-[11px] text-[var(--ink-500)]">27 / 20 required</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Two-column: participants + quick actions -->
+        <div class="grid grid-cols-12 gap-5">
+          <div class="col-span-12 lg:col-span-7 card p-5">
+            <div class="flex items-center justify-between mb-3">
+              <div class="font-semibold text-[15px]">Participants</div>
+              <div class="flex items-center gap-2">
+                <div class="relative">
+                  <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--ink-400)]" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+                  <input class="input pl-8 text-[13px] py-2" placeholder="Search" />
+                </div>
+                <button class="btn-ghost px-3 py-2 text-[13px] flex items-center gap-1.5"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="M5 12h14"/></svg> Add</button>
+              </div>
+            </div>
+
+            <div class="divide-y divide-[var(--ink-200)]">
+              <!-- row -->
+              <div class="flex items-center gap-3 py-2.5">
+                <div class="w-8 h-8 rounded-full bg-[var(--scarlet-100)] text-[var(--scarlet-700)] grid place-items-center text-[12px] font-bold">JC</div>
+                <div class="flex-1">
+                  <div class="text-[13px] font-semibold">John Cao</div>
+                  <div class="text-[11px] text-[var(--ink-500)]">Undergraduate · Senator</div>
+                </div>
+                <span class="tag-pill">Weight 1</span>
+                <span class="chip chip-live"><span class="pulse-dot"></span> Present</span>
+              </div>
+              <div class="flex items-center gap-3 py-2.5">
+                <div class="w-8 h-8 rounded-full bg-[#E6EEFB] text-[#1E4BB3] grid place-items-center text-[12px] font-bold">AM</div>
+                <div class="flex-1">
+                  <div class="text-[13px] font-semibold">Ava Martinez</div>
+                  <div class="text-[11px] text-[var(--ink-500)]">Graduate · Senator · proxy for Sen. J. Doe</div>
+                </div>
+                <span class="tag-pill">Weight 2</span>
+                <span class="chip chip-live"><span class="pulse-dot"></span> Present</span>
+              </div>
+              <div class="flex items-center gap-3 py-2.5">
+                <div class="w-8 h-8 rounded-full bg-[#FDE9D9] text-[#8A4B00] grid place-items-center text-[12px] font-bold">RS</div>
+                <div class="flex-1">
+                  <div class="text-[13px] font-semibold">Ravi Shah</div>
+                  <div class="text-[11px] text-[var(--ink-500)]">Undergraduate · Member</div>
+                </div>
+                <span class="tag-pill">Weight 1</span>
+                <span class="chip chip-muted">Voted</span>
+              </div>
+              <div class="flex items-center gap-3 py-2.5">
+                <div class="w-8 h-8 rounded-full bg-[#E1F5E9] text-[#0B7A4D] grid place-items-center text-[12px] font-bold">KL</div>
+                <div class="flex-1">
+                  <div class="text-[13px] font-semibold">Kira Liu</div>
+                  <div class="text-[11px] text-[var(--ink-500)]">Undergraduate · Senator</div>
+                </div>
+                <span class="tag-pill">Weight 1</span>
+                <span class="chip chip-muted">Away</span>
+              </div>
+              <div class="flex items-center gap-3 py-2.5 opacity-70">
+                <div class="w-8 h-8 rounded-full bg-[var(--ink-100)] text-[var(--ink-500)] grid place-items-center text-[12px] font-bold">+23</div>
+                <div class="flex-1">
+                  <div class="text-[13px] font-semibold">23 more participants</div>
+                  <div class="text-[11px] text-[var(--ink-500)]">Tap to view full roll</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-span-12 lg:col-span-5 space-y-5">
+            <!-- Active proxies -->
+            <div class="card p-5">
+              <div class="flex items-center justify-between mb-3">
+                <div class="font-semibold text-[15px]">Active proxies</div>
+                <button class="text-[12px] font-semibold text-[var(--scarlet-500)]">Manage</button>
+              </div>
+              <div class="space-y-2.5">
+                <div class="soft-card p-3 flex items-center gap-3">
+                  <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-[var(--scarlet-500)]"><path d="M17 11a5 5 0 10-10 0v10h10z"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                  <div class="flex-1">
+                    <div class="text-[13px] font-semibold">Ava Martinez</div>
+                    <div class="text-[11px] text-[var(--ink-500)]">Proxy for Sen. Jane Doe · +1 weight</div>
+                  </div>
+                  <span class="chip chip-live"><span class="pulse-dot"></span> Active</span>
+                </div>
+                <div class="soft-card p-3 flex items-center gap-3">
+                  <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-[var(--scarlet-500)]"><path d="M17 11a5 5 0 10-10 0v10h10z"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                  <div class="flex-1">
+                    <div class="text-[13px] font-semibold">Ravi Shah</div>
+                    <div class="text-[11px] text-[var(--ink-500)]">Proxy for Sen. T. Ng · +1 weight</div>
+                  </div>
+                  <span class="chip chip-live"><span class="pulse-dot"></span> Active</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Quick actions -->
+            <div class="card p-5">
+              <div class="font-semibold text-[15px] mb-3">Quick actions</div>
+              <div class="grid grid-cols-2 gap-3">
+                <button class="btn-primary py-3.5 flex flex-col items-start px-4">
+                  <div class="flex items-center gap-1.5 text-[11px] uppercase tracking-widest opacity-80 font-semibold">
+                    <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+                    Motion
+                  </div>
+                  <div class="text-[15px] font-semibold mt-1">Push a motion</div>
+                </button>
+                <button class="btn-primary py-3.5 flex flex-col items-start px-4">
+                  <div class="flex items-center gap-1.5 text-[11px] uppercase tracking-widest opacity-80 font-semibold">
+                    <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M8 7V5a4 4 0 118 0v2"/><rect x="4" y="7" width="16" height="14" rx="2"/></svg>
+                    Election
+                  </div>
+                  <div class="text-[15px] font-semibold mt-1">Push an election</div>
+                </button>
+                <button class="btn-ghost py-3 flex items-center gap-2 justify-center col-span-2 text-[13px]">
+                  <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M21 21H3"/></svg>
+                  Download meeting export
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =========================== PUSH MOTION MODAL =========================== -->
+<section class="max-w-[1240px] mx-auto px-8 py-14">
+  <div class="flex items-end justify-between mb-6">
+    <div>
+      <div class="section-label mb-3">04 · Authoring</div>
+      <h2 class="serif text-[36px] leading-none tracking-tight">Push a motion</h2>
+    </div>
+    <p class="screen-desc">All existing fields — title, preset, description, vote options, threshold, display, result visibility, proxy, export, time — reorganized into a single scroll-friendly column with a live preview.</p>
+  </div>
+
+  <div class="frame modal-backdrop">
+    <div class="frame-bar">
+      <span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span>
+      <div class="url">tartan.vote/session/BUBMGC</div>
+    </div>
+
+    <div class="relative p-10 grid-bg" style="min-height: 720px;">
+      <!-- Dim background hint -->
+      <div class="absolute inset-0 bg-[var(--ink-900)]/40"></div>
+
+      <div class="relative mx-auto" style="max-width: 940px;">
+        <div class="modal grid grid-cols-12 overflow-hidden">
+          <!-- Left form -->
+          <div class="col-span-12 md:col-span-7 p-8 border-r border-[var(--ink-200)]">
+            <div class="flex items-start justify-between">
+              <div>
+                <div class="tag-pill">Motion #07</div>
+                <div class="serif text-[28px] leading-tight mt-2">New motion</div>
+                <div class="text-[13px] text-[var(--ink-500)]">Draft before pushing. Voters won't see this until you publish.</div>
+              </div>
+              <button class="w-9 h-9 grid place-items-center rounded-full hover:bg-[var(--ink-100)]">
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
+              </button>
+            </div>
+
+            <div class="mt-6 space-y-5">
+              <div>
+                <div class="label mb-2">Title</div>
+                <input class="input w-full" placeholder="e.g. Approve the Q2 budget" />
+              </div>
+
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <div class="label mb-2">Preset</div>
+                  <select class="input w-full"><option>Standard vote</option><option>Constitutional amendment</option><option>Custom…</option></select>
+                </div>
+                <div class="flex items-end">
+                  <button class="btn-ghost w-full py-3">Apply preset</button>
+                </div>
+              </div>
+
+              <div>
+                <div class="label mb-2">Description</div>
+                <textarea class="input w-full min-h-[90px]" placeholder="Motion text as it will appear to voters."></textarea>
+              </div>
+
+              <div>
+                <div class="label mb-2">Vote options</div>
+                <div class="space-y-2">
+                  <div class="flex items-center gap-2">
+                    <div class="input flex-1 flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-[var(--accent-emerald)]"></span>Yes</div>
+                    <button class="w-10 h-10 rounded-lg border border-[var(--ink-200)] grid place-items-center text-[var(--ink-400)] hover:bg-[var(--ink-50)]"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M5 6l1 14h12l1-14"/></svg></button>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <div class="input flex-1 flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-[var(--scarlet-500)]"></span>No</div>
+                    <button class="w-10 h-10 rounded-lg border border-[var(--ink-200)] grid place-items-center text-[var(--ink-400)] hover:bg-[var(--ink-50)]"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M5 6l1 14h12l1-14"/></svg></button>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <div class="input flex-1 flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-[var(--accent-amber)]"></span>Abstain</div>
+                    <button class="w-10 h-10 rounded-lg border border-[var(--ink-200)] grid place-items-center text-[var(--ink-400)] hover:bg-[var(--ink-50)]"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M5 6l1 14h12l1-14"/></svg></button>
+                  </div>
+                  <button class="btn-ghost w-full py-2 text-[13px] flex items-center justify-center gap-1.5"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="M5 12h14"/></svg> Add option</button>
+                </div>
+              </div>
+
+              <div class="divider"></div>
+
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <div class="label mb-2">Threshold</div>
+                  <select class="input w-full"><option>Majority</option><option>Two-thirds</option><option>Unanimous</option></select>
+                </div>
+                <div>
+                  <div class="label mb-2">Result visibility</div>
+                  <select class="input w-full"><option>Show live totals during meeting</option><option>Reveal only after close</option></select>
+                </div>
+                <div>
+                  <div class="label mb-2">In-meeting display</div>
+                  <select class="input w-full"><option>Show who voted in each category</option><option>Show totals only</option></select>
+                </div>
+                <div>
+                  <div class="label mb-2">Meeting export</div>
+                  <select class="input w-full"><option>Save only totals in export</option><option>Save per-voter ballots</option></select>
+                </div>
+              </div>
+
+              <label class="flex items-center gap-3 p-3 rounded-xl border border-[var(--ink-200)] cursor-pointer hover:bg-[var(--ink-50)]">
+                <span class="w-10 h-6 rounded-full bg-[var(--scarlet-500)] relative">
+                  <span class="absolute right-0.5 top-0.5 w-5 h-5 rounded-full bg-white shadow"></span>
+                </span>
+                <div>
+                  <div class="text-[13px] font-semibold">Enable proxy voting</div>
+                  <div class="text-[11px] text-[var(--ink-500)]">Delegates can cast on behalf of absent senators.</div>
+                </div>
+              </label>
+
+              <div>
+                <div class="label mb-2">Time limit</div>
+                <div class="grid grid-cols-4 gap-2">
+                  <div class="input flex flex-col items-center py-2"><div class="text-[20px] font-semibold">0</div><div class="text-[10px] text-[var(--ink-500)] uppercase tracking-widest">day</div></div>
+                  <div class="input flex flex-col items-center py-2"><div class="text-[20px] font-semibold">0</div><div class="text-[10px] text-[var(--ink-500)] uppercase tracking-widest">hour</div></div>
+                  <div class="input flex flex-col items-center py-2"><div class="text-[20px] font-semibold">3</div><div class="text-[10px] text-[var(--ink-500)] uppercase tracking-widest">minute</div></div>
+                  <div class="input flex flex-col items-center py-2"><div class="text-[20px] font-semibold">0</div><div class="text-[10px] text-[var(--ink-500)] uppercase tracking-widest">second</div></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2 mt-6 pt-5 border-t border-[var(--ink-200)]">
+              <button class="btn-ghost py-2.5 px-4 text-[13px]">Save as draft</button>
+              <button class="btn-primary py-2.5 px-5 ml-auto">Push motion to voters</button>
+            </div>
+          </div>
+
+          <!-- Right preview -->
+          <div class="col-span-12 md:col-span-5 p-8" style="background: var(--ink-50);">
+            <div class="label mb-3">Voter preview</div>
+            <div class="card p-5">
+              <div class="flex items-center gap-2 mb-2">
+                <span class="chip chip-live"><span class="pulse-dot"></span> Live</span>
+                <span class="tag-pill"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> 03:00</span>
+              </div>
+              <div class="serif text-[22px] leading-tight">Approve the Q2 budget</div>
+              <div class="text-[12px] text-[var(--ink-500)] mt-1">The full budget is attached to this motion. Vote reflects your section's position.</div>
+
+              <div class="space-y-2 mt-4">
+                <div class="vote-option selected">
+                  <div class="flex items-center gap-3">
+                    <div class="radio-mark"></div>
+                    <div class="font-semibold text-[14px]">Yes</div>
+                  </div>
+                  <span class="text-[11px] text-[var(--ink-500)]">In favor</span>
+                </div>
+                <div class="vote-option">
+                  <div class="flex items-center gap-3">
+                    <div class="radio-mark"></div>
+                    <div class="font-semibold text-[14px]">No</div>
+                  </div>
+                  <span class="text-[11px] text-[var(--ink-500)]">Against</span>
+                </div>
+                <div class="vote-option">
+                  <div class="flex items-center gap-3">
+                    <div class="radio-mark"></div>
+                    <div class="font-semibold text-[14px]">Abstain</div>
+                  </div>
+                  <span class="text-[11px] text-[var(--ink-500)]">Decline to vote</span>
+                </div>
+              </div>
+
+              <button class="btn-primary w-full py-3 mt-4">Submit vote</button>
+              <div class="text-[11px] text-[var(--ink-400)] mt-2 text-center">Your ballot is logged to the meeting export per host settings.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- =========================== PUSH ELECTION + CONFIRM RESULTS =========================== -->
+<section class="max-w-[1240px] mx-auto px-8 py-14">
+  <div class="flex items-end justify-between mb-6">
+    <div>
+      <div class="section-label mb-3">05 · Elections & confirmations</div>
+      <h2 class="serif text-[36px] leading-none tracking-tight">Push an election · Confirm results</h2>
+    </div>
+    <p class="screen-desc">Same entries as today — title, candidates, election style, time limit — arranged with more breathing room. Smaller confirmation modals for frequent actions.</p>
+  </div>
+
+  <div class="grid grid-cols-12 gap-6">
+    <!-- Election modal -->
+    <div class="col-span-12 lg:col-span-8">
+      <div class="frame">
+        <div class="frame-bar">
+          <span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span>
+          <div class="url">…/session/BUBMGC · Push election</div>
+        </div>
+        <div class="p-8 grid-bg relative" style="background:#F7F8FC">
+          <div class="modal mx-auto overflow-hidden" style="max-width: 640px;">
+            <div class="p-7">
+              <div class="flex items-start justify-between">
+                <div>
+                  <div class="tag-pill">Election</div>
+                  <div class="serif text-[26px] leading-tight mt-2">Create election</div>
+                  <div class="text-[13px] text-[var(--ink-500)]">Candidates, style, and a time limit. Voters see a ranked or plurality ballot.</div>
+                </div>
+                <button class="w-9 h-9 grid place-items-center rounded-full hover:bg-[var(--ink-100)]"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg></button>
+              </div>
+
+              <div class="mt-5 space-y-4">
+                <div>
+                  <div class="label mb-2">Title</div>
+                  <input class="input w-full" placeholder="e.g. VP Finance 2026" />
+                </div>
+
+                <div>
+                  <div class="label mb-2">Candidates</div>
+                  <div class="space-y-2">
+                    <div class="input flex items-center gap-3">
+                      <span class="w-6 h-6 rounded-full bg-[var(--scarlet-100)] text-[var(--scarlet-700)] grid place-items-center text-[11px] font-bold">1</span>
+                      <span class="flex-1">Priya Patel</span>
+                      <button class="text-[var(--ink-400)] hover:text-[var(--scarlet-500)]"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/></svg></button>
+                    </div>
+                    <div class="input flex items-center gap-3">
+                      <span class="w-6 h-6 rounded-full bg-[var(--scarlet-100)] text-[var(--scarlet-700)] grid place-items-center text-[11px] font-bold">2</span>
+                      <span class="flex-1">Marcus Green</span>
+                      <button class="text-[var(--ink-400)] hover:text-[var(--scarlet-500)]"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/></svg></button>
+                    </div>
+                    <button class="btn-ghost w-full py-2.5 text-[13px] flex items-center justify-center gap-1.5"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="M5 12h14"/></svg> Add candidate</button>
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <div class="label mb-2">Election style</div>
+                    <select class="input w-full"><option>Plurality (pick one)</option><option>Ranked choice</option><option>Approval</option></select>
+                  </div>
+                  <div>
+                    <div class="label mb-2">Ballot visibility</div>
+                    <select class="input w-full"><option>Secret ballot</option><option>Open ballot</option></select>
+                  </div>
+                </div>
+
+                <div>
+                  <div class="label mb-2">Time limit</div>
+                  <div class="grid grid-cols-4 gap-2">
+                    <div class="input flex flex-col items-center py-2"><div class="text-[20px] font-semibold">0</div><div class="text-[10px] text-[var(--ink-500)] uppercase tracking-widest">day</div></div>
+                    <div class="input flex flex-col items-center py-2"><div class="text-[20px] font-semibold">0</div><div class="text-[10px] text-[var(--ink-500)] uppercase tracking-widest">hour</div></div>
+                    <div class="input flex flex-col items-center py-2"><div class="text-[20px] font-semibold">5</div><div class="text-[10px] text-[var(--ink-500)] uppercase tracking-widest">minute</div></div>
+                    <div class="input flex flex-col items-center py-2"><div class="text-[20px] font-semibold">0</div><div class="text-[10px] text-[var(--ink-500)] uppercase tracking-widest">second</div></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex items-center gap-2 mt-6 pt-5 border-t border-[var(--ink-200)]">
+                <button class="btn-ghost py-2.5 px-4 text-[13px]">Cancel</button>
+                <button class="btn-primary py-2.5 px-5 ml-auto">Push election</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Confirm results modal -->
+    <div class="col-span-12 lg:col-span-4">
+      <div class="frame">
+        <div class="frame-bar">
+          <span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span>
+          <div class="url">…confirm</div>
+        </div>
+        <div class="p-6 modal-backdrop grid-bg" style="min-height: 560px;">
+          <div class="modal mx-auto p-6" style="max-width: 360px;">
+            <div class="w-10 h-10 rounded-full bg-[var(--scarlet-50)] text-[var(--scarlet-500)] grid place-items-center">
+              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 9v4"/><path d="M12 17h.01"/><circle cx="12" cy="12" r="9"/></svg>
+            </div>
+            <div class="serif text-[22px] leading-tight mt-3">Push results to voters?</div>
+            <div class="text-[13px] text-[var(--ink-500)] mt-1">This will close the motion and reveal the final tally to everyone in the session.</div>
+
+            <div class="soft-card p-3 mt-4">
+              <div class="text-[11px] text-[var(--ink-500)] uppercase tracking-widest">Summary</div>
+              <div class="flex items-center justify-between mt-1"><div class="text-[13px] font-semibold">Approve Q2 budget</div><span class="tag-pill">TBD</span></div>
+            </div>
+
+            <div class="flex gap-2 mt-5">
+              <button class="btn-ghost py-2.5 flex-1 text-[13px]">No, keep closed</button>
+              <button class="btn-primary py-2.5 flex-1 text-[13px]">Yes, push</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- =========================== LIVE MOTION + VOTER VIEW =========================== -->
+<section class="max-w-[1240px] mx-auto px-8 py-14">
+  <div class="flex items-end justify-between mb-6">
+    <div>
+      <div class="section-label mb-3">06 · During the vote</div>
+      <h2 class="serif text-[36px] leading-none tracking-tight">Live motion · Voter ballot</h2>
+    </div>
+    <p class="screen-desc">The host sees tallies tick up in real time; voters get a focused ballot card with motion details and the same dropdown of options as today.</p>
+  </div>
+
+  <div class="grid grid-cols-12 gap-6">
+    <!-- Live host view -->
+    <div class="col-span-12 lg:col-span-7">
+      <div class="frame">
+        <div class="frame-bar">
+          <span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span>
+          <div class="url">…/motion/approve-q2-budget</div>
+        </div>
+        <div class="p-7" style="background:#F7F8FC">
+          <div class="card p-6">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="chip chip-live"><span class="pulse-dot"></span> Motion running</span>
+              <span class="tag-pill"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> 02:14 left</span>
+              <span class="tag-pill">Session BUBMGC</span>
+            </div>
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <div class="serif text-[32px] leading-tight">Approve the Q2 budget</div>
+                <div class="text-[13px] text-[var(--ink-500)] mt-1">Threshold: Majority · Live totals on</div>
+              </div>
+              <div class="text-right">
+                <div class="label">Turnout</div>
+                <div class="text-[22px] font-semibold tracking-tight">19 / 27</div>
+                <div class="text-[11px] text-[var(--ink-500)]">70% ballots in</div>
+              </div>
+            </div>
+
+            <div class="mt-6 space-y-4">
+              <!-- bar -->
+              <div>
+                <div class="flex items-center justify-between mb-1.5">
+                  <div class="text-[13px] font-semibold">Pass</div>
+                  <div class="text-[12px] text-[var(--ink-500)]"><b class="text-[var(--ink-900)]">14</b> votes · 74%</div>
+                </div>
+                <div class="progress-track h-3"><div class="progress-bar" style="width:74%; background: var(--accent-emerald);"></div></div>
+              </div>
+              <div>
+                <div class="flex items-center justify-between mb-1.5">
+                  <div class="text-[13px] font-semibold">Reject</div>
+                  <div class="text-[12px] text-[var(--ink-500)]"><b class="text-[var(--ink-900)]">3</b> votes · 16%</div>
+                </div>
+                <div class="progress-track h-3"><div class="progress-bar" style="width:16%; background: var(--scarlet-500);"></div></div>
+              </div>
+              <div>
+                <div class="flex items-center justify-between mb-1.5">
+                  <div class="text-[13px] font-semibold">Abstain</div>
+                  <div class="text-[12px] text-[var(--ink-500)]"><b class="text-[var(--ink-900)]">2</b> votes · 10%</div>
+                </div>
+                <div class="progress-track h-3"><div class="progress-bar" style="width:10%; background: var(--accent-amber);"></div></div>
+              </div>
+            </div>
+
+            <div class="divider my-6"></div>
+
+            <div class="grid grid-cols-3 gap-3">
+              <div class="soft-card p-3">
+                <div class="label">Status</div>
+                <div class="text-[14px] font-semibold mt-1 text-[var(--accent-emerald)]">Projected pass</div>
+              </div>
+              <div class="soft-card p-3">
+                <div class="label">Total weight</div>
+                <div class="text-[14px] font-semibold mt-1">19 / 31</div>
+              </div>
+              <div class="soft-card p-3">
+                <div class="label">Closes at</div>
+                <div class="text-[14px] font-semibold mt-1">7:22 PM</div>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2 mt-6">
+              <button class="btn-ghost py-2.5 px-4 text-[13px]">Back to meeting</button>
+              <button class="btn-primary py-2.5 px-5 ml-auto">End motion early</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Voter ballot -->
+    <div class="col-span-12 lg:col-span-5">
+      <div class="frame">
+        <div class="frame-bar">
+          <span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span>
+          <div class="url">tartan.vote/vote</div>
+        </div>
+        <div class="p-7" style="background:#F7F8FC">
+          <div class="flex items-center gap-2 mb-4">
+            <div class="logo-mark" style="width:24px;height:24px;border-radius:6px;">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>
+            </div>
+            <div class="text-[12px] font-semibold">TartanVote</div>
+            <span class="chip chip-muted ml-auto">John Cao · Weight 1</span>
+          </div>
+
+          <div class="card p-6">
+            <div class="flex items-center gap-2 mb-2">
+              <span class="chip chip-live"><span class="pulse-dot"></span> Live</span>
+              <span class="tag-pill"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> 02:14</span>
+            </div>
+            <div class="label">Motion #07 · Session BUBMGC</div>
+            <div class="serif text-[26px] leading-tight mt-1">Approve the Q2 budget</div>
+            <div class="soft-card p-3 mt-3 text-[13px] italic text-[var(--ink-500)] border-l-4 border-l-[var(--scarlet-500)]">
+              The Q2 allocation covers events, publications, and two new initiatives. Full breakdown attached in the meeting packet.
+            </div>
+
+            <div class="label mt-5 mb-2">Concerning this motion, I vote</div>
+            <div class="space-y-2">
+              <div class="vote-option selected">
+                <div class="flex items-center gap-3">
+                  <div class="radio-mark"></div>
+                  <div>
+                    <div class="font-semibold text-[14px]">Yes</div>
+                    <div class="text-[12px] text-[var(--ink-500)]">In favor of the motion</div>
+                  </div>
+                </div>
+                <div class="w-2 h-2 rounded-full bg-[var(--accent-emerald)]"></div>
+              </div>
+              <div class="vote-option">
+                <div class="flex items-center gap-3">
+                  <div class="radio-mark"></div>
+                  <div>
+                    <div class="font-semibold text-[14px]">No</div>
+                    <div class="text-[12px] text-[var(--ink-500)]">Against the motion</div>
+                  </div>
+                </div>
+                <div class="w-2 h-2 rounded-full bg-[var(--scarlet-500)]"></div>
+              </div>
+              <div class="vote-option">
+                <div class="flex items-center gap-3">
+                  <div class="radio-mark"></div>
+                  <div>
+                    <div class="font-semibold text-[14px]">Abstain</div>
+                    <div class="text-[12px] text-[var(--ink-500)]">Decline to vote</div>
+                  </div>
+                </div>
+                <div class="w-2 h-2 rounded-full bg-[var(--accent-amber)]"></div>
+              </div>
+            </div>
+
+            <button class="btn-primary w-full py-3 mt-5">Submit vote</button>
+            <div class="text-[11px] text-[var(--ink-400)] mt-2 text-center">You can change your vote until the motion closes.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+
+<!-- =========================== RESULTS + PROXY =========================== -->
+<section class="max-w-[1240px] mx-auto px-8 py-14">
+  <div class="flex items-end justify-between mb-6">
+    <div>
+      <div class="section-label mb-3">07 · Closing & Setup</div>
+      <h2 class="serif text-[36px] leading-none tracking-tight">Results · Proxy setup</h2>
+    </div>
+    <p class="screen-desc">The final verdict is given its own editorial moment. Proxy setup — role + delegation — becomes a two-step flow with clear context.</p>
+  </div>
+
+  <div class="grid grid-cols-12 gap-6">
+    <!-- Results -->
+    <div class="col-span-12 lg:col-span-7">
+      <div class="frame">
+        <div class="frame-bar">
+          <span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span>
+          <div class="url">…/motion/approve-q2-budget/results</div>
+        </div>
+        <div class="p-8" style="background:#F7F8FC">
+          <div class="card overflow-hidden">
+            <div class="h-1.5 bg-[var(--accent-emerald)]"></div>
+            <div class="p-7">
+              <div class="flex items-center gap-2 mb-2">
+                <span class="chip" style="background: rgba(16,163,107,.10); color: var(--accent-emerald);"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 12l4 4L19 6"/></svg> Motion passed</span>
+                <span class="tag-pill">Event · test</span>
+                <span class="tag-pill">Session BUBMGC</span>
+              </div>
+              <div class="serif text-[36px] leading-tight">Motion results</div>
+              <div class="text-[13px] text-[var(--ink-500)] mt-1">Final tally below. A full audit record is available in the meeting export.</div>
+
+              <div class="mt-6 space-y-4">
+                <div>
+                  <div class="flex items-center justify-between mb-1.5">
+                    <div class="text-[14px] font-semibold">Pass</div>
+                    <div class="text-[12px] text-[var(--ink-500)]"><b class="text-[var(--ink-900)]">1</b> vote · 100%</div>
+                  </div>
+                  <div class="progress-track h-3"><div class="progress-bar" style="width:100%; background: var(--accent-emerald);"></div></div>
+                </div>
+                <div>
+                  <div class="flex items-center justify-between mb-1.5">
+                    <div class="text-[14px] font-semibold">Reject</div>
+                    <div class="text-[12px] text-[var(--ink-500)]"><b class="text-[var(--ink-900)]">0</b> votes · 0%</div>
+                  </div>
+                  <div class="progress-track h-3"><div class="progress-bar" style="width:2%; background: var(--scarlet-500);"></div></div>
+                </div>
+                <div>
+                  <div class="flex items-center justify-between mb-1.5">
+                    <div class="text-[14px] font-semibold">Abstain</div>
+                    <div class="text-[12px] text-[var(--ink-500)]"><b class="text-[var(--ink-900)]">0</b> votes · 0%</div>
+                  </div>
+                  <div class="progress-track h-3"><div class="progress-bar" style="width:2%; background: var(--accent-amber);"></div></div>
+                </div>
+              </div>
+
+              <div class="soft-card p-3 mt-6 text-[13px] italic text-[var(--ink-500)] border-l-4 border-l-[var(--accent-emerald)]">
+                Motion is passed.
+              </div>
+
+              <div class="divider my-5"></div>
+
+              <div class="flex items-center gap-4">
+                <div>
+                  <div class="label">Total votes</div>
+                  <div class="text-[20px] font-semibold">1</div>
+                </div>
+                <div>
+                  <div class="label">Event</div>
+                  <div class="text-[20px] font-semibold">test</div>
+                </div>
+                <div class="ml-auto flex items-center gap-2">
+                  <button class="btn-ghost py-2.5 px-4 text-[13px]">Download ballot log</button>
+                  <button class="btn-primary py-2.5 px-5">Back to session</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Proxy setup -->
+    <div class="col-span-12 lg:col-span-5">
+      <div class="frame">
+        <div class="frame-bar">
+          <span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span>
+          <div class="url">tartan.vote/proxy-setup</div>
+        </div>
+        <div class="p-8" style="background:#F7F8FC">
+          <div class="flex items-center gap-2 mb-5">
+            <div class="logo-mark" style="width:24px;height:24px;border-radius:6px;">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>
+            </div>
+            <div class="text-[12px] font-semibold">TartanVote</div>
+            <span class="chip chip-muted ml-auto">Session BUBMGC</span>
+          </div>
+
+          <div class="card p-6">
+            <div class="tag-pill">Proxy setup · Step 1 of 2</div>
+            <div class="serif text-[26px] leading-tight mt-2">Confirm your role</div>
+            <div class="text-[13px] text-[var(--ink-500)] mt-1">We use this to assign the correct number of vote instances for the session.</div>
+
+            <div class="mt-5">
+              <div class="label mb-2">Are you an Undergraduate Senator?</div>
+              <div class="grid grid-cols-2 gap-2">
+                <button class="vote-option selected"><div class="flex items-center gap-3"><div class="radio-mark"></div><div class="font-semibold text-[14px]">Yes</div></div></button>
+                <button class="vote-option"><div class="flex items-center gap-3"><div class="radio-mark"></div><div class="font-semibold text-[14px]">No</div></div></button>
+              </div>
+            </div>
+
+            <div class="mt-4">
+              <div class="label mb-2">Proxying for <span class="text-[var(--ink-400)] normal-case tracking-normal">(optional)</span></div>
+              <input class="input w-full" placeholder="e.g. Senator Jane Doe" />
+              <div class="text-[11px] text-[var(--ink-400)] mt-1">Leave blank if you're only voting as yourself.</div>
+            </div>
+
+            <div class="flex items-center gap-2 mt-6">
+              <button class="btn-ghost py-2.5 px-4 text-[13px]">Back</button>
+              <button class="btn-primary py-2.5 px-5 ml-auto">Continue</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+
+<!-- =========================== MOBILE =========================== -->
+<section class="max-w-[1240px] mx-auto px-8 py-14">
+  <div class="flex items-end justify-between mb-6">
+    <div>
+      <div class="section-label mb-3">08 · Mobile</div>
+      <h2 class="serif text-[36px] leading-none tracking-tight">On a senator's phone</h2>
+    </div>
+    <p class="screen-desc">Same components, responsive down to 360px. The ballot fits on one screen; the timer stays pinned.</p>
+  </div>
+
+  <div class="grid grid-cols-12 gap-6 justify-center">
+    <div class="col-span-12 md:col-span-4 flex justify-center">
+      <div class="rounded-[38px] border-[10px] border-[var(--ink-900)] bg-white shadow-2xl overflow-hidden" style="width: 320px; height: 640px;">
+        <div class="h-6 bg-[var(--ink-900)]"></div>
+        <div class="p-5" style="background:#F7F8FC; height: calc(100% - 24px); overflow: hidden;">
+          <div class="flex items-center gap-2">
+            <div class="logo-mark" style="width:22px;height:22px;border-radius:6px;"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5"/></svg></div>
+            <div class="text-[11px] font-semibold">TartanVote</div>
+            <span class="chip chip-muted ml-auto text-[10px]">John</span>
+          </div>
+          <div class="mt-5 text-center">
+            <div class="serif text-[28px] leading-tight text-[var(--scarlet-500)]">Welcome, John.</div>
+            <div class="text-[12px] text-[var(--ink-500)]">Enter a session code to join.</div>
+          </div>
+          <div class="card p-4 mt-5">
+            <div class="label mb-2">Session code</div>
+            <input class="input input-lg w-full text-center tracking-[0.25em]" value="BUBMGC" />
+            <button class="btn-primary w-full mt-3 py-2.5">Join session</button>
+            <div class="flex items-center gap-3 my-4"><div class="h-px flex-1 bg-[var(--ink-200)]"></div><div class="text-[10px] text-[var(--ink-400)] uppercase tracking-widest">or</div><div class="h-px flex-1 bg-[var(--ink-200)]"></div></div>
+            <button class="btn-ghost w-full py-2.5 text-[13px]">Create a session</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-span-12 md:col-span-4 flex justify-center">
+      <div class="rounded-[38px] border-[10px] border-[var(--ink-900)] bg-white shadow-2xl overflow-hidden" style="width: 320px; height: 640px;">
+        <div class="h-6 bg-[var(--ink-900)]"></div>
+        <div class="p-5" style="background:#F7F8FC; height: calc(100% - 24px); overflow: hidden;">
+          <div class="flex items-center gap-2">
+            <span class="chip chip-live text-[10px]"><span class="pulse-dot"></span> Live</span>
+            <span class="tag-pill text-[10px]">02:14</span>
+          </div>
+          <div class="label mt-3">Motion #07</div>
+          <div class="serif text-[20px] leading-tight mt-1">Approve the Q2 budget</div>
+          <div class="soft-card p-2.5 mt-2 text-[11px] italic text-[var(--ink-500)] border-l-2 border-l-[var(--scarlet-500)]">Full budget attached.</div>
+
+          <div class="label mt-4 mb-1.5">I vote</div>
+          <div class="space-y-1.5">
+            <div class="vote-option selected py-2"><div class="flex items-center gap-2"><div class="radio-mark"></div><div class="text-[13px] font-semibold">Yes</div></div><div class="w-1.5 h-1.5 rounded-full bg-[var(--accent-emerald)]"></div></div>
+            <div class="vote-option py-2"><div class="flex items-center gap-2"><div class="radio-mark"></div><div class="text-[13px] font-semibold">No</div></div><div class="w-1.5 h-1.5 rounded-full bg-[var(--scarlet-500)]"></div></div>
+            <div class="vote-option py-2"><div class="flex items-center gap-2"><div class="radio-mark"></div><div class="text-[13px] font-semibold">Abstain</div></div><div class="w-1.5 h-1.5 rounded-full bg-[var(--accent-amber)]"></div></div>
+          </div>
+          <button class="btn-primary w-full mt-3 py-2.5 text-[13px]">Submit vote</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-span-12 md:col-span-4 flex justify-center">
+      <div class="rounded-[38px] border-[10px] border-[var(--ink-900)] bg-white shadow-2xl overflow-hidden" style="width: 320px; height: 640px;">
+        <div class="h-6 bg-[var(--ink-900)]"></div>
+        <div class="p-5" style="background:#F7F8FC; height: calc(100% - 24px); overflow: hidden;">
+          <span class="chip" style="background: rgba(16,163,107,.10); color: var(--accent-emerald); font-size: 10px;"><svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 12l4 4L19 6"/></svg> Motion passed</span>
+          <div class="serif text-[22px] leading-tight mt-2">Motion results</div>
+          <div class="text-[11px] text-[var(--ink-500)]">Approve the Q2 budget</div>
+
+          <div class="mt-3 space-y-2.5">
+            <div>
+              <div class="flex items-center justify-between mb-1"><div class="text-[11px] font-semibold">Pass</div><div class="text-[10px] text-[var(--ink-500)]">14 · 74%</div></div>
+              <div class="progress-track h-2"><div class="progress-bar" style="width:74%; background: var(--accent-emerald);"></div></div>
+            </div>
+            <div>
+              <div class="flex items-center justify-between mb-1"><div class="text-[11px] font-semibold">Reject</div><div class="text-[10px] text-[var(--ink-500)]">3 · 16%</div></div>
+              <div class="progress-track h-2"><div class="progress-bar" style="width:16%; background: var(--scarlet-500);"></div></div>
+            </div>
+            <div>
+              <div class="flex items-center justify-between mb-1"><div class="text-[11px] font-semibold">Abstain</div><div class="text-[10px] text-[var(--ink-500)]">2 · 10%</div></div>
+              <div class="progress-track h-2"><div class="progress-bar" style="width:10%; background: var(--accent-amber);"></div></div>
+            </div>
+          </div>
+
+          <div class="soft-card p-2.5 mt-4 text-[11px] italic text-[var(--ink-500)] border-l-2 border-l-[var(--accent-emerald)]">Motion is passed.</div>
+
+          <button class="btn-primary w-full mt-4 py-2.5 text-[13px]">Back to session</button>
+          <button class="btn-ghost w-full mt-2 py-2.5 text-[13px]">Download log</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =========================== CHANGE LOG =========================== -->
+<section class="max-w-[1240px] mx-auto px-8 py-14">
+  <div class="grid grid-cols-12 gap-6">
+    <div class="col-span-12 lg:col-span-5">
+      <div class="section-label mb-3">09 · Before / after</div>
+      <h2 class="serif text-[36px] leading-none tracking-tight">What changes, what stays</h2>
+      <p class="text-[14px] text-[var(--ink-500)] mt-3 max-w-[420px]">Every button, input, and flow you already have is preserved. The differences are visual and structural: hierarchy, spacing, color discipline, and contextual affordances.</p>
+    </div>
+    <div class="col-span-12 lg:col-span-7 card p-6">
+      <div class="grid grid-cols-2 gap-6 text-[13px]">
+        <div>
+          <div class="label mb-3 text-[var(--scarlet-500)]">Current</div>
+          <ul class="space-y-2.5 text-[var(--ink-700)]">
+            <li>• All-red, all-uppercase buttons stack the same way</li>
+            <li>• Modals are tall, flat white boxes with minimal hierarchy</li>
+            <li>• No persistent navigation — host uses back-arrow only</li>
+            <li>• Results are a small centered card with thin bars</li>
+            <li>• Motion / election entries feel identical</li>
+            <li>• "X" close control lives in isolation, not paired with title</li>
+          </ul>
+        </div>
+        <div>
+          <div class="label mb-3 text-[var(--accent-emerald)]">Proposed</div>
+          <ul class="space-y-2.5 text-[var(--ink-700)]">
+            <li>• Primary / ghost / dark button roles used consistently</li>
+            <li>• Modals pair form + live preview; clear section groups</li>
+            <li>• Dark rail sidebar anchors the host and surfaces meeting code</li>
+            <li>• Results get an editorial headline + status bar on top</li>
+            <li>• Motions and elections have distinct headers and iconography</li>
+            <li>• Close sits next to title; status chips replace plain text</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-12 text-center text-[12px] text-[var(--ink-400)]">
+    Prepared for John Cao · TartanVote · ScottyLabs — <span class="text-[var(--ink-500)]">visual proposal, no project files were modified.</span>
+  </div>
+</section>
+
+<div class="h-20"></div>
+
+</body>
+</html>
