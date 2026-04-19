@@ -11,13 +11,7 @@ const allowedOrigins =
         .map((origin) => origin.trim())
         .filter((origin) => origin.length > 0) ?? [];
 
-const corsOrigins = Array.from(
-    new Set([
-        ...allowedOrigins,
-        frontendBaseUrl,
-        appBaseUrl,
-    ]),
-);
+const corsOrigins = Array.from(new Set([...allowedOrigins, frontendBaseUrl, appBaseUrl]));
 
 const app = express();
 

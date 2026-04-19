@@ -28,12 +28,7 @@ const allowedOrigins =
         .filter((origin) => origin.length > 0) ?? [];
 
 const trustedOrigins = Array.from(
-    new Set([
-        ...allowedOrigins,
-        frontendBaseUrl,
-        appBaseUrl,
-        betterAuthUrl,
-    ]),
+    new Set([...allowedOrigins, frontendBaseUrl, appBaseUrl, betterAuthUrl]),
 );
 
 if (!issuer || !clientId || !clientSecret) {

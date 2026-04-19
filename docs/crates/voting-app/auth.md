@@ -64,7 +64,7 @@ bun x auth@latest migrate --config ./auth.mjs
 ## Troubleshooting
 
 - Error: `Invalid parameter: redirect_uri`
-	- Cause: the redirect URI sent to OIDC is not in the IdP client's allowed redirect URI list.
+    - Cause: the redirect URI sent to OIDC is not in the IdP client's allowed redirect URI list.
 - Default redirect URI sent to OIDC: `{APP_BASE_URL}/auth/callback` (e.g. `http://localhost:8080/auth/callback`).
 - That backend callback bridges to Better Auth callback internally.
 - Fix: ensure `{APP_BASE_URL}/auth/callback` is allowlisted on the IdP client, or set `OIDC_REDIRECT_URI` to an already-allowlisted URI.
