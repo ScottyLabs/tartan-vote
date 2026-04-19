@@ -58,10 +58,11 @@
 
 <!-- Mobile backdrop -->
 {#if sidebarOpen}
-  <div
-    class="lg:hidden fixed inset-0 z-30 bg-black/50 backdrop-blur-sm"
+  <button
+    class="lg:hidden fixed inset-0 z-30 bg-black/50 backdrop-blur-sm w-full border-0 p-0 cursor-default"
     onclick={() => (sidebarOpen = false)}
-  ></div>
+    aria-label="Close sidebar"
+  ></button>
 {/if}
 
 <!-- Page layout -->

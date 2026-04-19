@@ -6,11 +6,11 @@
     children: Snippet;
   }
   let { variant = 'muted', pulse = false, children }: Props = $props();
-  const cls = {
+  const cls = $derived({
     live: 'chip chip-live',
     muted: 'chip chip-muted',
     pass: 'chip chip-pass'
-  }[variant];
+  }[variant]);
 </script>
 
 <span class={cls}>

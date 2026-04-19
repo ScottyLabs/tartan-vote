@@ -21,17 +21,17 @@
     class: klass = ''
   }: Props = $props();
 
-  const base = {
+  const base = $derived({
     primary: 'btn-primary',
     ghost: 'btn-ghost',
     dark: 'btn-dark'
-  }[variant];
+  }[variant]);
 
-  const sizeClass = {
+  const sizeClass = $derived({
     sm: 'text-[13px] px-3 py-2',
     md: 'text-sm px-5 py-3',
     lg: 'text-base px-6 py-3.5'
-  }[size];
+  }[size]);
 </script>
 
 <button

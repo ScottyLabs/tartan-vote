@@ -9,11 +9,11 @@
   }
   let { label, value, hint, tone = 'default', trailing }: Props = $props();
 
-  const valueColor = {
+  const valueColor = $derived({
     default: 'text-ink-900',
     emerald: 'text-[var(--accent-emerald)]',
     scarlet: 'text-[var(--scarlet-500)]'
-  }[tone];
+  }[tone]);
 </script>
 
 <div class="border border-ink-200 rounded-2xl p-[18px] bg-gradient-to-b from-white to-[#FAFBFE]">

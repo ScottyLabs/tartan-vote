@@ -21,7 +21,7 @@
     footer
   }: Props = $props();
 
-  const maxW = { sm: 'max-w-sm', md: 'max-w-xl', lg: 'max-w-4xl' }[size];
+  const maxW = $derived({ sm: 'max-w-sm', md: 'max-w-xl', lg: 'max-w-4xl' }[size]);
 </script>
 
 {#if open}

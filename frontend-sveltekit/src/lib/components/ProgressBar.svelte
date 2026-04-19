@@ -14,12 +14,12 @@
     minBar = 0
   }: Props = $props();
 
-  const barColor = {
+  const barColor = $derived({
     emerald: 'var(--accent-emerald)',
     scarlet: 'var(--scarlet-500)',
     amber: 'var(--accent-amber)',
     ink: 'var(--ink-500)'
-  }[color];
+  }[color]);
 
   const width = $derived(Math.max(minBar, Math.min(100, percent)));
 </script>
