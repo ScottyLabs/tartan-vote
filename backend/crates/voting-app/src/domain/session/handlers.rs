@@ -22,13 +22,6 @@ pub struct EndSessionResponse {
     pub status: SessionStatus,
 }
 
-#[derive(Serialize)]
-pub struct HasActiveEventResponse {
-    pub session_code: String,
-    pub has_active_event: bool,
-    pub event_id: Option<i32>,
-}
-
 #[derive(Deserialize)]
 pub struct SetSessionProxyRequest {
     pub is_senator: bool,
@@ -138,6 +131,12 @@ pub async fn join_session(
     }
 }
 
+fn normalize_proxy_for(proxy_for: Option<&str>) -> Option<String> {
+    proxy_for
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
 pub async fn set_session_proxy(
     user: SyncedUser,
     State(state): State<AppState>,
@@ -172,11 +171,7 @@ pub async fn set_session_proxy(
             .into_response();
     }
 
-    let proxy_for = body
-        .proxy_for
-        .as_ref()
-        .map(|value| value.trim().to_string())
-        .filter(|value| !value.is_empty());
+    let proxy_for = normalize_proxy_for(body.proxy_for.as_deref());
 
     let existing_instances = match entity::prelude::UserSession::find()
         .filter(user_session::Column::SessionId.eq(session.id))
@@ -367,42 +362,315 @@ pub async fn end_session(
     }
 }
 
-pub async fn has_active_event(
-    _user: SyncedUser,
-    State(state): State<AppState>,
-    Path(session_code): Path<String>,
-) -> impl IntoResponse {
-    let store = &state.store;
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::extract::{Path, State};
+    use chrono::Utc;
+    use entity::enums::JoinLeft;
+    use entity::{session, user, user_session};
+    use sea_orm::{DatabaseBackend, MockDatabase};
+    use std::sync::Arc;
+    use voting_app_store::Store;
 
-    let session = match store
-        .sessions()
-        .find_by_join_code(session_code.clone())
+    fn test_user(id: i32) -> SyncedUser {
+        SyncedUser(Arc::new(user::Model {
+            id,
+            name: "Test User".to_string(),
+            andrew_id: "testuser".to_string(),
+            oidc_subject: "test-oidc-subject".to_string(),
+            created_at: Utc::now().fixed_offset(),
+        }))
+    }
+
+    fn make_state(db: sea_orm::DatabaseConnection) -> AppState {
+        AppState {
+            store: Store::new(db.clone()),
+            db,
+            config: crate::config::Config {
+                app_base_url: String::new(),
+                frontend_base_url: String::new(),
+                cors_allowed_origins: vec![],
+                better_auth_base_url: String::new(),
+                better_auth_provider_id: String::new(),
+                database_url: String::new(),
+                bind_addr: String::new(),
+            },
+        }
+    }
+
+    async fn axum_to_json(response: axum::response::Response) -> serde_json::Value {
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        serde_json::from_slice(&bytes).unwrap()
+    }
+
+    fn make_session(
+        id: i32,
+        join_code: &str,
+        status: SessionStatus,
+        created_by: i32,
+    ) -> session::Model {
+        session::Model {
+            id,
+            join_code: join_code.to_string(),
+            status,
+            created_by_user_id: created_by,
+        }
+    }
+
+    fn make_user_session(
+        id: i32,
+        user_id: i32,
+        session_id: i32,
+        proxy: Option<String>,
+    ) -> user_session::Model {
+        user_session::Model {
+            id,
+            user_id,
+            session_id,
+            proxy,
+            join_left: JoinLeft::Joined,
+            timestamp: Utc::now().fixed_offset(),
+        }
+    }
+
+    #[test]
+    fn normalize_proxy_for_returns_none_when_absent() {
+        assert_eq!(normalize_proxy_for(None), None);
+    }
+
+    #[test]
+    fn normalize_proxy_for_returns_none_for_empty_string() {
+        assert_eq!(normalize_proxy_for(Some("")), None);
+    }
+
+    #[test]
+    fn normalize_proxy_for_returns_none_for_whitespace_only() {
+        assert_eq!(normalize_proxy_for(Some("   ")), None);
+    }
+
+    #[test]
+    fn normalize_proxy_for_returns_trimmed_value() {
+        assert_eq!(
+            normalize_proxy_for(Some("  alice  ")),
+            Some("alice".to_string())
+        );
+    }
+
+    #[test]
+    fn normalize_proxy_for_returns_value_unchanged_when_no_padding() {
+        assert_eq!(
+            normalize_proxy_for(Some("alice")),
+            Some("alice".to_string())
+        );
+    }
+
+    // fn status_session
+
+    #[tokio::test]
+    async fn status_session_reports_not_ended_for_open_session() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results([vec![make_session(1, "ABC123", SessionStatus::Open, 1)]])
+            .into_connection();
+
+        let response = status_session(
+            test_user(1),
+            State(make_state(db)),
+            Path("ABC123".to_string()),
+        )
         .await
-    {
-        Ok(Some(session)) => session,
-        Ok(None) => return (StatusCode::NOT_FOUND).into_response(),
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR).into_response(),
-    };
+        .into_response();
 
-    match store.events().find_active_by_session_id(session.id).await {
-        Ok(Some(event)) => (
-            StatusCode::OK,
-            Json(HasActiveEventResponse {
-                session_code,
-                has_active_event: true,
-                event_id: Some(event.id),
-            }),
+        assert_eq!(response.status(), StatusCode::OK);
+        let json = axum_to_json(response).await;
+        assert_eq!(json["session_ended"], false);
+    }
+
+    #[tokio::test]
+    async fn status_session_reports_ended_for_closed_session() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results([vec![make_session(1, "ABC123", SessionStatus::Closed, 1)]])
+            .into_connection();
+
+        let response = status_session(
+            test_user(1),
+            State(make_state(db)),
+            Path("ABC123".to_string()),
         )
-            .into_response(),
-        Ok(None) => (
-            StatusCode::OK,
-            Json(HasActiveEventResponse {
-                session_code,
-                has_active_event: false,
-                event_id: None,
-            }),
+        .await
+        .into_response();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let json = axum_to_json(response).await;
+        assert_eq!(json["session_ended"], true);
+    }
+
+    #[tokio::test]
+    async fn status_session_returns_404_when_not_found() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results([vec![] as Vec<session::Model>])
+            .into_connection();
+
+        let response = status_session(
+            test_user(1),
+            State(make_state(db)),
+            Path("NOPE00".to_string()),
         )
-            .into_response(),
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR).into_response(),
+        .await
+        .into_response();
+
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    }
+
+    // fn join_session
+
+    #[tokio::test]
+    async fn join_session_succeeds_for_new_participant() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results([vec![make_session(1, "ABC123", SessionStatus::Open, 99)]])
+            .append_query_results([vec![] as Vec<user_session::Model>])
+            .append_query_results([vec![make_user_session(10, 1, 1, None)]])
+            .into_connection();
+
+        let response = join_session(
+            test_user(1),
+            State(make_state(db)),
+            Path("ABC123".to_string()),
+        )
+        .await
+        .into_response();
+
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn join_session_is_idempotent_when_already_joined() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results([vec![make_session(1, "ABC123", SessionStatus::Open, 99)]])
+            .append_query_results([vec![make_user_session(10, 1, 1, None)]])
+            .into_connection();
+
+        let response = join_session(
+            test_user(1),
+            State(make_state(db)),
+            Path("ABC123".to_string()),
+        )
+        .await
+        .into_response();
+
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn join_session_rejects_closed_session() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results([vec![make_session(1, "ABC123", SessionStatus::Closed, 99)]])
+            .into_connection();
+
+        let response = join_session(
+            test_user(1),
+            State(make_state(db)),
+            Path("ABC123".to_string()),
+        )
+        .await
+        .into_response();
+
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[tokio::test]
+    async fn join_session_returns_404_when_not_found() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results([vec![] as Vec<session::Model>])
+            .into_connection();
+
+        let response = join_session(
+            test_user(1),
+            State(make_state(db)),
+            Path("NOPE00".to_string()),
+        )
+        .await
+        .into_response();
+
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    }
+
+    // fn end_session
+
+    #[tokio::test]
+    async fn end_session_closes_open_session_for_creator() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results([
+                vec![make_session(1, "ABC123", SessionStatus::Open, 1)],
+                vec![make_session(1, "ABC123", SessionStatus::Closed, 1)],
+            ])
+            .into_connection();
+
+        let response = end_session(
+            test_user(1),
+            State(make_state(db)),
+            Path("ABC123".to_string()),
+        )
+        .await
+        .into_response();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let json = axum_to_json(response).await;
+        assert_eq!(json["session_code"], "ABC123");
+    }
+
+    #[tokio::test]
+    async fn end_session_rejects_non_creator() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results([vec![make_session(1, "ABC123", SessionStatus::Open, 99)]])
+            .into_connection();
+
+        let response = end_session(
+            test_user(1),
+            State(make_state(db)),
+            Path("ABC123".to_string()),
+        )
+        .await
+        .into_response();
+
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[tokio::test]
+    async fn end_session_is_idempotent_when_already_closed() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results([vec![make_session(1, "ABC123", SessionStatus::Closed, 1)]])
+            .into_connection();
+
+        let response = end_session(
+            test_user(1),
+            State(make_state(db)),
+            Path("ABC123".to_string()),
+        )
+        .await
+        .into_response();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let json = axum_to_json(response).await;
+        assert_eq!(json["session_code"], "ABC123");
+    }
+
+    #[tokio::test]
+    async fn end_session_returns_404_when_not_found() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results([vec![] as Vec<session::Model>])
+            .into_connection();
+
+        let response = end_session(
+            test_user(1),
+            State(make_state(db)),
+            Path("NOPE00".to_string()),
+        )
+        .await
+        .into_response();
+
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
     }
 }
