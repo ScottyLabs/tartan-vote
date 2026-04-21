@@ -55,7 +55,7 @@
           let
             b2n = bun2nix.packages.${system}.default;
 
-            votingAppFrontend = b2n.mkDerivation {
+            frontend = b2n.mkDerivation {
               pname = "voting-app-frontend";
               version = (builtins.fromJSON (builtins.readFile ./frontend/package.json)).version;
               src = ./frontend;
@@ -74,14 +74,14 @@
               '';
             };
 
-            cargoNix = pkgs.callPackage ./backend/Cargo.nix { };
+            cargoNix = pkgs.callPackage ./Cargo.nix { };
 
-            votingAppBackend = cargoNix.workspaceMembers."backend".build;
+            backend = cargoNix.workspaceMembers."backend".build;
 
           in
           {
-            inherit votingAppFrontend votingAppBackend;
-            default = votingAppBackend;
+            inherit frontend backend;
+            default = backend;
           }
         ))
       );

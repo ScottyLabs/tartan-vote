@@ -2,7 +2,7 @@
 * text=auto
 
 # Generated files — hide from GitHub diffs/stats
-backend/Cargo.nix linguist-generated=true
+Cargo.nix linguist-generated=true
 frontend/bun.nix linguist-generated=true
 flake.lock linguist-generated=true
 

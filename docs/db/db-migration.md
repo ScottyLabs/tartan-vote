@@ -13,13 +13,14 @@ backend/crates $ sea-orm-cli migrate generate MIGRATION_NAME
 To migrate the database, follow the steps in [SETUP.md](../SETUP.md#backend) or for short, run
 
 ```sh
-backend $ docker compose up -d
 backend/crates/voting-app $ cargo run
 ```
 
+(PostgreSQL is managed automatically by devenv when you enter the shell.)
+
 ## Entities
 
-Generating entities requires the database to be migrated, so that the entities can be built off the structure of the database. After migrating the database, ensure your Docker is running, and run either
+Generating entities requires the database to be migrated, so that the entities can be built off the structure of the database. After migrating the database, run either
 
 ```sh
 backend/crates/entity/src $ sea-orm-cli generate entity

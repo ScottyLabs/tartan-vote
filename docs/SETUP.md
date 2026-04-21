@@ -2,15 +2,7 @@
 
 ## Prerequisites
 
-First, you need Bun, Cargo, and Docker (Desktop optional) installed.
-
-To install Bun, follow the documentation found at [https://bun.com/docs/installation], or run:
-`curl -fsSL https://bun.com/install | bash`
-
-To install Cargo, similarly, follow the documentation at [https://doc.rust-lang.org/cargo/getting-started/installation.html] or run:
-`curl https://sh.rustup.rs -sSf | sh`
-
-For Docker, you may optionally use Docker Desktop, providing a GUI interface, which can be installed from [https://www.docker.com/get-started/]. On the otherhand, you may want to only install Docker Enginer, which includes a server and a CLI, found at [https://docs.docker.com/engine/install].
+This project uses [devenv](https://devenv.sh/getting-started/) to provide Bun, Cargo, PostgreSQL, and all other development dependencies. Follow the devenv installation instructions.
 
 ## Starting up
 
@@ -21,6 +13,8 @@ Now, we will get your own instance of Poodle running!
 You will need [git](https://git-scm.com/install/).
 
 Run `git clone https://github.com/ScottyLabs/voting-app.git` in your favorite (or least favorite) folder to download the repository, and run `cd voting-app` to enter.
+
+Then run `devenv shell` (or use [direnv](https://direnv.net/)) to enter the development environment. This starts PostgreSQL and exposes Bun, Cargo, and other tooling.
 
 ### Backend
 
@@ -37,21 +31,9 @@ bun x auth@latest migrate --config ./auth.mjs
 bun run dev
 cd ..
 
-# To start the backend, first navigate with
-cd backend
-
-# Next, to set up the PostgreSQL database inside of Docker,
-backend $ docker compose up -d
-# You should see a message similar to `Container backend-db-1 Started`.
-
-# To start the backend, navigate to the crate which holds the main files with
-cd crates/voting-app
-
-# Now, build and run the backend with
-backend/crates/voting-app $ cargo run
-
-# Eventually (probably not now), you may want to stop Docker. Run (in the backend folder)
-backend $ docker compose down
+# Build and run the backend (postgres is managed by devenv)
+cd backend/crates/voting-app
+cargo run
 ```
 
 ### Frontend

@@ -27,7 +27,6 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: check
-          args: --manifest-path backend/Cargo.toml
 
   test:
     name: Test
@@ -47,7 +46,6 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --manifest-path backend/Cargo.toml
 
   format-and-lint:
     name: Format and Lint
@@ -68,10 +66,10 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: fmt
-          args: --manifest-path backend/Cargo.toml --all -- --check
+          args: --all -- --check
 
       - name: Run cargo clippy
         uses: actions-rs/clippy-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          args: --all-features --manifest-path backend/Cargo.toml
+          args: --all-features

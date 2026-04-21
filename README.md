@@ -1,6 +1,6 @@
 # Poodle
 
-Poodle is a CMU Undergraduate Senate-commissioned, ScottyLabs-developed voting app, to help the Senate and other student organizations manage attendance and host elections and motions. Currently, the app is still under development, but we *strongly* hope to get it completed very soon! <!-- Add information about where to access the website here, when the MVP is done! -->
+Poodle is a CMU Undergraduate Senate-commissioned, ScottyLabs-developed voting app, to help the Senate and other student organizations manage attendance and host elections and motions. Currently, the app is still under development, but we _strongly_ hope to get it completed very soon! <!-- Add information about where to access the website here, when the MVP is done! -->
 
 ### Built With
 
@@ -17,49 +17,39 @@ Hello, reader! For the remainder of this README, and other documentation, we wil
 
 ### Prerequisites
 
-- [Bun](https://bun.com/docs/installation) - Javascript runtime and package manager
-- [Cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html) - Rust package manager and build system
-- [Docker](https://www.docker.com/get-started/) - For running the PostgreSQL database
+- [devenv](https://devenv.sh/getting-started/) - Provides Bun, Cargo, and PostgreSQL via Nix
 
 ### Quick Setup
 
 For detailed setup instructions, see [SETUP.md](docs/SETUP.md).
 
-Install Bun, Cargo, and Docker (see links above).
-
 #### Starting the backend
 
 ```bash
 # Copy the .env.example
-$ cp .env.example .env
+cp .env.example .env
 
 # Install auth service dependencies
-auth-service $ bun install
+cd auth-service
+bun install
 
 # Run Better Auth migrations (first run / after auth schema changes)
-auth-service $ bun x auth@latest migrate --config ./auth.mjs
+bun x auth@latest migrate --config ./auth.mjs
 
 # Start Better Auth service (in a separate terminal)
-auth-service $ bun run dev
+bun run dev
 
-# Start Docker
-backend $ docker compose up -d
-
-# Run the backend
-backend/crates/voting-app $ cargo run
-
-# Stop Docker
-backend $ docker compose down
+# Run the backend (postgres is managed by devenv)
+cd backend/crates/voting-app
+cargo run
 ```
 
 #### Starting the frontend
 
 ```bash
-# Install dependencies
-frontend $ bun install
-
-# 3. Start the frontend
-frontend $ bun run dev
+cd frontend
+bun install
+bun run dev
 ```
 
 ### Contributing
