@@ -13,6 +13,22 @@ Poodle is a CMU Undergraduate Senate-commissioned, ScottyLabs-developed voting a
 
 Hello, reader! For the remainder of this README, and other documentation, we will assume that you are a developer or contributor, using WSL or a Unix development system, and have some familiarity with the command line. If you need any help, you are free to contact one of the codeowners found in .github/CODEOWNERS, or join the [discord](https://go.scottylabs.org/discord).
 
+## Photos
+
+![login page](docs/photos/login.png)
+
+![join page](docs/photos/joinPage.png)
+
+![proxySetup page](docs/photos/proxySetup.png)
+
+![waiting page page](docs/photos/waitingPage.png)
+
+![host overview page](docs/photos/meetingOverview.png)
+
+![voting page](docs/photos/votingPage.png)
+
+![liveResults page](docs/photos/liveResults.png)
+
 ## Getting Started
 
 ### Prerequisites
