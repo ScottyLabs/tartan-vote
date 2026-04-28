@@ -1,4 +1,6 @@
 inputs:
+  devenv:
+    url: github:ap-1/devenv/wild-aarch64-linux-unstable-options
   scottylabs:
     url: git+https://codeberg.org/ScottyLabs/devenv
   rust-overlay:
