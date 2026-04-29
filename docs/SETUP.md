@@ -1,4 +1,4 @@
-# Extensive Guide to Running Poodle
+# Extensive Guide to Running Tartan Vote
 
 ## Prerequisites
 
@@ -6,7 +6,7 @@ This project uses [devenv](https://devenv.sh/getting-started/) to provide Bun, C
 
 ## Starting up
 
-Now, we will get your own instance of Poodle running!
+Now, we will get your own instance of Tartan Vote running!
 
 ### Setup
 
