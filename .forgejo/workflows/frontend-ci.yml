@@ -8,7 +8,7 @@ on:
 jobs:
   check:
     name: Check
-    runs-on: ubuntu-latest
+    runs-on: docker
     container:
       image: denoland/deno:latest
     defaults:
