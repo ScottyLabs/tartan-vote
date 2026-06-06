@@ -356,6 +356,70 @@ pub async fn create_event(
         .into_response()
 }
 
+pub async fn end_event(
+    user: SyncedUser,
+    State(state): State<AppState>,
+    Path(id): Path<i32>,
+) -> impl IntoResponse {
+    let store = &state.store;
+
+    let event = match store.events().find_by_id(id).await {
+        Ok(Some(event)) => event,
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({"error": "Event not found"})),
+            )
+                .into_response();
+        }
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Database error"})),
+            )
+                .into_response();
+        }
+    };
+
+    if event.created_by_user_id != user.0.id {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({"error": "Only the event creator can end this event"})),
+        )
+            .into_response();
+    }
+
+    if event.status == StatusOption::Inactive {
+        return (
+            StatusCode::OK,
+            Json(EndEventResponse {
+                id: event.id,
+                status: event.status,
+            }),
+        )
+            .into_response();
+    }
+
+    let mut event_to_update: event::ActiveModel = event.into_active_model();
+    event_to_update.status = Set(StatusOption::Inactive);
+
+    match store.events().update(event_to_update).await {
+        Ok(updated) => (
+            StatusCode::OK,
+            Json(EndEventResponse {
+                id: updated.id,
+                status: updated.status,
+            }),
+        )
+            .into_response(),
+        Err(_) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": "Failed to end event"})),
+        )
+            .into_response(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -431,69 +495,5 @@ mod tests {
             result.expect_err("should fail"),
             "A senator may only be proxied once per event"
         );
-    }
-}
-
-pub async fn end_event(
-    user: SyncedUser,
-    State(state): State<AppState>,
-    Path(id): Path<i32>,
-) -> impl IntoResponse {
-    let store = &state.store;
-
-    let event = match store.events().find_by_id(id).await {
-        Ok(Some(event)) => event,
-        Ok(None) => {
-            return (
-                StatusCode::NOT_FOUND,
-                Json(json!({"error": "Event not found"})),
-            )
-                .into_response();
-        }
-        Err(_) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"error": "Database error"})),
-            )
-                .into_response();
-        }
-    };
-
-    if event.created_by_user_id != user.0.id {
-        return (
-            StatusCode::FORBIDDEN,
-            Json(json!({"error": "Only the event creator can end this event"})),
-        )
-            .into_response();
-    }
-
-    if event.status == StatusOption::Inactive {
-        return (
-            StatusCode::OK,
-            Json(EndEventResponse {
-                id: event.id,
-                status: event.status,
-            }),
-        )
-            .into_response();
-    }
-
-    let mut event_to_update: event::ActiveModel = event.into_active_model();
-    event_to_update.status = Set(StatusOption::Inactive);
-
-    match store.events().update(event_to_update).await {
-        Ok(updated) => (
-            StatusCode::OK,
-            Json(EndEventResponse {
-                id: updated.id,
-                status: updated.status,
-            }),
-        )
-            .into_response(),
-        Err(_) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({"error": "Failed to end event"})),
-        )
-            .into_response(),
     }
 }

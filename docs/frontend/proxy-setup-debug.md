@@ -7,20 +7,23 @@ I've enhanced the `ProxySetup.svelte` component with comprehensive logging and d
 ### Changes Made:
 
 1. **Enhanced Console Logging** - The component now logs:
-    - Request URL being called
-    - Full request body
-    - Response status and headers
-    - Response body (success and error cases)
-    - Detailed error messages with colored console output (🔵, 🟢, 🔴)
+
+   - Request URL being called
+   - Full request body
+   - Response status and headers
+   - Response body (success and error cases)
+   - Detailed error messages with colored console output (🔵, 🟢, 🔴)
 
 1. **Debug Info Display** - The ProxySetup screen now shows:
-    - The `VITE_API_BASE` value currently being used
-    - The full URL being constructed for the request
+
+   - The `VITE_API_BASE` value currently being used
+   - The full URL being constructed for the request
 
 1. **Better Error Handling**:
-    - Detects response content-type and parses accordingly
-    - Shows user-friendly error messages
-    - Validates that response is JSON before parsing
+
+   - Detects response content-type and parses accordingly
+   - Shows user-friendly error messages
+   - Validates that response is JSON before parsing
 
 1. **Session Code Validation** - Shows error if session code is missing
 
@@ -33,8 +36,8 @@ When the ProxySetup screen appears:
 1. Open browser DevTools (F12)
 1. Go to "Console" tab
 1. The component will show:
-    - `Debug Info` box with the API base URL and full endpoint URL being used
-    - Expected URLs: `http://localhost:8000/session/ABC123/proxy` (adjust port/domain as needed)
+   - `Debug Info` box with the API base URL and full endpoint URL being used
+   - Expected URLs: `http://localhost:8000/session/ABC123/proxy` (adjust port/domain as needed)
 
 ### Step 2: Click Continue and Watch Logs
 
@@ -42,8 +45,8 @@ When you select a senator option and click "Continue":
 
 1. Look for 🔵 (blue circle) logs showing the request being sent
 1. Watch for response logs:
-    - If you see 🟢 (green circle): Request succeeded! Check that the notice message appears
-    - If you see 🔴 (red circle): Request failed. Error message will be displayed
+   - If you see 🟢 (green circle): Request succeeded! Check that the notice message appears
+   - If you see 🔴 (red circle): Request failed. Error message will be displayed
 
 ### Step 3: Common Issues and Solutions
 
@@ -125,10 +128,10 @@ For more detailed information:
 1. Click "Continue" button
 1. Look for the `proxy` request
 1. Click on it to see:
-    - **Headers**: Shows request headers (Content-Type, credentials)
-    - **Request**: Shows the JSON body being sent
-    - **Response**: Shows the server's response
-    - **Timing**: Shows how long the request took
+   - **Headers**: Shows request headers (Content-Type, credentials)
+   - **Request**: Shows the JSON body being sent
+   - **Response**: Shows the server's response
+   - **Timing**: Shows how long the request took
 
 ### Step 5: Backend Logs
 
@@ -142,35 +145,38 @@ RUST_LOG=debug cargo run --bin backend
 ```
 
 2. Look for logs about:
-    - Incoming requests
-    - Database queries
-    - User authentication
-    - Session lookups
+   - Incoming requests
+   - Database queries
+   - User authentication
+   - Session lookups
 
 ## Expected Behavior When Working
 
 When everything is working correctly:
 
 1. **ProxySetup screen appears** with:
-    - The correct session code
-    - Debug info showing the API URL
-    - Senator dropdown and optional proxy input
+
+   - The correct session code
+   - Debug info showing the API URL
+   - Senator dropdown and optional proxy input
 
 1. **You select options and click Continue**:
-    - Senator: Yes/No (required)
-    - Proxying for: Name (optional)
+
+   - Senator: Yes/No (required)
+   - Proxying for: Name (optional)
 
 1. **Console shows** (in order):
 
-    ```
-    🔵 Sending proxy request: { url: "...", ... }
-    🔵 Response received: { status: 200, statusText: "OK", ... }
-    🟢 Success! Proxy response: { vote_instance_count: 2, is_senator: true, has_proxy: true }
-    ```
+   ```
+   🔵 Sending proxy request: { url: "...", ... }
+   🔵 Response received: { status: 200, statusText: "OK", ... }
+   🟢 Success! Proxy response: { vote_instance_count: 2, is_senator: true, has_proxy: true }
+   ```
 
 1. **Success message appears**:
-    - "You now have 2 vote instances (your own vote + one proxy vote)."
-    - Or appropriate message based on your configuration
+
+   - "You now have 2 vote instances (your own vote + one proxy vote)."
+   - Or appropriate message based on your configuration
 
 1. **Moves to WaitingPage** with the participation notice displayed
 
@@ -202,8 +208,8 @@ curl -X POST http://localhost:8000/session/ABC123/proxy \
 1. **Method**: POST
 1. **URL**: `http://localhost:8000/session/{SESSION_CODE}/proxy`
 1. **Headers**:
-    - `Content-Type: application/json`
-    - `Cookie: <auth_session_cookie>`
+   - `Content-Type: application/json`
+   - `Cookie: <auth_session_cookie>`
 1. **Body** (JSON):
 
 ```json
@@ -220,12 +226,12 @@ curl -X POST http://localhost:8000/session/ABC123/proxy \
 - **Route**: `POST /session/{session_code}/proxy`
 - **Auth Required**: Yes (needs valid session cookie)
 - **Request Type**: `SetSessionProxyRequest`
-    - `is_senator: bool` (required)
-    - `proxy_for: Option<String>` (optional, null if not proxying)
+  - `is_senator: bool` (required)
+  - `proxy_for: Option<String>` (optional, null if not proxying)
 - **Response Type**: `SetSessionProxyResponse`
-    - `vote_instance_count: number`
-    - `is_senator: boolean`
-    - `has_proxy: boolean`
+  - `vote_instance_count: number`
+  - `is_senator: boolean`
+  - `has_proxy: boolean`
 
 ### Frontend Environment Variables
 

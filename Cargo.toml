@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = ["backend/crates/*"]
+default-members = ["backend/crates/voting-app"]
 
 [workspace.package]
 version = "0.1.0"

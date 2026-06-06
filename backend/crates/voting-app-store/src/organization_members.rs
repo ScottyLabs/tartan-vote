@@ -11,7 +11,7 @@ impl<'a> OrganizationMemberRepository<'a> {
     }
 
     pub fn db(&self) -> &DatabaseConnection {
-        &self.db
+        self.db
     }
 
     pub async fn fetch_users_of_organization(

@@ -1,6 +1,4 @@
 inputs:
-  devenv:
-    url: github:cachix/devenv
   scottylabs:
     url: git+https://codeberg.org/ScottyLabs/devenv
   rust-overlay:
@@ -15,8 +13,7 @@ inputs:
     inputs:
       nixpkgs:
         follows: nixpkgs
-  bun2nix:
-    url: github:nix-community/bun2nix
-    inputs:
-      nixpkgs:
-        follows: nixpkgs
+secretspec:
+  enable: true
+  profile: dev
+  provider: vault://secrets2.scottylabs.org/secret

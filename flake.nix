@@ -1,5 +1,5 @@
 {
-  description = "Voting App";
+  description = "Tartan Vote";
 
   nixConfig = {
     extra-substituters = [ "https://scottylabs.cachix.org" ];
@@ -10,6 +10,7 @@
 
   inputs = {
     nixpkgs.url = "github:cachix/devenv-nixpkgs/rolling";
+    crane.url = "github:ipetkov/crane";
     devenv.url = "github:cachix/devenv";
     scottylabs.url = "git+https://codeberg.org/ScottyLabs/devenv";
     rust-overlay = {
@@ -20,17 +21,15 @@
       url = "github:numtide/treefmt-nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    bun2nix = {
-      url = "github:nix-community/bun2nix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
   };
 
-  outputs = { self, nixpkgs, devenv, scottylabs, bun2nix, ... } @ inputs:
+  outputs = { self, nixpkgs, crane, devenv, scottylabs, rust-overlay, ... } @ inputs:
     let
-      supportedSystems = [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" "x86_64-darwin" ];
-      forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
-      pkgsFor = system: nixpkgs.legacyPackages.${system};
+      forAllSystems = nixpkgs.lib.genAttrs [ "x86_64-linux" "aarch64-linux" ];
+      pkgsFor = system: import nixpkgs {
+        inherit system;
+        overlays = [ rust-overlay.overlays.default ];
+      };
     in
     {
       devShells = forAllSystems (system:
@@ -47,43 +46,30 @@
       packages = forAllSystems (system:
         let
           pkgs = pkgsFor system;
+          rustToolchain = pkgs.rust-bin.stable.latest.default;
+          craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
+
+          commonArgs = {
+            pname = "api";
+            version = "0.1.0";
+            src = craneLib.cleanCargoSource ./.;
+            strictDeps = true;
+
+            nativeBuildInputs = [ pkgs.pkg-config ];
+            buildInputs = [ pkgs.openssl ];
+          };
+
+          cargoArtifacts = craneLib.buildDepsOnly commonArgs;
         in
         {
           devenv = devenv.packages.${system}.devenv;
+
+          api = craneLib.buildPackage (commonArgs // {
+            inherit cargoArtifacts;
+            doCheck = false;
+          });
+          default = self.packages.${system}.api;
         }
-        // (nixpkgs.lib.optionalAttrs (system == "x86_64-linux") (
-          let
-            b2n = bun2nix.packages.${system}.default;
-
-            frontend = b2n.mkDerivation {
-              pname = "voting-app-frontend";
-              version = (builtins.fromJSON (builtins.readFile ./frontend/package.json)).version;
-              src = ./frontend;
-
-              bunDeps = b2n.fetchBunDeps {
-                bunNix = ./frontend/bun.nix;
-              };
-
-              buildPhase = ''
-                bun run build
-              '';
-
-              installPhase = ''
-                mkdir -p $out
-                cp -r dist/* $out/
-              '';
-            };
-
-            cargoNix = pkgs.callPackage ./Cargo.nix { };
-
-            backend = cargoNix.workspaceMembers."backend".build;
-
-          in
-          {
-            inherit frontend backend;
-            default = backend;
-          }
-        ))
       );
     };
 }

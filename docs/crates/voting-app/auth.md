@@ -25,8 +25,10 @@ Apply/update these tables with:
 
 ```bash
 cd auth-service
-bun x auth@latest migrate --config ./auth.mjs
+bun run migrate
 ```
+
+(This wraps `@better-auth/cli migrate -y --config auth.mjs`.)
 
 ## Backend flow
 
@@ -52,19 +54,23 @@ bun x auth@latest migrate --config ./auth.mjs
 
 ## Required env vars
 
-- `BETTER_AUTH_BASE_URL` (backend to Better Auth API base; e.g. `http://localhost:3005/api/auth`)
-- `BETTER_AUTH_URL` (Better Auth service public base URL; e.g. `http://localhost:3005`)
-- `BETTER_AUTH_SECRET` (high-entropy secret used for signing/encryption)
-- `CORS_ALLOWED_ORIGINS` (comma-separated allowlist applied to backend CORS and auth-service CORS/trustedOrigins)
-- `VITE_BETTER_AUTH_BASE_URL` (frontend Better Auth API base)
-- `BETTER_AUTH_PROVIDER_ID` and `VITE_BETTER_AUTH_PROVIDER_ID`
-- Existing `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` are still used by `auth-service` to configure OAuth provider.
+All of these are provided automatically inside `devenv shell`. See
+[secrets-and-config.md](../../secrets-and-config.md) for where each value comes
+from (devenv constants, `DEV_HOST`-derived URLs, or OpenBao secrets).
+
+- `BETTER_AUTH_BASE_URL` (backend to Better Auth API base; e.g. `http://localhost:3005/api/auth`) — derived from `DEV_HOST`
+- `BETTER_AUTH_URL` (Better Auth service public base URL; e.g. `http://localhost:3005`) — derived from `DEV_HOST`
+- `BETTER_AUTH_SECRET` (high-entropy secret used for signing/encryption) — **OpenBao secret**
+- `CORS_ALLOWED_ORIGINS` (comma-separated allowlist applied to backend CORS and auth-service CORS/trustedOrigins) — derived from `DEV_HOST`
+- `VITE_BETTER_AUTH_BASE_URL` (frontend Better Auth API base) — derived from `DEV_HOST`
+- `BETTER_AUTH_PROVIDER_ID` and `VITE_BETTER_AUTH_PROVIDER_ID` — devenv constants (`cmu-sso`)
+- `OIDC_ISSUER` — devenv constant; `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` — **OpenBao secrets**. Used by `auth-service` to configure the OAuth provider.
 - `OIDC_REDIRECT_URI` is optional. By default auth-service uses `{APP_BASE_URL}/auth/callback` to match existing allowed callbacks.
 
 ## Troubleshooting
 
 - Error: `Invalid parameter: redirect_uri`
-    - Cause: the redirect URI sent to OIDC is not in the IdP client's allowed redirect URI list.
+  - Cause: the redirect URI sent to OIDC is not in the IdP client's allowed redirect URI list.
 - Default redirect URI sent to OIDC: `{APP_BASE_URL}/auth/callback` (e.g. `http://localhost:8080/auth/callback`).
 - That backend callback bridges to Better Auth callback internally.
 - Fix: ensure `{APP_BASE_URL}/auth/callback` is allowlisted on the IdP client, or set `OIDC_REDIRECT_URI` to an already-allowlisted URI.

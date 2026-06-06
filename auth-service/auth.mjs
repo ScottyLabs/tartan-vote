@@ -8,6 +8,9 @@ import { Pool } from "pg";
 
 const thisFilePath = fileURLToPath(import.meta.url);
 const thisDirPath = dirname(thisFilePath);
+// Secrets come from the environment (devenv resolves them from OpenBao via
+// secretspec). The .env file is only a fallback for vars not already set, so we
+// do not override here.
 dotenv.config({ path: resolve(thisDirPath, "../.env") });
 
 const port = Number(process.env.BETTER_AUTH_PORT || 3005);
@@ -19,58 +22,58 @@ const issuer = process.env.OIDC_ISSUER;
 const clientId = process.env.OIDC_CLIENT_ID;
 const clientSecret = process.env.OIDC_CLIENT_SECRET;
 const redirectURI =
-    process.env.OIDC_REDIRECT_URI ||
-    `${(process.env.APP_BASE_URL || "http://localhost:8080").replace(/\/$/, "")}/auth/callback`;
+  process.env.OIDC_REDIRECT_URI ||
+  `${(process.env.APP_BASE_URL || "http://localhost:8080").replace(/\/$/, "")}/auth/callback`;
 
 const allowedOrigins =
-    process.env.CORS_ALLOWED_ORIGINS?.split(",")
-        .map((origin) => origin.trim())
-        .filter((origin) => origin.length > 0) ?? [];
+  process.env.CORS_ALLOWED_ORIGINS?.split(",")
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0) ?? [];
 
 const trustedOrigins = Array.from(
-    new Set([...allowedOrigins, frontendBaseUrl, appBaseUrl, betterAuthUrl]),
+  new Set([...allowedOrigins, frontendBaseUrl, appBaseUrl, betterAuthUrl]),
 );
 
 if (!issuer || !clientId || !clientSecret) {
-    throw new Error("OIDC_ISSUER, OIDC_CLIENT_ID, and OIDC_CLIENT_SECRET must be set");
+  throw new Error("OIDC_ISSUER, OIDC_CLIENT_ID, and OIDC_CLIENT_SECRET must be set");
 }
 
 const authConfig = {
-    baseURL: betterAuthUrl,
-    trustedOrigins,
-    user: {
-        modelName: "auth_user",
-    },
-    session: {
-        modelName: "auth_session",
-    },
-    account: {
-        modelName: "auth_account",
-    },
-    verification: {
-        modelName: "auth_verification",
-    },
-    plugins: [
-        genericOAuth({
-            config: [
-                {
-                    providerId,
-                    discoveryUrl: `${issuer.replace(/\/$/, "")}/.well-known/openid-configuration`,
-                    clientId,
-                    clientSecret,
-                    ...(redirectURI ? { redirectURI } : {}),
-                    scopes: ["openid", "email", "profile"],
-                    requireIssuerValidation: true,
-                },
-            ],
-        }),
-    ],
+  baseURL: betterAuthUrl,
+  trustedOrigins,
+  user: {
+    modelName: "auth_user",
+  },
+  session: {
+    modelName: "auth_session",
+  },
+  account: {
+    modelName: "auth_account",
+  },
+  verification: {
+    modelName: "auth_verification",
+  },
+  plugins: [
+    genericOAuth({
+      config: [
+        {
+          providerId,
+          discoveryUrl: `${issuer.replace(/\/$/, "")}/.well-known/openid-configuration`,
+          clientId,
+          clientSecret,
+          ...(redirectURI ? { redirectURI } : {}),
+          scopes: ["openid", "email", "profile"],
+          requireIssuerValidation: true,
+        },
+      ],
+    }),
+  ],
 };
 
 if (process.env.DATABASE_URL) {
-    authConfig.database = new Pool({
-        connectionString: process.env.DATABASE_URL,
-    });
+  authConfig.database = new Pool({
+    connectionString: process.env.DATABASE_URL,
+  });
 }
 
 export const auth = betterAuth(authConfig);

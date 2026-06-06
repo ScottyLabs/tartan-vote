@@ -136,7 +136,7 @@ pub async fn setup() {
     let listener = tokio::net::TcpListener::bind(&bind_addr)
         .await
         .expect("failed to bind to server address");
-    println!("Listening on {}", &bind_addr);
+    println!("Listening on {}", bind_addr);
 
     axum::serve(listener, api_router.into_make_service())
         .await

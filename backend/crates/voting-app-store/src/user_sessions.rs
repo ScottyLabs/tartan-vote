@@ -11,7 +11,7 @@ impl<'a> UserSessionRepository<'a> {
     }
 
     pub fn db(&self) -> &DatabaseConnection {
-        &self.db
+        self.db
     }
 
     pub async fn fetch_by_session_id(

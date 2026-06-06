@@ -1,16 +1,17 @@
 {
-    "name": "auth-service",
-    "private": true,
-    "type": "module",
-    "scripts": {
-        "dev": "node server.mjs",
-        "start": "node server.mjs"
-    },
-    "dependencies": {
-        "better-auth": "^1.3.10",
-        "cors": "^2.8.5",
-        "dotenv": "^16.6.1",
-        "express": "^4.21.2",
-        "pg": "^8.16.3"
-    }
+  "name": "auth-service",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node server.mjs",
+    "start": "node server.mjs",
+    "migrate": "npx run @better-auth/cli@latest migrate -y --config auth.mjs"
+  },
+  "dependencies": {
+    "better-auth": "^1.3.10",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^4.21.2",
+    "pg": "^8.16.3"
+  }
 }

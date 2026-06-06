@@ -20,9 +20,9 @@
 1. Log in to voter interface
 1. Enter session code and join
 1. On `ProxySetup` screen:
-    - Select "No" for senator
-    - Leave proxy name empty
-    - Click "Continue"
+   - Select "No" for senator
+   - Leave proxy name empty
+   - Click "Continue"
 1. Should see notice: "You currently have 0 vote instances for this session."
 1. Verify on `WaitingPage` that notice is displayed
 1. When motion becomes active, verify user sees "No voting options available"
@@ -33,7 +33,7 @@
 - [ ] Database check: 0 `user_session` rows for this user+session with `join_left = Joined`
 - [ ] Attendance endpoint shows user as `is_proxy_holder: false`, `proxy_for: []`
 
----
+______________________________________________________________________
 
 ### Scenario 2: Non-Senator Proxy
 
@@ -44,9 +44,9 @@
 1. Log in to voter interface
 1. Enter session code and join
 1. On `ProxySetup` screen:
-    - Select "No" for senator
-    - Enter proxy name: "Jane Doe"
-    - Click "Continue"
+   - Select "No" for senator
+   - Enter proxy name: "Jane Doe"
+   - Click "Continue"
 1. Should see notice: "You now have 1 proxy vote instance."
 1. When motion becomes active, verify user sees 1 voting option labeled "Jane Doe"
 1. Cast vote on that option
@@ -60,7 +60,7 @@
 - [ ] Vote in database has `proxy: true` in data field
 - [ ] Attendance endpoint shows user as `is_proxy_holder: true`, `proxy_for: ["Jane Doe"]`
 
----
+______________________________________________________________________
 
 ### Scenario 3: Senator (No Proxy)
 
@@ -71,9 +71,9 @@
 1. Log in to voter interface
 1. Enter session code and join
 1. On `ProxySetup` screen:
-    - Select "Yes" for senator
-    - Leave proxy name empty
-    - Click "Continue"
+   - Select "Yes" for senator
+   - Leave proxy name empty
+   - Click "Continue"
 1. Should see notice: "You now have 1 vote instance."
 1. When motion becomes active, verify user sees 1 voting option (unnamed, or labeled "Yourself")
 1. Cast vote on that option
@@ -87,7 +87,7 @@
 - [ ] Vote in database has `proxy: false` in data field
 - [ ] Attendance endpoint shows user as `is_proxy_holder: false`, `proxy_for: []`
 
----
+______________________________________________________________________
 
 ### Scenario 4: Senator Proxy
 
@@ -98,9 +98,9 @@
 1. Log in to voter interface
 1. Enter session code and join
 1. On `ProxySetup` screen:
-    - Select "Yes" for senator
-    - Enter proxy name: "John Smith"
-    - Click "Continue"
+   - Select "Yes" for senator
+   - Enter proxy name: "John Smith"
+   - Click "Continue"
 1. Should see notice: "You now have 2 vote instances (your own vote + one proxy vote)."
 1. When motion becomes active, verify user sees 2 voting options: one unnamed (self) + one labeled "John Smith"
 1. Cast votes on both options (can be same or different)
@@ -114,7 +114,7 @@
 - [ ] Both votes in database with appropriate `proxy` fields
 - [ ] Attendance endpoint shows user as `is_proxy_holder: true`, `proxy_for: ["John Smith"]`
 
----
+______________________________________________________________________
 
 ### Scenario 5: Idempotency - Same Submission Twice
 
@@ -123,9 +123,9 @@
 **Steps:**
 
 1. On `ProxySetup` screen:
-    - Select "Yes" for senator
-    - Enter "Jane Doe"
-    - Click "Continue" → notice shows 2 instances
+   - Select "Yes" for senator
+   - Enter "Jane Doe"
+   - Click "Continue" → notice shows 2 instances
 1. (Hypothetically) Call same endpoint again with identical payload
 1. Should still get notice saying 2 instances
 
@@ -152,7 +152,7 @@ curl -X POST http://localhost:8000/session/ABC123/proxy \
 - [ ] No duplicate `user_session` rows created
 - [ ] Database remains consistent
 
----
+______________________________________________________________________
 
 ### Scenario 6: Re-Submission with Changes
 
@@ -190,7 +190,7 @@ SELECT proxy FROM user_session WHERE user_id = ? AND session_id = ? AND join_lef
 - [ ] Instance count remains 2
 - [ ] No orphaned database rows
 
----
+______________________________________________________________________
 
 ### Scenario 7: Changing from Senator to Non-Senator
 
@@ -227,7 +227,7 @@ SELECT proxy FROM user_session WHERE user_id = ? AND session_id = ? AND join_lef
 - [ ] Proxy instance preserved
 - [ ] Instance count becomes 1
 
----
+______________________________________________________________________
 
 ### Scenario 8: Host Attendance View
 
@@ -237,21 +237,21 @@ SELECT proxy FROM user_session WHERE user_id = ? AND session_id = ? AND join_lef
 
 1. Host creates session and starts waiting for attendees
 1. Multiple users join with different configurations:
-    - User A: Senator, no proxy
-    - User B: Non-senator, proxying for "User A"
-    - User C: Senator, proxying for "User D"
+   - User A: Senator, no proxy
+   - User B: Non-senator, proxying for "User A"
+   - User C: Senator, proxying for "User D"
 1. Host views attendance (in `SessionCreation` hover cards)
 1. Verify each user shows correct proxy status
 
 **Verification:**
 
 - [ ] GET `/session/{code}/attendance` returns:
-    - User A: `is_proxy_holder: false, proxy_for: []`
-    - User B: `is_proxy_holder: true, proxy_for: ["User A"]`
-    - User C: `is_proxy_holder: true, proxy_for: ["User D"]`
+  - User A: `is_proxy_holder: false, proxy_for: []`
+  - User B: `is_proxy_holder: true, proxy_for: ["User A"]`
+  - User C: `is_proxy_holder: true, proxy_for: ["User D"]`
 - [ ] Host UI displays these correctly in participant hover cards
 
----
+______________________________________________________________________
 
 ### Scenario 9: Proxy Name Whitespace Handling
 
@@ -276,7 +276,7 @@ curl -X POST http://localhost:8000/session/ABC123/proxy \
 - [ ] Database stores "Jane Doe" (no extra spaces)
 - [ ] Voting interface displays "Jane Doe" (no padding)
 
----
+______________________________________________________________________
 
 ### Scenario 10: Empty Proxy Name
 
@@ -306,7 +306,7 @@ curl -X POST http://localhost:8000/session/ABC123/proxy \
 - [ ] Empty string not stored in database
 - [ ] Instance count calculated correctly
 
----
+______________________________________________________________________
 
 ## Integration Test: Full Voting Flow
 
@@ -325,8 +325,8 @@ curl -X POST http://localhost:8000/session/ABC123/proxy \
 1. Admin starts a motion
 1. Each user casts votes on all available options
 1. Verify vote counts in results:
-    - Should see 4 total votes (1 + 1 + 2 = 4, not 3)
-    - Votes labeled with their "from" user and proxy status
+   - Should see 4 total votes (1 + 1 + 2 = 4, not 3)
+   - Votes labeled with their "from" user and proxy status
 
 **Verification:**
 
@@ -334,7 +334,7 @@ curl -X POST http://localhost:8000/session/ABC123/proxy \
 - [ ] Each vote correctly tagged with user + proxy info
 - [ ] Results display includes proxy vote attribution
 
----
+______________________________________________________________________
 
 ## Performance & Edge Cases
 
@@ -359,29 +359,33 @@ curl -X POST http://localhost:8000/session/ABC123/proxy \
 - Try proxy names with: emoji, unicode, quotes, ampersands
 - Verify: Accepted and displayed correctly
 
----
+______________________________________________________________________
 
 ## Regression Tests
 
 ### Ensure No Breaking Changes
 
 1. **Session creation still works:**
-    - `POST /session/create` returns expected response
-    - No proxy fields in response
+
+   - `POST /session/create` returns expected response
+   - No proxy fields in response
 
 1. **Regular voting still works (non-proxy case):**
-    - Users without proxy can still vote normally
-    - Vote structure unchanged
+
+   - Users without proxy can still vote normally
+   - Vote structure unchanged
 
 1. **Results endpoints unchanged:**
-    - `/events/{id}/results` returns same structure
-    - (Proxy data is supplementary in vote metadata)
+
+   - `/events/{id}/results` returns same structure
+   - (Proxy data is supplementary in vote metadata)
 
 1. **Admin endpoints unchanged:**
-    - Session status checks work
-    - Event start/end unchanged
 
----
+   - Session status checks work
+   - Event start/end unchanged
+
+______________________________________________________________________
 
 ## Debugging Commands
 
@@ -424,18 +428,18 @@ curl -X POST http://localhost:8000/session/ABC123/proxy \
   -d '{"is_senator": true, "proxy_for": "Test Name"}'
 ```
 
----
+______________________________________________________________________
 
 ## Expected Behavior Matrix
 
-| User Type   | Input        | Expected Instances | Base | Proxy | Notice                                 |
+| User Type | Input | Expected Instances | Base | Proxy | Notice |
 | ----------- | ------------ | ------------------ | ---- | ----- | -------------------------------------- |
-| Senator     | No proxy     | 1                  | ✓    | -     | "You now have 1 vote instance."        |
-| Senator     | Proxy "Jane" | 2                  | ✓    | ✓     | "You now have 2 vote instances..."     |
-| Non-senator | No proxy     | 0                  | -    | -     | "You currently have 0 vote instances." |
-| Non-senator | Proxy "Jane" | 1                  | -    | ✓     | "You now have 1 proxy vote instance."  |
+| Senator | No proxy | 1 | ✓ | - | "You now have 1 vote instance." |
+| Senator | Proxy "Jane" | 2 | ✓ | ✓ | "You now have 2 vote instances..." |
+| Non-senator | No proxy | 0 | - | - | "You currently have 0 vote instances." |
+| Non-senator | Proxy "Jane" | 1 | - | ✓ | "You now have 1 proxy vote instance." |
 
----
+______________________________________________________________________
 
 ## Cleanup After Testing
 
@@ -449,7 +453,7 @@ DELETE FROM session;
 # (Depends on your DB setup/teardown strategy)
 ```
 
----
+______________________________________________________________________
 
 ## Sign-Off Checklist
 

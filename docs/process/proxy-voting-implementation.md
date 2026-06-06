@@ -8,12 +8,12 @@ The voting application now supports a sophisticated proxy voting system where us
 
 The system allocates vote instances based on senator status and proxy assignment:
 
-| User Type               | Base Instance | Proxy Instance | Total Instances | Notes                               |
+| User Type | Base Instance | Proxy Instance | Total Instances | Notes |
 | ----------------------- | ------------- | -------------- | --------------- | ----------------------------------- |
-| Senator, no proxy       | ✓             | -              | 1               | Votes as self                       |
-| Senator, with proxy     | ✓             | ✓              | 2               | Votes as self + proxies for someone |
-| Non-senator, no proxy   | -             | -              | 0               | Cannot vote                         |
-| Non-senator, with proxy | -             | ✓              | 1               | Can only proxy for a senator        |
+| Senator, no proxy | ✓ | - | 1 | Votes as self |
+| Senator, with proxy | ✓ | ✓ | 2 | Votes as self + proxies for someone |
+| Non-senator, no proxy | - | - | 0 | Cannot vote |
+| Non-senator, with proxy | - | ✓ | 1 | Can only proxy for a senator |
 
 ## Architecture
 
@@ -117,8 +117,8 @@ Lists all participants in session with proxy metadata (for host meeting overview
 
 - **New field:** `proxy: Option<String>` — proxy target name (null if not a proxy instance)
 - **Semantic:** One user can have multiple `user_session` rows per session:
-    - One non-proxy row (base instance, if senator)
-    - Zero or one proxy row (if proxying for someone)
+  - One non-proxy row (base instance, if senator)
+  - Zero or one proxy row (if proxying for someone)
 
 **Unique Constraint:** `(user_id, session_id, proxy)` — prevents duplicate entries
 
@@ -154,10 +154,10 @@ Pre-voting-page screen that captures participation configuration.
 1. User optionally enters proxy target name
 1. On submit, calls `POST /session/{code}/proxy` with parsed payload
 1. On success, generates user-friendly notice:
-    - "You now have 2 vote instances (your own vote + one proxy vote)."
-    - "You now have 1 proxy vote instance."
-    - "You now have 1 vote instance."
-    - "You currently have 0 vote instances for this session."
+   - "You now have 2 vote instances (your own vote + one proxy vote)."
+   - "You now have 1 proxy vote instance."
+   - "You now have 1 vote instance."
+   - "You currently have 0 vote instances for this session."
 1. Passes notice to `App.svelte` via `onNext(notice)` callback
 
 ### `WaitingPage.svelte` (ENHANCED)
@@ -212,11 +212,11 @@ Host meeting control screen now displays proxy assignments in participant cards.
 1. Fetch all existing joined sessions for user
 1. Separate base vs proxy instances
 1. **Senator logic:**
-    - If `is_senator=true`: Ensure one base instance exists (create if missing)
-    - If `is_senator=false`: Delete all base instances
+   - If `is_senator=true`: Ensure one base instance exists (create if missing)
+   - If `is_senator=false`: Delete all base instances
 1. **Proxy logic:**
-    - If `proxy_for=Some(name)`: Update first proxy or create new if missing
-    - If `proxy_for=None`: Delete all proxy instances
+   - If `proxy_for=Some(name)`: Update first proxy or create new if missing
+   - If `proxy_for=None`: Delete all proxy instances
 1. Query final count and return response
 
 **Idempotency:** Safe to call multiple times; always reconciles instance set to match desired state.
@@ -242,8 +242,8 @@ This ensures only active, joined sessions are counted when provisioning votes.
 ### `docs/db/db-json.md`
 
 - Updated vote data structure to include:
-    - `proxy: boolean` — whether this vote instance is a proxy
-    - `proxy_for_user_id: number | null` — ID of person being proxied for (preserved for audit)
+  - `proxy: boolean` — whether this vote instance is a proxy
+  - `proxy_for_user_id: number | null` — ID of person being proxied for (preserved for audit)
 
 ## Quality Assurance
 
@@ -255,32 +255,39 @@ This ensures only active, joined sessions are counted when provisioning votes.
 ### Test Coverage Needed
 
 1. **Non-senator proxy flow:**
-    - User selects "No" + proxy name "Jane"
-    - Verify: 1 vote instance created (proxy only)
+
+   - User selects "No" + proxy name "Jane"
+   - Verify: 1 vote instance created (proxy only)
 
 1. **Senator proxy flow:**
-    - User selects "Yes" + proxy name "John"
-    - Verify: 2 vote instances created (base + proxy)
+
+   - User selects "Yes" + proxy name "John"
+   - Verify: 2 vote instances created (base + proxy)
 
 1. **Senator no-proxy flow:**
-    - User selects "Yes" + no proxy name
-    - Verify: 1 vote instance created (base only)
+
+   - User selects "Yes" + no proxy name
+   - Verify: 1 vote instance created (base only)
 
 1. **Non-senator no-proxy flow:**
-    - User selects "No" + no proxy name
-    - Verify: 0 vote instances created
+
+   - User selects "No" + no proxy name
+   - Verify: 0 vote instances created
 
 1. **Idempotency:**
-    - Call same endpoint twice with same payload
-    - Verify: Same instance count returned both times
+
+   - Call same endpoint twice with same payload
+   - Verify: Same instance count returned both times
 
 1. **Re-submission with changes:**
-    - User calls with `(is_senator=true, proxy=null)`
-    - Then calls with `(is_senator=false, proxy="Jane")`
-    - Verify: Base instance deleted, proxy instance created
+
+   - User calls with `(is_senator=true, proxy=null)`
+   - Then calls with `(is_senator=false, proxy="Jane")`
+   - Verify: Base instance deleted, proxy instance created
 
 1. **Attendance display:**
-    - Confirm host sees correct `is_proxy_holder` and `proxy_for` arrays
+
+   - Confirm host sees correct `is_proxy_holder` and `proxy_for` arrays
 
 ## Edge Cases Handled
 
