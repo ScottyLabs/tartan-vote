@@ -24,10 +24,15 @@
     });
 
     async function handleClick() {
-        await authClient.signIn.oauth2({
-            providerId: BETTER_AUTH_PROVIDER_ID,
-            callbackURL: window.location.origin,
-        });
+        try {
+            await authClient.signIn.oauth2({
+                providerId: BETTER_AUTH_PROVIDER_ID,
+                callbackURL: window.location.origin,
+            });
+        } catch (error) {
+            console.error("SSO sign-in failed", error);
+            alert("Sign-in failed. Please try again or contact ScottyLabs.");
+        }
     }
 </script>
 
