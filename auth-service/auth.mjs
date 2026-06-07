@@ -38,9 +38,27 @@ if (!issuer || !clientId || !clientSecret) {
   throw new Error("OIDC_ISSUER, OIDC_CLIENT_ID, and OIDC_CLIENT_SECRET must be set");
 }
 
+const betterAuthSecret = process.env.BETTER_AUTH_SECRET;
+if (!betterAuthSecret) {
+  throw new Error("BETTER_AUTH_SECRET must be set");
+}
+
+const cookieDomain = process.env.COOKIE_DOMAIN?.trim() || undefined;
+
 const authConfig = {
   baseURL: betterAuthUrl,
+  secret: betterAuthSecret,
   trustedOrigins,
+  ...(cookieDomain
+    ? {
+        advanced: {
+          crossSubDomainCookies: {
+            enabled: true,
+            domain: cookieDomain,
+          },
+        },
+      }
+    : {}),
   user: {
     modelName: "auth_user",
   },

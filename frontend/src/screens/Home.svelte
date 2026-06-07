@@ -22,7 +22,9 @@
     let authStatusError = $state<string | null>(null);
 
     let joinError = $state<string | null>(null);
+    let createError = $state<string | null>(null);
     let joining = $state<boolean>(false);
+    let creating = $state<boolean>(false);
 
     const API_BASE = import.meta.env.VITE_API_BASE || "";
     const BETTER_AUTH_PROVIDER_ID =
@@ -81,17 +83,32 @@
     }
 
     async function handleCreateSessionClick() {
-        const response = await fetch(`${API_BASE}/session/create`, {
-            cache: "no-store",
-            credentials: "include",
-        });
+        creating = true;
+        createError = null;
 
-        if (!response.ok) {
-            throw new Error(`Session creation failed: ${response.status}`);
+        try {
+            const response = await fetch(`${API_BASE}/session/create`, {
+                cache: "no-store",
+                credentials: "include",
+            });
+
+            if (response.status === 401) {
+                createError = "Sign in before creating a session.";
+                return;
+            }
+
+            if (!response.ok) {
+                createError = `Could not create session (${response.status}).`;
+                return;
+            }
+
+            const data = await response.json();
+            toAdmin(data.session_code);
+        } catch {
+            createError = "Could not reach the API. Try again.";
+        } finally {
+            creating = false;
         }
-
-        const data = await response.json();
-        toAdmin(data.session_code);
     }
 </script>
 
@@ -140,15 +157,23 @@
     <div class="row">
         <h3 class="session">Want to create a session?</h3>
         {#if authStatus?.logged_in}
-            <button onclick={handleCreateSessionClick} class="sessBtn"
-                >Create Session</button
+            <button
+                onclick={handleCreateSessionClick}
+                class="sessBtn"
+                disabled={creating}
             >
+                {creating ? "Creating..." : "Create Session"}
+            </button>
         {:else}
             <button onclick={handleSignInClick} class="sessBtn"
                 >Sign in to Create Session</button
             >
         {/if}
     </div>
+
+    {#if createError}
+        <p class="error">{createError}</p>
+    {/if}
 </main>
 
 <style>
