@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-This project uses [devenv](https://devenv.sh/getting-started/) to provide Bun, Cargo, PostgreSQL, and all other development dependencies. Follow the devenv installation instructions.
+This project uses [devenv](https://devenv.sh/getting-started/) to provide Cargo, Deno, Node, PostgreSQL, and all other development dependencies. Follow the devenv installation instructions.
 
 ## Starting up
 
@@ -12,9 +12,14 @@ Now, we will get your own instance of Tartan Vote running!
 
 You will need [git](https://git-scm.com/install/).
 
-Run `git clone https://github.com/ScottyLabs/voting-app.git` in your favorite (or least favorite) folder to download the repository, and run `cd voting-app` to enter.
+Clone the repository from Codeberg:
 
-Then run `devenv shell` (or use [direnv](https://direnv.net/)) to enter the development environment. This starts PostgreSQL and exposes Bun, Cargo, and other tooling.
+```bash
+git clone https://codeberg.org/ScottyLabs/tartan-vote.git
+cd tartan-vote
+```
+
+Run `direnv allow` (or `devenv shell`) to enter the development environment. This starts PostgreSQL and exposes Cargo, Deno, Node, and other tooling.
 
 ### Secrets
 
@@ -31,38 +36,43 @@ If `devenv shell` reports missing secrets or you get `403 permission denied`, se
 [secrets-and-config.md](secrets-and-config.md), which documents the full secrets
 model, the `DEV_HOST` override for cross-machine testing, and troubleshooting.
 
-### Backend
+### Better Auth migrations
 
-The backend is the link between the frontend and the database.
+On first setup (or after auth schema changes), run migrations from the auth service:
 
 ```bash
-# Start Better Auth service in a separate terminal
 cd auth-service
-bun install
-bun run migrate
-bun run dev
-
-cd ..
-# Build and run the backend from the repo root
-cargo run
+npm run migrate
 ```
 
-### Frontend
+### Run everything
 
-Now that your backend is running, we can set up the frontend. Navigate to the frontend folder. You will probably need another terminal instance, because you need both running at the same time.
+From the repo root, start all three processes with devenv:
 
 ```bash
-# Navigate with
-
-cd frontend
-
-# We want to install the proper dependencies for the frontend. Run
-
-frontend $ bun install
-
-# followed by
-
-frontend $ bun run dev
-
-# to start up the frontend.
+devenv up
 ```
+
+This runs:
+
+- **api** — Rust backend (`cargo run`)
+- **auth** — Better Auth service (`node server.mjs`)
+- **frontend** — Svelte dev server (`deno run dev --host`)
+
+You can also start processes individually:
+
+```bash
+devenv processes up api
+devenv processes up auth
+devenv processes up frontend
+```
+
+### Cross-machine testing
+
+To serve on one machine and browse from another, set your LAN IP in a git-ignored `.env.local`:
+
+```bash
+echo 'DEV_HOST=192.168.1.20' > .env.local
+```
+
+Re-enter the shell, then register `http://<your-ip>:8080/auth/callback` on the Keycloak client. See [secrets-and-config.md](secrets-and-config.md).

@@ -12,9 +12,16 @@
     postgres.enable = true;
     secrets.enable = true;
 
-    kennel.services.tartan-vote.api = {
+    kennel.services.api = {
       customDomain = "api.tartan-vote.scottylabs.org";
-      oidc.redirectPaths = [ "/oauth2/callback" ];
+      oidc.redirectPaths = [ "/auth/callback" ];
+    };
+    kennel.services.auth = {
+      customDomain = "auth.tartan-vote.scottylabs.org";
+    };
+    kennel.sites.frontend = {
+      spa = true;
+      customDomain = "tartan-vote.scottylabs.org";
     };
   };
 
@@ -32,7 +39,11 @@
   ];
 
   processes = {
-    backend.exec = "secretspec run --profile dev -- cargo run";
+    api.exec = "secretspec run --profile dev -- cargo run";
+    auth = {
+      exec = "secretspec run --profile dev -- node server.mjs";
+      cwd = "./auth-service";
+    };
     frontend = {
       exec = "deno install && deno run dev --host";
       cwd = "./frontend";
@@ -44,7 +55,6 @@
   # host already runs a Postgres on 5432 the managed server lands on 5433. The
   # live port is in postmaster.pid (line 4); fall back to PGPORT, then 5432.
   enterShell = ''
-
     # Host-specific URLs are derived from a single DEV_HOST so the shared secret
     # store never carries a developer's machine address. For cross-machine
     # testing (serve here, browse from another device) set DEV_HOST to this
@@ -62,9 +72,21 @@
     export VITE_API_BASE="http://$DEV_HOST:8080"
     export VITE_BETTER_AUTH_BASE_URL="http://$DEV_HOST:3005/api/auth"
     export CORS_ALLOWED_ORIGINS="http://$DEV_HOST:5173,http://$DEV_HOST:8080,http://$DEV_HOST:3005"
+
+    pg_port="''${PGPORT:-5432}"
+    if [ -n "''${PGDATA:-}" ] && [ -f "''${PGDATA}/postmaster.pid" ]; then
+      pg_port="$(sed -n '4p' "''${PGDATA}/postmaster.pid" 2>/dev/null || echo "$pg_port")"
+    fi
+    if [ -n "''${DATABASE_URL:-}" ]; then
+      export DATABASE_URL="$(printf '%s' "$DATABASE_URL" | sed -E "s/(:[0-9]+)(\/|$)/:$pg_port\\2")"
+    fi
   '';
 
   env = {
+    VAULT_ADDR = "https://secrets2.scottylabs.org";
+    SECRETSPEC_PROFILE = "dev";
+    SECRETSPEC_PROVIDER = "vault://secrets2.scottylabs.org/secret";
+
     # Non-secret, machine-independent constants. Host-specific URLs are derived
     # from DEV_HOST in enterShell above.
     OIDC_ISSUER = "https://idp.scottylabs.org/realms/scottylabs";

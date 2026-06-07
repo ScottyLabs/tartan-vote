@@ -33,49 +33,57 @@ Hello, reader! For the remainder of this README, and other documentation, we wil
 
 ### Prerequisites
 
-- [devenv](https://devenv.sh/getting-started/) - Provides Bun, Cargo, and PostgreSQL via Nix
+- [devenv](https://devenv.sh/getting-started/) — provides Cargo, Deno, Node, PostgreSQL, and other tooling via Nix
+- [direnv](https://direnv.net/) (recommended)
 
 ### Quick Setup
 
 For detailed setup instructions, see [SETUP.md](docs/SETUP.md). Configuration and
 secrets are documented in [secrets-and-config.md](docs/secrets-and-config.md).
 
-Inside `devenv shell`, all configuration (constants, host URLs, `DATABASE_URL`)
-is provided automatically; real secrets come from OpenBao. Authenticate once per
-machine with `bao login -method=oidc` (`BAO_ADDR=https://secrets2.scottylabs.org`).
-
-#### Starting auth
+Authenticate once per machine with OpenBao so secretspec can read dev secrets:
 
 ```bash
-# Install auth service dependencies
-cd auth-service
-bun install
-
-# Run Better Auth migrations (first run / after auth schema changes)
-bun run migrate
-
-# Start Better Auth service (in a separate terminal)
-bun run dev
+export BAO_ADDR=https://secrets2.scottylabs.org
+bao login -method=oidc
 ```
 
-### Running the backend
-
-Run the backend from the repo root. The workspace's default-members points at
-the backend crate, so no `cd` needed.
-
-```
-cargo run
-```
-
-If you so desire, you can always go to the package directory, I guess...
-
-#### Starting the frontend
+Allow direnv (or enter the shell manually):
 
 ```bash
-cd frontend
-bun install
-bun run dev
+direnv allow
+# or: devenv shell
 ```
+
+Run Better Auth migrations on first setup (or after auth schema changes):
+
+```bash
+cd auth-service && npm run migrate
+```
+
+Start all three dev processes:
+
+```bash
+devenv up
+# or: devenv processes up
+```
+
+This starts the API (`api`), Better Auth service (`auth`), and Svelte frontend (`frontend`). Inside the devenv shell, constants, host URLs, `DATABASE_URL`, and secrets are provided automatically.
+
+### Deployment
+
+Production runs on [Kennel](https://codeberg.org/ScottyLabs/kennel) via devenv and secretspec.
+
+- **Local:** `devenv up`
+- **Prod:** push to Codeberg `main`; Kennel builds `.#packages.x86_64-linux.{api,auth,frontend}`
+
+Deployment URLs follow Kennel's pattern:
+
+- API: `tartan-vote-api-main.scottylabs.net` (custom: `api.tartan-vote.scottylabs.org`)
+- Auth: `tartan-vote-auth-main.scottylabs.net` (custom: `auth.tartan-vote.scottylabs.org`)
+- Frontend: `tartan-vote-frontend-main.scottylabs.net` (custom: `tartan-vote.scottylabs.org`)
+
+Kennel auto-provisions the Keycloak OIDC client on deploy when `oidc.redirectPaths` is set on the `api` service. See [secrets-and-config.md](docs/secrets-and-config.md) for details.
 
 ### Contributing
 

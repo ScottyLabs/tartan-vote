@@ -6,8 +6,10 @@ non-`localhost` host for cross-machine testing.
 
 ## TL;DR
 
-- Enter the dev environment with `devenv shell` (or `direnv`). It provides
-  everything: constants, derived URLs, the database connection, and real
+- Enter the dev environment with `devenv shell` (or `direnv`), then run
+  `devenv up` to start the API, auth service, and frontend together.
+
+- The shell provides constants, derived URLs, the database connection, and real
   secrets pulled from OpenBao.
 
 - You normally do not need a `.env` file for local development.
@@ -36,6 +38,7 @@ never carries any one developer's machine-specific values.
 | **Derived host URLs** | `APP_BASE_URL`, `FRONTEND_BASE_URL`, `BETTER_AUTH_URL`, `BETTER_AUTH_BASE_URL`, `VITE_API_BASE`, `VITE_BETTER_AUTH_BASE_URL`, `CORS_ALLOWED_ORIGINS` | `devenv.nix` (`enterShell`), computed from `DEV_HOST` |
 | **OpenBao (secretspec)** | Real secrets: `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `BETTER_AUTH_SECRET` | `secret/secretspec/tartan-vote/dev/*` |
 | **devenv Postgres** | `DATABASE_URL` (points at the managed Postgres socket/port) | `devenv.nix` (`enterShell`) |
+| **secretspec prod/staging/preview** | Deployment URLs + secrets for Kennel | `secretspec.toml` profiles; Kennel resolves by environment |
 
 The host URLs are all just `{scheme}://{host}:{port}` built from a single
 `DEV_HOST`, so they don't need to be stored anywhere. Only the host varies
@@ -53,10 +56,10 @@ and are accessed through [secretspec](https://secretspec.dev/).
   (`tartan-vote-dev`, `tartan-vote-prod`).
 - **Provider:** `vault://secrets2.scottylabs.org/secret` (the ScottyLabs devenv
   module configures this; it works for both Vault and OpenBao).
-- **Profile:** `dev` for local development.
+- **Profile:** `dev` for local development; `prod`, `staging`, or `preview` for Kennel deployments.
 
-The devenv integration is enabled with `secretspec.enable = true;` in `devenv.nix`,
-which makes `config.secretspec.secrets.*` resolve from OpenBao at shell entry.
+The devenv integration is enabled in `devenv.yaml`, which makes
+`config.secretspec.secrets.*` resolve from OpenBao at shell entry.
 
 ### Authenticating (one-time per machine)
 
@@ -106,10 +109,9 @@ secretspec run -- <command>
 ```
 
 > Inside `devenv shell`, secrets are already exported into the environment
-> (`devenv.nix` maps them from `config.secretspec.secrets`), so you run the
-> backend and auth-service directly — `cargo run`, `bun run dev` — without
-> wrapping them in `secretspec run`. `secretspec run` is only needed to inject
-> secrets for a process started **outside** the dev shell.
+> (`devenv.nix` maps them from `config.secretspec.secrets`). The devenv
+> processes (`devenv up`) wrap commands in `secretspec run --profile dev` so
+> they work even when started outside a fully-loaded shell.
 
 Your global default provider/profile is in `~/.config/secretspec/config.toml`:
 
@@ -146,6 +148,48 @@ URLs must point at the serving machine's LAN IP — a remote browser resolves
    the IdP rejects the login with `Invalid parameter: redirect_uri`.
 
 Remove `.env.local` (or comment the line) to return to `localhost`.
+
+## Kennel deployment & OIDC auto-provisioning
+
+Kennel deploys three artifacts declared in `devenv.nix`:
+
+| Kind | Name | Package | Custom domain |
+| --- | --- | --- | --- |
+| Service | `api` | `packages.api` | `api.tartan-vote.scottylabs.org` |
+| Service | `auth` | `packages.auth` | `auth.tartan-vote.scottylabs.org` |
+| Site | `frontend` | `packages.frontend` | `tartan-vote.scottylabs.org` |
+
+The `api` service declares `oidc.redirectPaths = [ "/auth/callback" ]`. On every
+deploy, Kennel reconciles Keycloak clients and writes OIDC credentials to OpenBao:
+
+| OpenBao path | Written by |
+| --- | --- |
+| `secret/secretspec/tartan-vote/prod/OIDC_CLIENT_ID` | Kennel (prod client `tartan-vote`) |
+| `secret/secretspec/tartan-vote/prod/OIDC_CLIENT_SECRET` | Kennel |
+| `secret/secretspec/tartan-vote/staging/OIDC_CLIENT_*` | Kennel (client `tartan-vote-staging`) |
+| `secret/secretspec/tartan-vote/preview/OIDC_CLIENT_*` | Kennel (same staging credentials) |
+
+Redirect URIs Kennel registers include
+`https://tartan-vote-api-main.scottylabs.net/auth/callback` and
+`https://api.tartan-vote.scottylabs.org/auth/callback` (plus staging/PR variants).
+
+`BETTER_AUTH_SECRET` for prod/staging must be seeded manually in OpenBao before
+the first deploy:
+
+```bash
+bao kv put secret/secretspec/tartan-vote/prod/BETTER_AUTH_SECRET value="$(openssl rand -base64 32)"
+```
+
+After a successful main-branch deploy, verify OIDC secrets:
+
+```bash
+bao kv get secret/secretspec/tartan-vote/prod/OIDC_CLIENT_ID
+bao kv get secret/secretspec/tartan-vote/prod/OIDC_CLIENT_SECRET
+```
+
+Local development does **not** auto-create Keycloak clients. Dev uses the shared
+`idp.scottylabs.org` realm with secrets from the `dev` profile; register
+`http://$DEV_HOST:8080/auth/callback` manually for cross-machine testing.
 
 ## Troubleshooting
 

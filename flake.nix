@@ -13,6 +13,10 @@
     crane.url = "github:ipetkov/crane";
     devenv.url = "github:cachix/devenv";
     scottylabs.url = "git+https://codeberg.org/ScottyLabs/devenv";
+    bun2nix = {
+      url = "github:nix-community/bun2nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -23,13 +27,35 @@
     };
   };
 
-  outputs = { self, nixpkgs, crane, devenv, scottylabs, rust-overlay, ... } @ inputs:
+  outputs = { self, nixpkgs, crane, devenv, scottylabs, bun2nix, rust-overlay, ... } @ inputs:
     let
       forAllSystems = nixpkgs.lib.genAttrs [ "x86_64-linux" "aarch64-linux" ];
       pkgsFor = system: import nixpkgs {
         inherit system;
         overlays = [ rust-overlay.overlays.default ];
       };
+
+      mkFrontend =
+        { apiBase, authBase }:
+        pkgs: pkgs.stdenv.mkDerivation {
+          pname = "tartan-vote-frontend";
+          version = "0.1.0";
+          src = ./frontend;
+          nativeBuildInputs = [ pkgs.deno ];
+          buildPhase = ''
+            export DENO_DIR="$TMPDIR/deno"
+            export HOME="$TMPDIR"
+            deno install --allow-scripts
+            export VITE_API_BASE="${apiBase}"
+            export VITE_BETTER_AUTH_BASE_URL="${authBase}"
+            export VITE_BETTER_AUTH_PROVIDER_ID="cmu-sso"
+            deno run build
+          '';
+          installPhase = ''
+            mkdir -p $out
+            cp -r dist/* $out/
+          '';
+        };
     in
     {
       devShells = forAllSystems (system:
@@ -60,6 +86,27 @@
           };
 
           cargoArtifacts = craneLib.buildDepsOnly commonArgs;
+
+          auth = pkgs.buildNpmPackage {
+            pname = "tartan-vote-auth";
+            version = "0.1.0";
+            src = ./auth-service;
+            npmDepsHash = "sha256-C7PBozzDwylKgbQotdgV05DArH17ZQ0i2de3QHlveMI=";
+            npmFlags = [ "--omit=dev" ];
+            dontNpmBuild = true;
+            nativeBuildInputs = [ pkgs.makeWrapper ];
+            postInstall = ''
+              mkdir -p $out/bin
+              makeWrapper ${pkgs.nodejs_22}/bin/node $out/bin/auth \
+                --chdir $out \
+                --add-flags server.mjs
+            '';
+          };
+
+          frontend = mkFrontend {
+            apiBase = "https://api.tartan-vote.scottylabs.org";
+            authBase = "https://auth.tartan-vote.scottylabs.org/api/auth";
+          } pkgs;
         in
         {
           devenv = devenv.packages.${system}.devenv;
@@ -68,6 +115,9 @@
             inherit cargoArtifacts;
             doCheck = false;
           });
+
+          inherit auth frontend;
+
           default = self.packages.${system}.api;
         }
       );

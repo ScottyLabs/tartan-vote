@@ -3,7 +3,7 @@ import express from "express";
 import { toNodeHandler } from "better-auth/node";
 import { auth } from "./auth.mjs";
 
-const port = Number(process.env.BETTER_AUTH_PORT || 3005);
+const port = Number(process.env.PORT || process.env.BETTER_AUTH_PORT || 3005);
 const frontendBaseUrl = process.env.FRONTEND_BASE_URL || "http://localhost:5173";
 const appBaseUrl = process.env.APP_BASE_URL || "http://localhost:8080";
 const allowedOrigins =

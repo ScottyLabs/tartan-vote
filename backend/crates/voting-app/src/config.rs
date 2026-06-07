@@ -34,9 +34,16 @@ impl Config {
             better_auth_provider_id: env::var("BETTER_AUTH_PROVIDER_ID")
                 .unwrap_or_else(|_| "cmu-sso".to_string()),
             database_url: must_env("DATABASE_URL")?,
-            bind_addr: env::var("BIND_ADDR").unwrap_or_else(|_| "0.0.0.0:8080".to_string()),
+            bind_addr: bind_addr_from_env(),
         })
     }
+}
+
+fn bind_addr_from_env() -> String {
+    if let Ok(port) = env::var("PORT") {
+        return format!("0.0.0.0:{port}");
+    }
+    env::var("BIND_ADDR").unwrap_or_else(|_| "0.0.0.0:8080".to_string())
 }
 
 fn must_env(name: &str) -> Result<String, String> {
