@@ -77,7 +77,7 @@
             postInstall = ''
               mkdir -p $out/bin
               makeWrapper ${pkgs.nodejs_22}/bin/node $out/bin/auth \
-                --chdir $out \
+                --chdir $out/lib/node_modules/auth-service \
                 --add-flags server.mjs
             '';
           };
