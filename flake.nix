@@ -91,7 +91,7 @@
             pname = "tartan-vote-auth";
             version = "0.1.0";
             src = ./auth-service;
-            npmDepsHash = "sha256-C7PBozzDwylKgbQotdgV05DArH17ZQ0i2de3QHlveMI=";
+            npmDepsHash = "sha256-/7XqvJAGyGSE3SudNDK0/vlOKUqif4nqfW5WN5mMsLs=";
             npmFlags = [ "--omit=dev" ];
             dontNpmBuild = true;
             nativeBuildInputs = [ pkgs.makeWrapper ];
