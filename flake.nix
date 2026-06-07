@@ -86,7 +86,7 @@
             pname = "tartan-vote-frontend";
             version = "0.1.0";
             src = ./frontend;
-            npmDepsHash = pkgs.lib.fakeHash;
+            npmDepsHash = "sha256-xJFNzrs4wbHzaoev50Edsfrg/gwIg39AKT7XDZDtSZU=";
             npmBuildScript = "build";
             env = {
               VITE_API_BASE = "https://api.tartan-vote.scottylabs.org";
