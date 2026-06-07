@@ -35,30 +35,6 @@
         overlays = [ rust-overlay.overlays.default ];
       };
 
-      mkFrontend =
-        { apiBase, authBase }:
-        pkgs: pkgs.stdenvNoCC.mkDerivation {
-          pname = "tartan-vote-frontend";
-          version = "0.1.0";
-          src = ./frontend;
-          # Deno fetches npm deps during install; Nix sandbox blocks DNS without this.
-          __noSandbox = true;
-          nativeBuildInputs = [ pkgs.deno pkgs.cacert ];
-          buildPhase = ''
-            export DENO_DIR="$TMPDIR/deno"
-            export HOME="$TMPDIR"
-            export SSL_CERT_FILE="${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
-            deno install --allow-scripts
-            export VITE_API_BASE="${apiBase}"
-            export VITE_BETTER_AUTH_BASE_URL="${authBase}"
-            export VITE_BETTER_AUTH_PROVIDER_ID="cmu-sso"
-            deno run build
-          '';
-          installPhase = ''
-            mkdir -p $out
-            cp -r dist/* $out/
-          '';
-        };
     in
     {
       devShells = forAllSystems (system:
@@ -106,10 +82,22 @@
             '';
           };
 
-          frontend = mkFrontend {
-            apiBase = "https://api.tartan-vote.scottylabs.org";
-            authBase = "https://auth.tartan-vote.scottylabs.org/api/auth";
-          } pkgs;
+          frontend = pkgs.buildNpmPackage {
+            pname = "tartan-vote-frontend";
+            version = "0.1.0";
+            src = ./frontend;
+            npmDepsHash = pkgs.lib.fakeHash;
+            npmBuildScript = "build";
+            env = {
+              VITE_API_BASE = "https://api.tartan-vote.scottylabs.org";
+              VITE_BETTER_AUTH_BASE_URL = "https://auth.tartan-vote.scottylabs.org/api/auth";
+              VITE_BETTER_AUTH_PROVIDER_ID = "cmu-sso";
+            };
+            installPhase = ''
+              mkdir -p $out
+              cp -r dist/* $out/
+            '';
+          };
         in
         {
           devenv = devenv.packages.${system}.devenv;
