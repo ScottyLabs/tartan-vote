@@ -37,14 +37,17 @@
 
       mkFrontend =
         { apiBase, authBase }:
-        pkgs: pkgs.stdenv.mkDerivation {
+        pkgs: pkgs.stdenvNoCC.mkDerivation {
           pname = "tartan-vote-frontend";
           version = "0.1.0";
           src = ./frontend;
-          nativeBuildInputs = [ pkgs.deno ];
+          # Deno fetches npm deps during install; Nix sandbox blocks DNS without this.
+          __noSandbox = true;
+          nativeBuildInputs = [ pkgs.deno pkgs.cacert ];
           buildPhase = ''
             export DENO_DIR="$TMPDIR/deno"
             export HOME="$TMPDIR"
+            export SSL_CERT_FILE="${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
             deno install --allow-scripts
             export VITE_API_BASE="${apiBase}"
             export VITE_BETTER_AUTH_BASE_URL="${authBase}"
