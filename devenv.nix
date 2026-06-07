@@ -94,10 +94,5 @@
     VITE_BETTER_AUTH_PROVIDER_ID = "cmu-sso";
     BETTER_AUTH_PORT = "3005";
     BIND_ADDR = "0.0.0.0:8080";
-
-    # Actual secrets, resolved from OpenBao via secretspec.
-    BETTER_AUTH_SECRET = config.secretspec.secrets.BETTER_AUTH_SECRET or "";
-    OIDC_CLIENT_ID = config.secretspec.secrets.OIDC_CLIENT_ID or "";
-    OIDC_CLIENT_SECRET = config.secretspec.secrets.OIDC_CLIENT_SECRET or "";
   };
 }
