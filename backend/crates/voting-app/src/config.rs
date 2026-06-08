@@ -9,6 +9,7 @@ pub struct Config {
     pub better_auth_provider_id: String,
     pub database_url: String,
     pub bind_addr: String,
+    pub dev_auth_bypass: bool,
 }
 
 impl Config {
@@ -35,6 +36,9 @@ impl Config {
                 .unwrap_or_else(|_| "cmu-sso".to_string()),
             database_url: must_env("DATABASE_URL")?,
             bind_addr: env::var("BIND_ADDR").unwrap_or_else(|_| "0.0.0.0:8080".to_string()),
+            dev_auth_bypass: env::var("DEV_AUTH_BYPASS")
+                .map(|value| matches!(value.to_ascii_lowercase().as_str(), "1" | "true" | "yes"))
+                .unwrap_or(false),
         })
     }
 }

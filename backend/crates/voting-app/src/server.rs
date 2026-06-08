@@ -60,6 +60,14 @@ pub async fn setup() {
             get(crate::domain::auth::handlers::auth_status),
         )
         .route(
+            "/auth/dev-signin",
+            axum::routing::post(crate::domain::auth::handlers::dev_signin),
+        )
+        .route(
+            "/auth/dev-signout",
+            axum::routing::post(crate::domain::auth::handlers::dev_signout),
+        )
+        .route(
             "/events/{id}/vote",
             axum::routing::post(crate::domain::votes::handlers::cast_vote),
         )

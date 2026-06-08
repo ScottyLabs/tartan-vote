@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
-  import { authClient, PROVIDER_ID } from "$lib/auth-client";
+  import { devSignIn, fetchAuthStatus } from "$lib/auth-client";
   import Logo from "$components/Logo.svelte";
   import Button from "$components/Button.svelte";
 
@@ -10,8 +10,8 @@
 
   onMount(async () => {
     try {
-      const s = await authClient.getSession();
-      if (s?.data?.user) goto("/join");
+      const status = await fetchAuthStatus();
+      if (status?.logged_in) goto("/join");
     } catch {
       /* ignore */
     }
@@ -21,12 +21,12 @@
     loading = true;
     error = "";
     try {
-      await authClient.signIn.oauth2({
-        providerId: PROVIDER_ID,
-        callbackURL: window.location.origin + "/join",
-      });
+      await devSignIn();
+      goto("/join");
     } catch (e: any) {
-      error = e?.message ?? "Sign-in failed";
+      error =
+        e?.message ??
+        "Dev sign-in failed. Is DEV_AUTH_BYPASS enabled on the backend?";
       loading = false;
     }
   }
@@ -59,15 +59,14 @@
         Sign in to continue
       </div>
       <div class="text-[13px] text-ink-500 mt-2">
-        Use your Carnegie Mellon credentials. You'll be returned here after
-        authenticating.
+        Dev mode: sign in creates a sample user in the database without CMU SSO.
       </div>
 
       <Button full onclick={signIn} disabled={loading} class="mt-8">
         {#if loading}
-          Connecting to CMU SSO…
+          Signing in…
         {:else}
-          Sign in with CMU SSO
+          Sign in (dev)
         {/if}
       </Button>
 

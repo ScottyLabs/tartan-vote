@@ -1,11 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import { authClient } from '$lib/auth-client';
+  import { fetchAuthStatus } from '$lib/auth-client';
 
   onMount(async () => {
-    const session = await authClient.getSession();
-    if (session?.data?.user) {
+    const status = await fetchAuthStatus();
+    if (status?.logged_in) {
       goto('/join');
     } else {
       goto('/signin');

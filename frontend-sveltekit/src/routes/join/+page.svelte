@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import { authClient } from '$lib/auth-client';
+  import { devSignOut, fetchAuthStatus } from '$lib/auth-client';
   import { api } from '$lib/api';
   import { sessionCode as sessionCodeStore } from '$stores/session';
   import Logo from '$components/Logo.svelte';
@@ -12,14 +12,21 @@
   let joining = $state(false);
   let creating = $state(false);
   let joinError = $state('');
-  let user = $state<null | { id: string; name: string; email?: string }>(null);
+  let user = $state<null | { id: number; name: string; andrew_id: string }>(null);
   let checkingAuth = $state(true);
 
   onMount(async () => {
     try {
-      const s = await authClient.getSession();
-      user = (s?.data?.user as any) ?? null;
-      if (!user) goto('/signin');
+      const status = await fetchAuthStatus();
+      if (!status?.logged_in) {
+        goto('/signin');
+        return;
+      }
+      user = {
+        id: status.user_id ?? -1,
+        name: status.user_name ?? 'Unknown User',
+        andrew_id: status.user_andrew_id ?? ''
+      };
     } finally {
       checkingAuth = false;
     }
@@ -63,7 +70,7 @@
   }
 
   async function signOut() {
-    await authClient.signOut();
+    await devSignOut();
     goto('/signin');
   }
 </script>

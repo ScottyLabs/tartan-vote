@@ -71,6 +71,8 @@ where
     }
 }
 
+pub const DEV_SESSION_COOKIE: &str = "dev_user_id";
+
 pub async fn sync_user_middleware(
     State(state): State<AppState>,
     mut request: http::Request<body::Body>,
@@ -80,11 +82,21 @@ pub async fn sync_user_middleware(
         return next.run(request).await;
     }
 
-    let Some(cookie_header) = request
+    let cookie_header = request
         .headers()
         .get(header::COOKIE)
-        .and_then(|value| value.to_str().ok())
-    else {
+        .and_then(|value| value.to_str().ok());
+
+    if state.config.dev_auth_bypass {
+        if let Some(cookie_header) = cookie_header {
+            if let Some(user) = load_dev_session_user(&state, cookie_header).await {
+                request.extensions_mut().insert(SyncedUser(Arc::new(user)));
+                return next.run(request).await;
+            }
+        }
+    }
+
+    let Some(cookie_header) = cookie_header else {
         return next.run(request).await;
     };
 
@@ -140,6 +152,21 @@ pub async fn sync_user_middleware(
     }
 
     next.run(request).await
+}
+
+async fn load_dev_session_user(state: &AppState, cookie_header: &str) -> Option<user::Model> {
+    let user_id = cookie_header
+        .split(';')
+        .map(str::trim)
+        .find_map(|part| part.strip_prefix(&format!("{DEV_SESSION_COOKIE}=")))?
+        .parse::<i32>()
+        .ok()?;
+
+    User::find_by_id(user_id)
+        .one(&state.db)
+        .await
+        .ok()
+        .flatten()
 }
 
 async fn fetch_better_auth_session(

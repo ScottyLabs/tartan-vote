@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount } from "svelte";
-    import { authClient } from "../lib/auth-client";
+    import { devSignIn, fetchAuthStatus } from "../lib/auth-client";
     import logo from "../lib/images/logoplaceholder.png";
 
     type Props = {
@@ -8,15 +8,14 @@
     };
 
     let { onNext }: Props = $props();
-
-    const BETTER_AUTH_PROVIDER_ID =
-        import.meta.env.VITE_BETTER_AUTH_PROVIDER_ID || "cmu-sso";
+    let signingIn = $state(false);
+    let error = $state<string | null>(null);
 
     onMount(() => {
         void (async () => {
             try {
-                const { data } = await authClient.getSession();
-                if (data?.user) {
+                const status = await fetchAuthStatus();
+                if (status?.logged_in) {
                     onNext();
                 }
             } catch (error) {}
@@ -24,10 +23,15 @@
     });
 
     async function handleClick() {
-        await authClient.signIn.oauth2({
-            providerId: BETTER_AUTH_PROVIDER_ID,
-            callbackURL: window.location.origin,
-        });
+        signingIn = true;
+        error = null;
+        try {
+            await devSignIn();
+            onNext();
+        } catch (signInError) {
+            error = "Dev sign-in failed. Is DEV_AUTH_BYPASS enabled on the backend?";
+            signingIn = false;
+        }
     }
 </script>
 
@@ -43,9 +47,12 @@
         width="350px"
         height="350px"
     />
-    <button onclick={handleClick} class="authBtn">
-        SIGN IN WITH CMU SSO
+    <button onclick={handleClick} class="authBtn" disabled={signingIn}>
+        {signingIn ? "SIGNING IN..." : "SIGN IN (DEV)"}
     </button>
+    {#if error}
+        <p class="error">{error}</p>
+    {/if}
 </main>
 
 <style>
@@ -68,6 +75,16 @@
 
     .authBtn:hover {
         background-color: color-mix(in srgb, var(--colors-primary), black 10%);
+    }
+
+    .authBtn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .error {
+        color: var(--color-danger);
+        margin-top: 1em;
     }
 
     h1 {
