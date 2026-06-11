@@ -26,6 +26,10 @@
 
   cachix.enable = false;
 
+  treefmt.config.settings.global.excludes = [
+    "**/package-lock.json"
+  ];
+
   # The ScottyLabs deno module runs `oxlint --deny all`, which force-enables
   # every opt-in rule -- including contradictory restriction/style rules that
   # ban async/await, ternaries, null, magic numbers, etc. Allow those categories
