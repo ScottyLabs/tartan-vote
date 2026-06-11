@@ -1,5 +1,23 @@
-{ config, pkgs, inputs, ... }:
+{ config, pkgs, lib, inputs, ... }:
 
+let
+  denoPackages = pkgs.callPackage ./nix/deno-package.nix { };
+
+  cleanJsSrc = path:
+    lib.cleanSourceWith {
+      src = path;
+      filter = p: _t:
+        let base = baseNameOf p;
+        in !(builtins.elem base [
+          "node_modules"
+          "package-lock.json"
+          "dist"
+        ]);
+    };
+
+  # Pin on x86_64-linux after the first Kennel build prints "got: sha256-...".
+  denoDepsHash = lib.fakeHash;
+in
 {
   imports = [ inputs.scottylabs.devenvModules.default ];
 
@@ -25,6 +43,28 @@
   };
 
   cachix.enable = false;
+
+  outputs = {
+    api = config.languages.rust.import ./. {
+      buildInputs = [ pkgs.openssl ];
+      nativeBuildInputs = [ pkgs.pkg-config ];
+    };
+
+    auth = denoPackages.mkDenoNodeService {
+      pname = "auth";
+      src = cleanJsSrc ./auth-service;
+      command = "server.mjs";
+      depsHash = denoDepsHash;
+    };
+
+    frontend = denoPackages.mkDenoViteFrontend {
+      pname = "frontend";
+      src = cleanJsSrc ./frontend;
+      apiBase = "https://api.tartan-vote.scottylabs.org";
+      authBase = "https://auth.tartan-vote.scottylabs.org/api/auth";
+      depsHash = denoDepsHash;
+    };
+  };
 
   # The ScottyLabs deno module runs `oxlint --deny all`, which force-enables
   # every opt-in rule -- including contradictory restriction/style rules that
