@@ -10,7 +10,6 @@
     rust.enable = true;
     deno.enable = true;
     postgres.enable = true;
-    secrets.enable = true;
 
     kennel.services.api = {
       customDomain = "api.tartan-vote.scottylabs.org";
