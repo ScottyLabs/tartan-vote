@@ -111,14 +111,6 @@ in
     export VITE_API_BASE="http://$DEV_HOST:8080"
     export VITE_BETTER_AUTH_BASE_URL="http://$DEV_HOST:3005/api/auth"
     export CORS_ALLOWED_ORIGINS="http://$DEV_HOST:5173,http://$DEV_HOST:8080,http://$DEV_HOST:3005"
-
-    pg_port="''${PGPORT:-5432}"
-    if [ -n "''${PGDATA:-}" ] && [ -f "''${PGDATA}/postmaster.pid" ]; then
-      pg_port="$(sed -n '4p' "''${PGDATA}/postmaster.pid" 2>/dev/null || echo "$pg_port")"
-    fi
-    if [ -n "''${DATABASE_URL:-}" ]; then
-      export DATABASE_URL="$(printf '%s' "$DATABASE_URL" | sed -E "s/(:[0-9]+)(\/|$)/:$pg_port\\2")"
-    fi
   '';
 
   env = {
