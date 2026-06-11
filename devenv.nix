@@ -79,10 +79,10 @@ in
 
   processes = {
     api.exec = "secretspec run --profile dev -- cargo run";
-    auth = {
-      exec = "secretspec run --profile dev -- node server.mjs";
-      cwd = "./auth-service";
-    };
+    # auth = {
+    #   exec = "secretspec run --profile dev -- node server.mjs";
+    #   cwd = "./auth-service";
+    # };
     frontend = {
       exec = "deno install && deno run dev --host";
       cwd = "./frontend";
