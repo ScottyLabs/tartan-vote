@@ -1,10 +1,14 @@
-use axum::{Router, middleware, routing::get};
+use axum::{middleware, routing::get};
 use http::{HeaderValue, Method, header};
 use migration::{Migrator, MigratorTrait};
 use sea_orm::Database;
 use tower_http::cors::CorsLayer;
+use utoipa::OpenApi;
+use utoipa_axum::{router::OpenApiRouter, routes};
+use utoipa_swagger_ui::SwaggerUi;
 use voting_app_store::Store;
 
+use crate::core::openapi::ApiDoc;
 use crate::{AppState, config::Config};
 
 pub async fn setup() {
@@ -47,7 +51,12 @@ pub async fn setup() {
         .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION, header::ACCEPT])
         .allow_credentials(true);
 
-    let api_router = Router::new()
+    let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
+        .routes(routes!(crate::domain::auth::handlers::auth_status))
+        .split_for_parts();
+
+    let api_router = router
+        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", api))
         .route("/", get(crate::domain::auth::handlers::demo_home)) // demo only
         .route("/auth/login", get(crate::domain::auth::handlers::login))
         .route(
@@ -55,10 +64,6 @@ pub async fn setup() {
             get(crate::domain::auth::handlers::callback),
         )
         .route("/auth/logout", get(crate::domain::auth::handlers::logout))
-        .route(
-            "/auth/status",
-            get(crate::domain::auth::handlers::auth_status),
-        )
         .route(
             "/events/{id}/vote",
             axum::routing::post(crate::domain::votes::handlers::cast_vote),

@@ -4,11 +4,12 @@ use axum::{
     response::{Html, IntoResponse, Redirect},
 };
 use serde::Serialize;
+use utoipa::ToSchema;
 
 use crate::AppState;
 use crate::core::auth::middleware::SyncedUser;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct AuthStatusResponse {
     pub logged_in: bool,
     pub user_id: Option<i32>,
@@ -41,6 +42,14 @@ pub async fn logout(State(state): State<AppState>) -> impl IntoResponse {
     Redirect::to(&state.config.frontend_base_url)
 }
 
+#[utoipa::path(
+    get,
+    path = "/auth/status",
+    tag = "auth",
+    responses(
+        (status = 200, description = "Current authentication status", body = AuthStatusResponse)
+    )
+)]
 pub async fn auth_status(user: Option<SyncedUser>) -> impl IntoResponse {
     let payload = AuthStatusResponse {
         logged_in: user.is_some(),
