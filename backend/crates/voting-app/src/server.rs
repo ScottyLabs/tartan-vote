@@ -53,6 +53,9 @@ pub async fn setup() {
 
     let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
         .routes(routes!(crate::domain::auth::handlers::auth_status))
+        .routes(routes!(crate::domain::auth::bypass::bypass_login))
+        .routes(routes!(crate::domain::auth::bypass::bypass_status))
+        .routes(routes!(crate::domain::auth::bypass::bypass_logout))
         .split_for_parts();
 
     let api_router = router
@@ -134,6 +137,10 @@ pub async fn setup() {
         .layer(middleware::from_fn_with_state(
             app_state.clone(),
             crate::core::auth::middleware::sync_user_middleware,
+        ))
+        .layer(middleware::from_fn_with_state(
+            app_state.clone(),
+            crate::domain::auth::bypass::bypass_auth_middleware,
         ))
         .layer(cors_layer)
         .with_state(app_state);
