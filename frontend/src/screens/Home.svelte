@@ -33,6 +33,24 @@
     onMount(() => {
         void (async () => {
             try {
+                const bypassRes = await fetch(`${API_BASE}/auth/status`, {
+                    cache: "no-store",
+                    credentials: "include",
+                });
+                if (bypassRes.ok) {
+                    const bypass = await bypassRes.json();
+                    if (bypass.logged_in) {
+                        authStatus = {
+                            logged_in: true,
+                            user_id: bypass.user_id ?? -1,
+                            user_name: bypass.user_name ?? "Unknown User",
+                            user_andrew_id: bypass.user_andrew_id ?? "",
+                            oidc_subject: null,
+                        };
+                        return;
+                    }
+                }
+
                 const { data } = await authClient.getSession();
                 if (data?.user) {
                     authStatus = {

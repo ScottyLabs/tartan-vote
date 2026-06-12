@@ -22,6 +22,15 @@
     onMount(() => {
         void (async () => {
             try {
+                const res = await fetch(`${API_BASE}/auth/status`, {
+                    cache: "no-store",
+                    credentials: "include",
+                });
+                if (res.ok && (await res.json()).logged_in) {
+                    onNext();
+                    return;
+                }
+
                 const { data } = await authClient.getSession();
                 if (data?.user) {
                     onNext();
