@@ -25,6 +25,8 @@ in
     enable = true;
     project.name = "tartan-vote";
 
+    conventionalCommits.enable = false;
+
     rust.enable = true;
     deno.enable = true;
     postgres.enable = true;
