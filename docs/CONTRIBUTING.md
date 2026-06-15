@@ -23,7 +23,7 @@ Direct pushes to main are blocked. You should create a branch (if you are a cont
 
 ### Commit Guidelines
 
-I am a firm believer in the [kernel commit style](https://docs.kernel.org/process/submitting-patches.html). Not all of those sections are useful, such as the fact that we do not mail patches (unfortunately), but most of those pieces of advice are helpful nonetheless. Good commit habits reflect on the developer. Being able to clearly reflect upon your changes and describe the impact of them means you are able to reason about your code and about why you are making the changes you are.
+I am a firm believer in the [kernel commit style](https://docs.kernel.org/process/submitting-patches.html). Not all of the sections in that document are useful, such as the fact that we do not mail patches (unfortunately), but most of the pieces of advice are helpful nonetheless. Good commit habits reflect on the developer. Being able to clearly reflect upon your changes and describe the impact of them means you are able to reason about your code and about why you are making the changes you are.
 
 #### Commit Subjects
 
