@@ -92,5 +92,17 @@ saving and leaving the file will combine your fixup commit with the one above it
 
 Maybe you messed up. That's perfectly fine! Git provides you many tools to undo your mistakes.
 
-> [!NOTE]
-> This documentation will be updated soon.
+One of the best tools is `git reflog`, short for "reference log". Many things you do in git change the reference you are on, and so undoing your mistakes is as simple as going to a previous reference.
+
+Suppose I rebased the two commits exactly how they appeared in the previous section (pick, then fixup). A reflog of the rebase (with `git rebase -i HEAD~2`) may look something like:
+
+```
+a943d2e HEAD@{0} rebase (finish): returning to refs/heads/branch
+a943d2e HEAD@{1} rebase (fixup): main: print hi message
+32ga76f HEAD@{2} rebase (start): checkout HEAD~2
+ef9a327 HEAD@{3} previous stuff...
+```
+
+Suppose I didn't actually want to rebase. (oops!) I could run `git checkout HEAD@{3}` to checkout the third previous reference, in this case, "previous stuff...", which occurred before all of the rebasing.
+
+This allows you do undo commits, rebases, branch deletions, almost everything except for resetting your uncommitted changes! (`git reset --hard HEAD`) Please do be careful.
