@@ -68,17 +68,6 @@ This starts the API (`api`), Better Auth service (`auth`), and Svelte frontend (
 
 Production runs on [Kennel](https://codeberg.org/ScottyLabs/kennel) via devenv and secretspec.
 
-- **Local:** `devenv up`
-- **Prod:** push to Codeberg `main`; Kennel builds `.#packages.x86_64-linux.{api,auth,frontend}`
-
-Deployment URLs follow Kennel's pattern:
-
-- API: `tartan-vote-api-main.scottylabs.net` (custom: `api.tartan-vote.scottylabs.org`)
-- Auth: `tartan-vote-auth-main.scottylabs.net` (custom: `auth.tartan-vote.scottylabs.org`)
-- Frontend: `tartan-vote-frontend-main.scottylabs.net` (custom: `tartan-vote.scottylabs.org`)
-
-Kennel auto-provisions the Keycloak OIDC client on deploy when `oidc.redirectPaths` is set on the `api` service. See [secrets-and-config.md](docs/secrets-and-config.md) for details.
-
 ### Contributing
 
 Please check [CONTRIBUTING.md](docs/CONTRIBUTING.md) before you contribute to this project!
