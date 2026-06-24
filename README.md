@@ -55,13 +55,7 @@ direnv allow
 # or: devenv shell
 ```
 
-Run Better Auth migrations on first setup (or after auth schema changes):
-
-```bash
-cd auth-service && npm run migrate
-```
-
-Start all three dev processes:
+Start all dev processes:
 
 ```bash
 devenv up
@@ -73,17 +67,6 @@ This starts the API (`api`), Better Auth service (`auth`), and Svelte frontend (
 ### Deployment
 
 Production runs on [Kennel](https://codeberg.org/ScottyLabs/kennel) via devenv and secretspec.
-
-- **Local:** `devenv up`
-- **Prod:** push to Codeberg `main`; Kennel builds `.#packages.x86_64-linux.{api,auth,frontend}`
-
-Deployment URLs follow Kennel's pattern:
-
-- API: `tartan-vote-api-main.scottylabs.net` (custom: `api.tartan-vote.scottylabs.org`)
-- Auth: `tartan-vote-auth-main.scottylabs.net` (custom: `auth.tartan-vote.scottylabs.org`)
-- Frontend: `tartan-vote-frontend-main.scottylabs.net` (custom: `tartan-vote.scottylabs.org`)
-
-Kennel auto-provisions the Keycloak OIDC client on deploy when `oidc.redirectPaths` is set on the `api` service. See [secrets-and-config.md](docs/secrets-and-config.md) for details.
 
 ### Contributing
 
