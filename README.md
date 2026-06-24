@@ -55,13 +55,7 @@ direnv allow
 # or: devenv shell
 ```
 
-Run Better Auth migrations on first setup (or after auth schema changes):
-
-```bash
-cd auth-service && npm run migrate
-```
-
-Start all three dev processes:
+Start all dev processes:
 
 ```bash
 devenv up
