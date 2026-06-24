@@ -422,7 +422,6 @@ dependencies = [
  "chrono",
  "dotenvy",
  "entity",
- "fastrand",
  "genpdf",
  "http",
  "migration",
@@ -1042,12 +1041,6 @@ dependencies = [
  "parking",
  "pin-project-lite",
 ]
-
-[[package]]
-name = "fastrand"
-version = "2.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a043dc74da1e37d6afe657061213aa6f425f855399a11d3463c6ecccc4dfda1f"
 
 [[package]]
 name = "find-msvc-tools"
