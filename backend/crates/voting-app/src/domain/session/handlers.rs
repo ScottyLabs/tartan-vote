@@ -9,7 +9,6 @@ use sea_orm::{
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::json;
-use std::iter::repeat_with;
 
 #[derive(Serialize)]
 pub struct CreateSessionResponse {
@@ -38,7 +37,7 @@ pub struct SetSessionProxyResponse {
 pub async fn create_session(user: SyncedUser, State(state): State<AppState>) -> impl IntoResponse {
     let store = &state.store;
 
-    let session_code = repeat_with(fastrand::uppercase).take(6).collect();
+    let session_code = petname::petname(2, "-").expect("Failed to generate session code");
 
     // logic should be implemented to verify that the join code is actually unique
     // but as of right now this is low priority because 36^6 > 2 billion
