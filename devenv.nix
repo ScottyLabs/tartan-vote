@@ -64,11 +64,8 @@
     export DEV_HOST
     export APP_BASE_URL="http://$DEV_HOST:8080"
     export FRONTEND_BASE_URL="http://$DEV_HOST:5173"
-    export BETTER_AUTH_URL="http://$DEV_HOST:3005"
-    export BETTER_AUTH_BASE_URL="http://$DEV_HOST:3005/api/auth"
     export VITE_API_BASE="http://$DEV_HOST:8080"
-    export VITE_BETTER_AUTH_BASE_URL="http://$DEV_HOST:3005/api/auth"
-    export CORS_ALLOWED_ORIGINS="http://$DEV_HOST:5173,http://$DEV_HOST:8080,http://$DEV_HOST:3005"
+    export CORS_ALLOWED_ORIGINS="http://$DEV_HOST:5173,http://$DEV_HOST:8080"
   '';
 
   env = {
@@ -78,9 +75,6 @@
 
     # Non-secret, machine-independent constants. Host-specific URLs are derived
     # from DEV_HOST in enterShell above.
-    BETTER_AUTH_PROVIDER_ID = "cmu-sso";
-    VITE_BETTER_AUTH_PROVIDER_ID = "cmu-sso";
-    BETTER_AUTH_PORT = "3005";
     BIND_ADDR = "0.0.0.0:8080";
   };
 }
