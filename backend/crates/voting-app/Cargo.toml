@@ -28,6 +28,7 @@ petname = "3"
 utoipa = { version = "5", features = ["axum_extras"] }
 utoipa-axum = "0.2"
 utoipa-swagger-ui = { version = "9", features = ["axum"] }
+sentry = { version = "0.48.3", default-features = false, features = ["backtrace", "contexts", "panic", "debug-images", "tracing", "reqwest", "rustls"] }
 
 [dev-dependencies]
 sea-orm = { version = "2.0.0-rc.37", features = ["mock"] }
