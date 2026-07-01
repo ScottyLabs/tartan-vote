@@ -3,6 +3,7 @@
   "tasks": {
     "dev": "vite --host",
     "build": "vite build",
+    "build:watch": "vite build --watch",
     "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json"
   }
 }

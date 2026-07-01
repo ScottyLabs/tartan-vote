@@ -19,38 +19,32 @@
         system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
-          lib = pkgs.lib;
           helpers = scottylabs.mkLib pkgs;
-
-          cleanJsSrc =
-            path:
-            lib.cleanSourceWith {
-              src = path;
-              filter =
-                p: _t:
-                let
-                  base = baseNameOf p;
-                in
-                  !(builtins.elem base [
-                    "node_modules"
-                    "package-lock.json"
-                    "dist"
-                  ]);
-            };
+        in
+        let
+          frontend = helpers.buildDenoTask {
+            src = ./frontend;
+            pname = "frontend";
+            task = "build";
+            env.VITE_API_BASE = "";
+          };
         in
         {
+          inherit frontend;
+
           api = helpers.buildRustService {
             src = ./.;
             pname = "api";
             buildInputs = [ pkgs.openssl ];
             nativeBuildInputs = [ pkgs.pkg-config ];
-            buildArgs.cargoExtraArgs = "-p backend";
+            buildArgs = {
+              cargoExtraArgs = "-p backend";
+              postInstall = ''
+                mkdir -p $out/share/tartan-vote/static
+                cp -r ${frontend}/dist/* $out/share/tartan-vote/static/
+              '';
+            };
           };
-
-          frontend = (helpers.buildDenoTask {
-            src = cleanJsSrc ./frontend;
-            pname = "frontend";
-          });
 
           default = self.packages.${system}.api;
         }

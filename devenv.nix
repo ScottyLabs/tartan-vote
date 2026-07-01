@@ -17,12 +17,8 @@
     ricochet.appUrl = "http://localhost:8080";
 
     kennel.services.api = {
-      customDomain = "api.tartan-vote.scottylabs.org";
-      oidc.redirectPaths = [ "/auth/callback" ];
-    };
-    kennel.sites.frontend = {
-      spa = true;
       customDomain = "tartan-vote.scottylabs.org";
+      oidc.redirectPaths = [ "/auth/callback" ];
     };
   };
 
@@ -40,9 +36,14 @@
   ];
 
   processes = {
-    api.exec = "secretspec run --profile dev -- cargo run";
-    frontend = {
-      exec = "deno install && deno run dev --host";
+    api.exec = ''
+      set -euo pipefail
+      export VITE_API_BASE=""
+      (cd frontend && deno install && deno task build)
+      exec secretspec run --profile dev -- cargo run
+    '';
+    frontend-watch = {
+      exec = "deno install && deno task build:watch";
       cwd = "./frontend";
     };
   };
@@ -63,9 +64,9 @@
     DEV_HOST="''${DEV_HOST:-localhost}"
     export DEV_HOST
     export APP_BASE_URL="http://$DEV_HOST:8080"
-    export FRONTEND_BASE_URL="http://$DEV_HOST:5173"
-    export VITE_API_BASE="http://$DEV_HOST:8080"
-    export CORS_ALLOWED_ORIGINS="http://$DEV_HOST:5173,http://$DEV_HOST:8080"
+    export FRONTEND_BASE_URL="http://$DEV_HOST:8080"
+    export VITE_API_BASE=""
+    export CORS_ALLOWED_ORIGINS="http://$DEV_HOST:8080"
   '';
 
   env = {
@@ -76,5 +77,6 @@
     # Non-secret, machine-independent constants. Host-specific URLs are derived
     # from DEV_HOST in enterShell above.
     BIND_ADDR = "0.0.0.0:8080";
+    VITE_API_BASE = "";
   };
 }

@@ -1,4 +1,6 @@
-use std::env;
+use std::{env, path::PathBuf};
+
+use crate::core::frontend;
 
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -8,6 +10,7 @@ pub struct Config {
     pub database_url: String,
     pub bind_addr: String,
     pub sentry_dsn: Option<String>,
+    pub frontend_dist: Option<PathBuf>,
 }
 
 impl Config {
@@ -32,6 +35,7 @@ impl Config {
             database_url: must_env("DATABASE_URL")?,
             bind_addr: bind_addr_from_env(),
             sentry_dsn: optional_env("SENTRY_DSN"),
+            frontend_dist: frontend::resolve_frontend_dist(),
         })
     }
 }
