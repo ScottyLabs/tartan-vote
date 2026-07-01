@@ -78,7 +78,6 @@
 
     # Non-secret, machine-independent constants. Host-specific URLs are derived
     # from DEV_HOST in enterShell above.
-    OIDC_ISSUER = "https://idp.scottylabs.org/realms/scottylabs";
     BETTER_AUTH_PROVIDER_ID = "cmu-sso";
     VITE_BETTER_AUTH_PROVIDER_ID = "cmu-sso";
     BETTER_AUTH_PORT = "3005";
