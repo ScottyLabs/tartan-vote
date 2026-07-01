@@ -5,8 +5,6 @@ pub struct Config {
     pub app_base_url: String,
     pub frontend_base_url: String,
     pub cors_allowed_origins: Vec<String>,
-    pub better_auth_base_url: String,
-    pub better_auth_provider_id: String,
     pub database_url: String,
     pub bind_addr: String,
     pub sentry_dsn: Option<String>,
@@ -31,9 +29,6 @@ impl Config {
             app_base_url: must_env("APP_BASE_URL")?,
             frontend_base_url,
             cors_allowed_origins,
-            better_auth_base_url: must_env("BETTER_AUTH_BASE_URL")?,
-            better_auth_provider_id: env::var("BETTER_AUTH_PROVIDER_ID")
-                .unwrap_or_else(|_| "cmu-sso".to_string()),
             database_url: must_env("DATABASE_URL")?,
             bind_addr: bind_addr_from_env(),
             sentry_dsn: optional_env("SENTRY_DSN"),

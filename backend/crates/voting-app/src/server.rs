@@ -134,10 +134,6 @@ pub async fn setup(config: Config) {
         .fallback(get(crate::domain::auth::handlers::demo_not_found)) // demo only
         .layer(middleware::from_fn_with_state(
             app_state.clone(),
-            crate::core::auth::middleware::sync_user_middleware,
-        ))
-        .layer(middleware::from_fn_with_state(
-            app_state.clone(),
             crate::domain::auth::bypass::bypass_auth_middleware,
         ))
         .layer(cors_layer)

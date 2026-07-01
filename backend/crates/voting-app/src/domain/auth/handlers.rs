@@ -1,6 +1,6 @@
 use axum::{
     Json,
-    extract::{RawQuery, State},
+    extract::State,
     response::{Html, IntoResponse, Redirect},
 };
 use serde::Serialize;
@@ -21,20 +21,9 @@ pub async fn login(State(state): State<AppState>) -> impl IntoResponse {
     Redirect::to(&state.config.frontend_base_url)
 }
 
-pub async fn callback(
-    State(state): State<AppState>,
-    RawQuery(raw_query): RawQuery,
-) -> impl IntoResponse {
-    if let Some(query) = raw_query {
-        let target = format!(
-            "{}/oauth2/callback/{}?{}",
-            state.config.better_auth_base_url.trim_end_matches('/'),
-            state.config.better_auth_provider_id,
-            query
-        );
-        return Redirect::to(&target);
-    }
-
+// TODO: OIDC authorization-code callback. Exchange the code for tokens via the
+// Ricochet relay / Keycloak, establish a session, then redirect to the frontend.
+pub async fn callback(State(state): State<AppState>) -> impl IntoResponse {
     Redirect::to(&state.config.frontend_base_url)
 }
 
