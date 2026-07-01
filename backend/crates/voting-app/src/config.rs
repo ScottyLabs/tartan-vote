@@ -9,6 +9,7 @@ pub struct Config {
     pub better_auth_provider_id: String,
     pub database_url: String,
     pub bind_addr: String,
+    pub sentry_dsn: Option<String>,
 }
 
 impl Config {
@@ -35,6 +36,7 @@ impl Config {
                 .unwrap_or_else(|_| "cmu-sso".to_string()),
             database_url: must_env("DATABASE_URL")?,
             bind_addr: bind_addr_from_env(),
+            sentry_dsn: optional_env("SENTRY_DSN"),
         })
     }
 }
@@ -48,4 +50,8 @@ fn bind_addr_from_env() -> String {
 
 fn must_env(name: &str) -> Result<String, String> {
     env::var(name).map_err(|_| format!("{name} must be set"))
+}
+
+fn optional_env(name: &str) -> Option<String> {
+    env::var(name).ok().filter(|value| !value.trim().is_empty())
 }
