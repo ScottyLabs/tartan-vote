@@ -1,6 +1,5 @@
 <script lang="ts">
     import { onMount } from "svelte";
-    import { authClient } from "../lib/auth-client";
     import logo from "../lib/images/logoplaceholder.png";
 
     type Props = {
@@ -8,9 +7,6 @@
     };
 
     let { onNext }: Props = $props();
-
-    const BETTER_AUTH_PROVIDER_ID =
-        import.meta.env.VITE_BETTER_AUTH_PROVIDER_ID || "cmu-sso";
 
     const API_BASE = import.meta.env.VITE_API_BASE || "";
 
@@ -28,27 +24,13 @@
                 });
                 if (res.ok && (await res.json()).logged_in) {
                     onNext();
-                    return;
-                }
-
-                const { data } = await authClient.getSession();
-                if (data?.user) {
-                    onNext();
                 }
             } catch (error) {}
         })();
     });
 
-    async function handleClick() {
-        try {
-            await authClient.signIn.oauth2({
-                providerId: BETTER_AUTH_PROVIDER_ID,
-                callbackURL: window.location.origin,
-            });
-        } catch (error) {
-            console.error("SSO sign-in failed", error);
-            alert("Sign-in failed. Please try again or contact ScottyLabs.");
-        }
+    function handleClick() {
+        window.location.href = `${API_BASE}/auth/login`;
     }
 
     async function handleBypass() {
