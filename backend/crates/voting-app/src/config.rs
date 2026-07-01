@@ -4,9 +4,6 @@ use crate::core::frontend;
 
 #[derive(Clone, Debug)]
 pub struct Config {
-    pub app_base_url: String,
-    pub frontend_base_url: String,
-    pub cors_allowed_origins: Vec<String>,
     pub database_url: String,
     pub bind_addr: String,
     pub sentry_dsn: Option<String>,
@@ -15,23 +12,7 @@ pub struct Config {
 
 impl Config {
     pub fn from_env() -> Result<Self, String> {
-        let frontend_base_url = must_env("FRONTEND_BASE_URL")?;
-        let cors_allowed_origins = env::var("CORS_ALLOWED_ORIGINS")
-            .ok()
-            .map(|raw| {
-                raw.split(',')
-                    .map(str::trim)
-                    .filter(|value| !value.is_empty())
-                    .map(ToOwned::to_owned)
-                    .collect::<Vec<_>>()
-            })
-            .filter(|origins| !origins.is_empty())
-            .unwrap_or_else(|| vec![frontend_base_url.clone()]);
-
         Ok(Self {
-            app_base_url: must_env("APP_BASE_URL")?,
-            frontend_base_url,
-            cors_allowed_origins,
             database_url: must_env("DATABASE_URL")?,
             bind_addr: bind_addr_from_env(),
             sentry_dsn: optional_env("SENTRY_DSN"),

@@ -26,7 +26,6 @@
             src = ./frontend;
             pname = "frontend";
             task = "build";
-            env.VITE_API_BASE = "";
           };
         in
         {

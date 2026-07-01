@@ -9,8 +9,6 @@
         onNext: (notice: string | null) => void;
     } = $props();
 
-    const API_BASE = import.meta.env.VITE_API_BASE || "";
-
     let proxyFor = $state("");
     let senatorChoice = $state<"yes" | "no" | "">("");
     let submitting = $state(false);
@@ -56,7 +54,7 @@
                 proxy_for: trimmed.length > 0 ? trimmed : null,
             };
 
-            const url = `${API_BASE}/session/${sessionCode}/proxy`;
+            const url = `/session/${sessionCode}/proxy`;
 
             const response = await fetch(url, {
                 method: "POST",

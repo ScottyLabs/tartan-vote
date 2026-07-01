@@ -1,12 +1,10 @@
 use axum::{
     Json,
-    extract::State,
     response::{Html, IntoResponse, Redirect},
 };
 use serde::Serialize;
 use utoipa::ToSchema;
 
-use crate::AppState;
 use crate::core::auth::middleware::SyncedUser;
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -17,18 +15,18 @@ pub struct AuthStatusResponse {
     pub user_andrew_id: Option<String>,
 }
 
-pub async fn login(State(state): State<AppState>) -> impl IntoResponse {
-    Redirect::to(&state.config.frontend_base_url)
+pub async fn login() -> impl IntoResponse {
+    Redirect::to("/")
 }
 
 // TODO: OIDC authorization-code callback. Exchange the code for tokens via the
 // Ricochet relay / Keycloak, establish a session, then redirect to the frontend.
-pub async fn callback(State(state): State<AppState>) -> impl IntoResponse {
-    Redirect::to(&state.config.frontend_base_url)
+pub async fn callback() -> impl IntoResponse {
+    Redirect::to("/")
 }
 
-pub async fn logout(State(state): State<AppState>) -> impl IntoResponse {
-    Redirect::to(&state.config.frontend_base_url)
+pub async fn logout() -> impl IntoResponse {
+    Redirect::to("/")
 }
 
 #[utoipa::path(
@@ -73,7 +71,7 @@ const BYPASS_JS: &str = "\
         }
         document.getElementById('bypass-form').addEventListener('submit', (e) => {
             e.preventDefault();
-            show(fetch(BASE + '/auth/bypass/login', {
+            show(fetch('/auth/bypass/login', {
                 method: 'POST',
                 credentials: 'include',
                 headers: { 'content-type': 'application/json' },
@@ -84,15 +82,13 @@ const BYPASS_JS: &str = "\
             }));
         });
         document.getElementById('bp-status').addEventListener('click', () =>
-            show(fetch(BASE + '/auth/bypass/status', { credentials: 'include' })));
+            show(fetch('/auth/bypass/status', { credentials: 'include' })));
         document.getElementById('bp-logout').addEventListener('click', () =>
-            show(fetch(BASE + '/auth/bypass/logout', { method: 'POST', credentials: 'include' })));";
+            show(fetch('/auth/bypass/logout', { method: 'POST', credentials: 'include' })));";
 
-pub async fn demo_home(State(state): State<AppState>) -> impl IntoResponse {
-    let base = state.config.app_base_url.trim_end_matches('/');
-
+pub async fn demo_home() -> impl IntoResponse {
     let bypass_section = BYPASS_FORM_HTML;
-    let bypass_script = format!("<script>const BASE = \"{base}\";{BYPASS_JS}</script>");
+    let bypass_script = format!("<script>{BYPASS_JS}</script>");
 
     let html = format!(
         "<!doctype html>
@@ -104,10 +100,10 @@ pub async fn demo_home(State(state): State<AppState>) -> impl IntoResponse {
     </head>
     <body>
         <ul>
-            <li><a href=\"{base}/auth/login\">Login</a></li>
-            <li><a href=\"{base}/auth/logout\">Logout</a></li>
-            <li><a href=\"{base}/auth/status\">Auth Status (JSON)</a></li>
-            <li><a href=\"{base}/health\">Health</a></li>
+            <li><a href=\"/auth/login\">Login</a></li>
+            <li><a href=\"/auth/logout\">Logout</a></li>
+            <li><a href=\"/auth/status\">Auth Status (JSON)</a></li>
+            <li><a href=\"/health\">Health</a></li>
         </ul>
         {bypass_section}
         {bypass_script}

@@ -8,8 +8,6 @@
 
     let { onNext }: Props = $props();
 
-    const API_BASE = import.meta.env.VITE_API_BASE || "";
-
     let bypassName = $state("Demo User");
     let bypassAndrewId = $state("demo");
     let bypassLoading = $state(false);
@@ -18,7 +16,7 @@
     onMount(() => {
         void (async () => {
             try {
-                const res = await fetch(`${API_BASE}/auth/status`, {
+                const res = await fetch(`/auth/status`, {
                     cache: "no-store",
                     credentials: "include",
                 });
@@ -30,7 +28,7 @@
     });
 
     function handleClick() {
-        window.location.href = `${API_BASE}/auth/login`;
+        window.location.href = `/auth/login`;
     }
 
     async function handleBypass() {
@@ -38,7 +36,7 @@
         bypassError = null;
 
         try {
-            const response = await fetch(`${API_BASE}/auth/bypass/login`, {
+            const response = await fetch(`/auth/bypass/login`, {
                 method: "POST",
                 cache: "no-store",
                 credentials: "include",

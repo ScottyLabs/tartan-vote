@@ -40,8 +40,6 @@
         }>;
     };
 
-    const API_BASE = import.meta.env.VITE_API_BASE || "";
-
     let loading = $state(false);
     let error = $state<string | null>(null);
     let bars = $state<Array<{ label: string; percent: number; color: string; count: number }>>([]);
@@ -83,7 +81,7 @@
         if (!sessionCode || leavingResults) return;
 
         try {
-            const response = await fetch(`${API_BASE}/session/${sessionCode}/status`, {
+            const response = await fetch(`/session/${sessionCode}/status`, {
                 cache: "no-store",
                 credentials: "include",
             });
@@ -113,7 +111,7 @@
         error = null;
 
         try {
-            const response = await fetch(`${API_BASE}/events/${event.id}/results`, {
+            const response = await fetch(`/events/${event.id}/results`, {
                 cache: "no-store",
                 credentials: "include",
             });

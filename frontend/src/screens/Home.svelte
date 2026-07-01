@@ -25,12 +25,10 @@
     let joining = $state<boolean>(false);
     let creating = $state<boolean>(false);
 
-    const API_BASE = import.meta.env.VITE_API_BASE || "";
-
     onMount(() => {
         void (async () => {
             try {
-                const res = await fetch(`${API_BASE}/auth/status`, {
+                const res = await fetch(`/auth/status`, {
                     cache: "no-store",
                     credentials: "include",
                 });
@@ -55,7 +53,7 @@
         sessionCode = sessionCode.toUpperCase();
 
         const response = await fetch(
-            `${API_BASE}/session/join/${sessionCode}`,
+            `/session/join/${sessionCode}`,
             { cache: "no-store", credentials: "include" },
         );
 
@@ -69,7 +67,7 @@
     }
 
     function handleSignInClick() {
-        window.location.href = `${API_BASE}/auth/login`;
+        window.location.href = `/auth/login`;
     }
 
     async function handleCreateSessionClick() {
@@ -77,7 +75,7 @@
         createError = null;
 
         try {
-            const response = await fetch(`${API_BASE}/session/create`, {
+            const response = await fetch(`/session/create`, {
                 cache: "no-store",
                 credentials: "include",
             });

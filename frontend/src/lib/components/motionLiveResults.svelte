@@ -9,8 +9,6 @@
         eventType: string;
     } = $props();
 
-    const API_BASE = import.meta.env.VITE_API_BASE || "";
-
     type MotionResults = {
         pass: number;
         reject: number;
@@ -45,7 +43,7 @@
         loadingResults = true;
 
         try {
-            const response = await fetch(`${API_BASE}/events/${eventId}/results`, {
+            const response = await fetch(`/events/${eventId}/results`, {
                 cache: "no-store",
                 credentials: "include",
             });

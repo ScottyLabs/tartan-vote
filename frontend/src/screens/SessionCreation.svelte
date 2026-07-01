@@ -256,8 +256,6 @@
         proxyAssignments = proxyAssignments.filter((_, i) => i !== index);
     }
 
-    const API_BASE = import.meta.env.VITE_API_BASE || "";
-
     async function loadParticipants() {
         if (!sessionCode) return;
 
@@ -265,7 +263,7 @@
 
         try {
             const response = await fetch(
-                `${API_BASE}/session/${sessionCode}/attendance`,
+                `/session/${sessionCode}/attendance`,
                 {
                     cache: "no-store",
                     credentials: "include",
@@ -309,7 +307,7 @@
     async function exportFile(kind: "attendance" | "votes", format: "pdf" | "csv") {
         try {
             const response = await fetch(
-                `${API_BASE}/session/${sessionCode}/export/${kind}/${format}`,
+                `/session/${sessionCode}/export/${kind}/${format}`,
                 { method: "GET", credentials: "include" }
             );
 
@@ -341,7 +339,7 @@
             const backendEventType =
                 draft.event_type === "motion" ? "Motion" : "Election";
 
-            const response = await fetch(`${API_BASE}/events/create/${sessionCode}`, {
+            const response = await fetch(`/events/create/${sessionCode}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 credentials: "include",
@@ -382,7 +380,7 @@
         endMeetingError = null;
 
         try {
-            const response = await fetch(`${API_BASE}/session/${sessionCode}/end`, {
+            const response = await fetch(`/session/${sessionCode}/end`, {
                 cache: "no-store",
                 credentials: "include",
             });

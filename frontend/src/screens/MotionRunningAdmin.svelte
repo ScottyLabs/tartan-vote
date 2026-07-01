@@ -19,8 +19,6 @@
         onEnd: () => void;
     } = $props();
 
-    const API_BASE = import.meta.env.VITE_API_BASE || "";
-
     let ending = $state(false);
     let error = $state<string | null>(null);
 
@@ -35,7 +33,7 @@
         error = null;
 
         try {
-            const response = await fetch(`${API_BASE}/events/${event.id}/end`, {
+            const response = await fetch(`/events/${event.id}/end`, {
                 cache: "no-store",
                 credentials: "include",
             });

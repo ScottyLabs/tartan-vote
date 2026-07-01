@@ -16,7 +16,6 @@
         }) => void;
     } = $props();
 
-    const API_BASE = import.meta.env.VITE_API_BASE || "";
     let pollId: number | null = null;
 
     type VoteInstance = {
@@ -31,7 +30,7 @@
         if (!sessionCode) return;
 
         try {
-            const response = await fetch(`${API_BASE}/events/${sessionCode}/check`, {
+            const response = await fetch(`/events/${sessionCode}/check`, {
                 cache: "no-store",
                 credentials: "include",
             });
@@ -51,7 +50,7 @@
 
             if (payload.active_event) {
                 const voteInstancesResponse = await fetch(
-                    `${API_BASE}/events/${payload.active_event.id}/vote-instances`,
+                    `/events/${payload.active_event.id}/vote-instances`,
                     {
                         cache: "no-store",
                         credentials: "include",

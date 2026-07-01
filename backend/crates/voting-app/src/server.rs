@@ -1,8 +1,6 @@
 use axum::{middleware, routing::get};
-use http::{HeaderValue, Method, header};
 use migration::{Migrator, MigratorTrait};
 use sea_orm::Database;
-use tower_http::cors::CorsLayer;
 use utoipa::OpenApi;
 use utoipa_axum::{router::OpenApiRouter, routes};
 use utoipa_swagger_ui::SwaggerUi;
@@ -27,29 +25,6 @@ pub async fn setup(config: Config) {
     let app_state = AppState { db, store, config };
 
     let bind_addr = app_state.config.bind_addr.clone();
-
-    let allowed_origins = app_state
-        .config
-        .cors_allowed_origins
-        .iter()
-        .map(|origin| {
-            origin
-                .parse::<HeaderValue>()
-                .expect("valid CORS_ALLOWED_ORIGINS entry")
-        })
-        .collect::<Vec<_>>();
-
-    let cors_layer = CorsLayer::new()
-        .allow_origin(allowed_origins)
-        .allow_methods([
-            Method::GET,
-            Method::POST,
-            Method::PUT,
-            Method::DELETE,
-            Method::OPTIONS,
-        ])
-        .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION, header::ACCEPT])
-        .allow_credentials(true);
 
     let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
         .routes(routes!(crate::domain::auth::handlers::auth_status))
@@ -152,7 +127,6 @@ pub async fn setup(config: Config) {
             app_state.clone(),
             crate::domain::auth::bypass::bypass_auth_middleware,
         ))
-        .layer(cors_layer)
         .with_state(app_state);
 
     let listener = tokio::net::TcpListener::bind(&bind_addr)

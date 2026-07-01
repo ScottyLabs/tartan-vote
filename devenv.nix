@@ -38,7 +38,6 @@
   processes = {
     api.exec = ''
       set -euo pipefail
-      export VITE_API_BASE=""
       (cd frontend && deno install && deno task build)
       exec secretspec run --profile dev -- cargo run
     '';
@@ -48,35 +47,9 @@
     };
   };
 
-  # Make DATABASE_URL follow whatever port the running devenv Postgres actually
-  # bound. devenv exports a portless DATABASE_URL / PGPORT=5432, but when the
-  # host already runs a Postgres on 5432 the managed server lands on 5433. The
-  # live port is in postmaster.pid (line 4); fall back to PGPORT, then 5432.
-  enterShell = ''
-    # Host-specific URLs are derived from a single DEV_HOST so the shared secret
-    # store never carries a developer's machine address. For cross-machine
-    # testing (serve here, browse from another device) set DEV_HOST to this
-    # machine's LAN IP in a git-ignored .env.local, e.g. DEV_HOST=192.168.1.20,
-    # and register http://$DEV_HOST:8080/auth/callback on the Keycloak client.
-    if [ -r "$PWD/.env.local" ]; then
-      set -a; . "$PWD/.env.local"; set +a
-    fi
-    DEV_HOST="''${DEV_HOST:-localhost}"
-    export DEV_HOST
-    export APP_BASE_URL="http://$DEV_HOST:8080"
-    export FRONTEND_BASE_URL="http://$DEV_HOST:8080"
-    export VITE_API_BASE=""
-    export CORS_ALLOWED_ORIGINS="http://$DEV_HOST:8080"
-  '';
-
   env = {
     VAULT_ADDR = "https://secrets2.scottylabs.org";
     SECRETSPEC_PROFILE = "dev";
     SECRETSPEC_PROVIDER = "vault://secrets2.scottylabs.org/secret";
-
-    # Non-secret, machine-independent constants. Host-specific URLs are derived
-    # from DEV_HOST in enterShell above.
-    BIND_ADDR = "0.0.0.0:8080";
-    VITE_API_BASE = "";
   };
 }
