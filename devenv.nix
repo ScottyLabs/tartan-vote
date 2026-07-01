@@ -35,18 +35,6 @@
     "nursery"
   ];
 
-  processes = {
-    api.exec = ''
-      set -euo pipefail
-      (cd frontend && deno install && deno task build)
-      exec secretspec run --profile dev -- cargo run
-    '';
-    frontend-watch = {
-      exec = "deno install && deno task build:watch";
-      cwd = "./frontend";
-    };
-  };
-
   env = {
     VAULT_ADDR = "https://secrets2.scottylabs.org";
     SECRETSPEC_PROFILE = "dev";
