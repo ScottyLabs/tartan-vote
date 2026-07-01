@@ -11,9 +11,7 @@ use voting_app_store::Store;
 use crate::core::openapi::ApiDoc;
 use crate::{AppState, config::Config};
 
-pub async fn setup() {
-    let config = Config::from_env().expect("failed to load configuration");
-
+pub async fn setup(config: Config) {
     let db = Database::connect(&config.database_url)
         .await
         .expect("failed to connect to database");
