@@ -7,7 +7,7 @@ non-`localhost` host for cross-machine testing.
 ## TL;DR
 
 - Enter the dev environment with `devenv shell` (or `direnv`), then run
-  `devenv up` to start the API, auth service, and frontend together.
+  `devenv up` to start the API and frontend together.
 
 - The shell provides constants, derived URLs, the database connection, and real
   secrets pulled from OpenBao.
@@ -34,9 +34,9 @@ never carries any one developer's machine-specific values.
 
 | Source | What it provides | Defined in |
 | --- | --- | --- |
-| **devenv constants** | Non-secret, machine-independent values: `OIDC_ISSUER`, `BETTER_AUTH_PROVIDER_ID`, `VITE_BETTER_AUTH_PROVIDER_ID`, `BETTER_AUTH_PORT`, `BIND_ADDR` | `devenv.nix` (`env`) |
-| **Derived host URLs** | `APP_BASE_URL`, `FRONTEND_BASE_URL`, `BETTER_AUTH_URL`, `BETTER_AUTH_BASE_URL`, `VITE_API_BASE`, `VITE_BETTER_AUTH_BASE_URL`, `CORS_ALLOWED_ORIGINS` | `devenv.nix` (`enterShell`), computed from `DEV_HOST` |
-| **OpenBao (secretspec)** | Real secrets: `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `BETTER_AUTH_SECRET` | `secret/secretspec/tartan-vote/dev/*` |
+| **devenv constants** | Non-secret, machine-independent values: `BIND_ADDR` | `devenv.nix` (`env`) |
+| **Derived host URLs** | `APP_BASE_URL`, `FRONTEND_BASE_URL`, `VITE_API_BASE`, `CORS_ALLOWED_ORIGINS` | `devenv.nix` (`enterShell`), computed from `DEV_HOST` |
+| **OpenBao (secretspec)** | Real secrets: `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` (+ the governance-provisioned `KEYCLOAK_URL`, `KEYCLOAK_REALM`, `OAUTH_RELAY_URL`, `PROJECT_GROUP`, `PROJECT_ADMIN_GROUP`) | `secret/secretspec/tartan-vote/dev/*` |
 | **devenv Postgres** | `DATABASE_URL` (points at the managed Postgres socket/port) | `devenv.nix` (`enterShell`) |
 | **secretspec prod/staging/preview** | Deployment URLs + secrets for Kennel | `secretspec.toml` profiles; Kennel resolves by environment |
 
@@ -90,7 +90,6 @@ Only genuine secrets are stored (see `secretspec.toml`):
 | --- | --- |
 | `OIDC_CLIENT_ID` | OIDC client ID for the Keycloak client |
 | `OIDC_CLIENT_SECRET` | OIDC client secret for the Keycloak client |
-| `BETTER_AUTH_SECRET` | Better Auth signing secret (`openssl rand -base64 32`) |
 
 ### Common commands
 
@@ -102,7 +101,7 @@ secretspec check
 secretspec get OIDC_CLIENT_ID
 
 # Set / rotate a secret (prompts for the value)
-secretspec set BETTER_AUTH_SECRET
+secretspec set OIDC_CLIENT_SECRET
 
 # Run a command with secrets injected (outside devenv shell)
 secretspec run -- <command>
@@ -151,12 +150,11 @@ Remove `.env.local` (or comment the line) to return to `localhost`.
 
 ## Kennel deployment & OIDC auto-provisioning
 
-Kennel deploys three artifacts declared in `devenv.nix`:
+Kennel deploys two artifacts declared in `devenv.nix`:
 
 | Kind | Name | Package | Custom domain |
 | --- | --- | --- | --- |
 | Service | `api` | `packages.api` | `api.tartan-vote.scottylabs.org` |
-| Service | `auth` | `packages.auth` | `auth.tartan-vote.scottylabs.org` |
 | Site | `frontend` | `packages.frontend` | `tartan-vote.scottylabs.org` |
 
 The `api` service declares `oidc.redirectPaths = [ "/auth/callback" ]`. On every
@@ -172,13 +170,6 @@ deploy, Kennel reconciles Keycloak clients and writes OIDC credentials to OpenBa
 Redirect URIs Kennel registers include
 `https://tartan-vote-api-main.scottylabs.net/auth/callback` and
 `https://api.tartan-vote.scottylabs.org/auth/callback` (plus staging/PR variants).
-
-`BETTER_AUTH_SECRET` for prod/staging must be seeded manually in OpenBao before
-the first deploy:
-
-```bash
-bao kv put secret/secretspec/tartan-vote/prod/BETTER_AUTH_SECRET value="$(openssl rand -base64 32)"
-```
 
 After a successful main-branch deploy, verify OIDC secrets:
 
@@ -202,10 +193,6 @@ Local development does **not** auto-create Keycloak clients. Dev uses the shared
   Your token lacks the `tartan-vote-dev` policy (or expired). Re-run
   `bao login -method=oidc` and verify with `bao token capabilities ...`. If still
   denied, verify that you have completed Governance, and then message DevOps.
-
-- **`OIDC_ISSUER, OIDC_CLIENT_ID, and OIDC_CLIENT_SECRET must be set`**
-  The auth-service couldn't read these. Inside `devenv shell` they come from
-  constants + OpenBao; ensure you're in the shell and authenticated.
 
 - **`Invalid parameter: redirect_uri`**
   `{APP_BASE_URL}/auth/callback` isn't allowlisted on the IdP client. Either set

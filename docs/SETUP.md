@@ -36,18 +36,9 @@ If `devenv shell` reports missing secrets or you get `403 permission denied`, se
 [secrets-and-config.md](secrets-and-config.md), which documents the full secrets
 model, the `DEV_HOST` override for cross-machine testing, and troubleshooting.
 
-### Better Auth migrations
-
-On first setup (or after auth schema changes), run migrations from the auth service:
-
-```bash
-cd auth-service
-npm run migrate
-```
-
 ### Run everything
 
-From the repo root, start all three processes with devenv:
+From the repo root, start all processes with devenv:
 
 ```bash
 devenv up
@@ -56,14 +47,12 @@ devenv up
 This runs:
 
 - **api** — Rust backend (`cargo run`)
-- **auth** — Better Auth service (`node server.mjs`)
 - **frontend** — Svelte dev server (`deno run dev --host`)
 
 You can also start processes individually:
 
 ```bash
 devenv processes up api
-devenv processes up auth
 devenv processes up frontend
 ```
 

@@ -7,7 +7,6 @@ Tartan Vote is a CMU Undergraduate Senate-commissioned, ScottyLabs-developed vot
 - Svelte
 - Rust
 - PostgreSQL
-- Better Auth
 
 ## Assumptions about the reader
 
@@ -62,7 +61,7 @@ devenv up
 # or: devenv processes up
 ```
 
-This starts the API (`api`), Better Auth service (`auth`), and Svelte frontend (`frontend`). Inside the devenv shell, constants, host URLs, `DATABASE_URL`, and secrets are provided automatically.
+This starts the API (`api`) and Svelte frontend (`frontend`). Inside the devenv shell, constants, host URLs, `DATABASE_URL`, and secrets are provided automatically.
 
 ### Deployment
 

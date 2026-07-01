@@ -1,76 +1,61 @@
 # Auth
 
-The backend now integrates with Better Auth via cookie-based session lookups instead of `axum-oidc` middleware.
+Better Auth has been removed. The backend no longer talks to an external auth
+service; user identity is resolved entirely in-process.
 
-## Overview
+Two paths exist today:
 
-- Better Auth runs as a standalone Node service in `auth-service/`.
-- Better Auth config is exported from `auth-service/auth.mjs` (used by runtime and CLI migrations).
-- `auth-service/server.mjs` only boots the HTTP server and mounts handlers.
-- OAuth callback reuses existing backend route `{APP_BASE_URL}/auth/callback`, which then redirects to Better Auth callback endpoint.
-- Frontend signs users in through Better Auth client APIs.
-- Backend reads Better Auth session via `GET {BETTER_AUTH_BASE_URL}/get-session` using incoming cookies.
-- Backend syncs/creates local `user` records and exposes them as `SyncedUser` for domain handlers.
-
-## Better Auth database tables
-
-To avoid conflicts with existing app tables, Better Auth uses dedicated model/table names:
-
-- `auth_user`
-- `auth_session`
-- `auth_account`
-- `auth_verification`
-
-Apply/update these tables with:
-
-```bash
-cd auth-service
-bun run migrate
-```
-
-(This wraps `@better-auth/cli migrate -y --config auth.mjs`.)
+- **Dev bypass** (working): a cookie/header-based shortcut for local development
+  and tests that creates/loads a local `user` and exposes it as `SyncedUser`.
+- **OIDC via Ricochet/Keycloak** (planned, stubbed): the `/auth/login` and
+  `/auth/callback` endpoints are placeholders. Real SSO through the Ricochet OAuth
+  relay is not yet implemented.
 
 ## Backend flow
 
 ### `src/core/auth/middleware.rs`
 
-- Reads the request `Cookie` header.
-- Calls Better Auth `get-session` endpoint.
-- Extracts Better Auth user identity.
-- Finds/creates local DB user (`user.oidc_subject` stores Better Auth user id).
-- Inserts `SyncedUser` in request extensions.
+- Defines `SyncedUser(Arc<user::Model>)` and its `FromRequestParts` /
+  `OptionalFromRequestParts` extractors. Handlers require auth by extracting
+  `SyncedUser`, or read optional auth via `Option<SyncedUser>`.
+- No session is fetched here anymore; `SyncedUser` is populated by the bypass
+  middleware (and, eventually, by the OIDC callback).
+
+### `src/domain/auth/bypass.rs`
+
+- `POST /auth/bypass/login`: creates/loads a user (`oidc_subject = "bypass:<andrew_id>"`)
+  and sets a `bypass_user_id` cookie.
+- `GET /auth/bypass/status`, `POST /auth/bypass/logout`: report / clear the bypass
+  session.
+- `bypass_auth_middleware`: resolves `SyncedUser` from the `bypass_user_id`
+  cookie or the `x-bypass-user-id` header.
 
 ### `src/domain/auth/handlers.rs`
 
 - `GET /auth/status`: returns auth state derived from optional `SyncedUser`.
-- `GET /auth/callback`: bridges OIDC callback query params to Better Auth callback path (`{BETTER_AUTH_BASE_URL}/oauth2/callback/{provider}`).
-- `GET /auth/login`, `/auth/logout`: legacy compatibility redirects to frontend.
+- `GET /auth/login`, `/auth/logout`: redirect to the frontend (stubs).
+- `GET /auth/callback`: stub that redirects to the frontend. **TODO:** exchange
+  the authorization code for tokens via the Ricochet relay / Keycloak, establish
+  a session, then redirect.
 
 ### `src/server.rs`
 
-- Removes OIDC/session-layer setup.
-- Keeps CORS and auth sync middleware globally.
-- Keeps existing API routes unchanged.
+- Mounts CORS and the bypass-auth middleware globally.
+- The `api` service declares `oidc.redirectPaths = [ "/auth/callback" ]` in
+  `devenv.nix`; the endpoint is reserved for the future OIDC flow.
 
-## Required env vars
+## Env vars
 
-All of these are provided automatically inside `devenv shell`. See
-[secrets-and-config.md](../../secrets-and-config.md) for where each value comes
-from (devenv constants, `DEV_HOST`-derived URLs, or OpenBao secrets).
+Auth-related configuration is provided automatically inside `devenv shell` (see
+[secrets-and-config.md](../../secrets-and-config.md)):
 
-- `BETTER_AUTH_BASE_URL` (backend to Better Auth API base; e.g. `http://localhost:3005/api/auth`) — derived from `DEV_HOST`
-- `BETTER_AUTH_URL` (Better Auth service public base URL; e.g. `http://localhost:3005`) — derived from `DEV_HOST`
-- `BETTER_AUTH_SECRET` (high-entropy secret used for signing/encryption) — **OpenBao secret**
-- `CORS_ALLOWED_ORIGINS` (comma-separated allowlist applied to backend CORS and auth-service CORS/trustedOrigins) — derived from `DEV_HOST`
-- `VITE_BETTER_AUTH_BASE_URL` (frontend Better Auth API base) — derived from `DEV_HOST`
-- `BETTER_AUTH_PROVIDER_ID` and `VITE_BETTER_AUTH_PROVIDER_ID` — devenv constants (`cmu-sso`)
-- `OIDC_ISSUER` — devenv constant; `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` — **OpenBao secrets**. Used by `auth-service` to configure the OAuth provider.
-- `OIDC_REDIRECT_URI` is optional. By default auth-service uses `{APP_BASE_URL}/auth/callback` to match existing allowed callbacks.
+- `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` — **OpenBao secrets** (governance
+  `oidc_client` feature).
+- `KEYCLOAK_URL`, `KEYCLOAK_REALM`, `OAUTH_RELAY_URL`, `PROJECT_GROUP`,
+  `PROJECT_ADMIN_GROUP` — provisioned by governance for the OIDC flow.
+- `APP_BASE_URL`, `FRONTEND_BASE_URL`, `CORS_ALLOWED_ORIGINS` — derived from
+  `DEV_HOST`.
 
-## Troubleshooting
-
-- Error: `Invalid parameter: redirect_uri`
-  - Cause: the redirect URI sent to OIDC is not in the IdP client's allowed redirect URI list.
-- Default redirect URI sent to OIDC: `{APP_BASE_URL}/auth/callback` (e.g. `http://localhost:8080/auth/callback`).
-- That backend callback bridges to Better Auth callback internally.
-- Fix: ensure `{APP_BASE_URL}/auth/callback` is allowlisted on the IdP client, or set `OIDC_REDIRECT_URI` to an already-allowlisted URI.
+The local OAuth relay is enabled with `scottylabs.ricochet.enable` in
+`devenv.nix`; it exports `APP_URL` so the relay can return to the backend
+`/auth/callback` once the OIDC flow is implemented.
