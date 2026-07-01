@@ -13,6 +13,9 @@
     deno.enable = true;
     postgres.enable = true;
 
+    ricochet.enable = true;
+    ricochet.appUrl = "http://localhost:8080";
+
     kennel.services.api = {
       customDomain = "api.tartan-vote.scottylabs.org";
       oidc.redirectPaths = [ "/auth/callback" ];
