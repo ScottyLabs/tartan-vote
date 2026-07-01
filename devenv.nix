@@ -1,23 +1,5 @@
 { config, pkgs, lib, inputs, ... }:
 
-let
-  denoPackages = pkgs.callPackage ./nix/deno-package.nix { };
-
-  cleanJsSrc = path:
-    lib.cleanSourceWith {
-      src = path;
-      filter = p: _t:
-        let base = baseNameOf p;
-        in !(builtins.elem base [
-          "node_modules"
-          "package-lock.json"
-          "dist"
-        ]);
-    };
-
-  # Pin on x86_64-linux after the first Kennel build prints "got: sha256-...".
-  denoDepsHash = lib.fakeHash;
-in
 {
   imports = [ inputs.scottylabs.devenvModules.default ];
 
@@ -35,9 +17,6 @@ in
       customDomain = "api.tartan-vote.scottylabs.org";
       oidc.redirectPaths = [ "/auth/callback" ];
     };
-    kennel.services.auth = {
-      customDomain = "auth.tartan-vote.scottylabs.org";
-    };
     kennel.sites.frontend = {
       spa = true;
       customDomain = "tartan-vote.scottylabs.org";
@@ -45,28 +24,6 @@ in
   };
 
   cachix.enable = false;
-
-  outputs = {
-    api = config.languages.rust.import ./. {
-      buildInputs = [ pkgs.openssl ];
-      nativeBuildInputs = [ pkgs.pkg-config ];
-    };
-
-    auth = denoPackages.mkDenoNodeService {
-      pname = "auth";
-      src = cleanJsSrc ./auth-service;
-      command = "server.mjs";
-      depsHash = denoDepsHash;
-    };
-
-    frontend = denoPackages.mkDenoViteFrontend {
-      pname = "frontend";
-      src = cleanJsSrc ./frontend;
-      apiBase = "https://api.tartan-vote.scottylabs.org";
-      authBase = "https://auth.tartan-vote.scottylabs.org/api/auth";
-      depsHash = denoDepsHash;
-    };
-  };
 
   # The ScottyLabs deno module runs `oxlint --deny all`, which force-enables
   # every opt-in rule -- including contradictory restriction/style rules that
@@ -81,10 +38,6 @@ in
 
   processes = {
     api.exec = "secretspec run --profile dev -- cargo run";
-    # auth = {
-    #   exec = "secretspec run --profile dev -- node server.mjs";
-    #   cwd = "./auth-service";
-    # };
     frontend = {
       exec = "deno install && deno run dev --host";
       cwd = "./frontend";
