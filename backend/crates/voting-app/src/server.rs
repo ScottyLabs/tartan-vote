@@ -9,6 +9,11 @@ use voting_app_store::Store;
 use crate::core::openapi::ApiDoc;
 use crate::{AppState, config::Config};
 
+#[utoipa::path(get, path = "/api/health", tag = "health", responses((status = OK, body = str)))]
+async fn health() -> &'static str {
+    "OK"
+}
+
 pub async fn setup(config: Config) {
     let db = Database::connect(&config.database_url)
         .await
@@ -29,10 +34,18 @@ pub async fn setup(config: Config) {
         .routes(routes!(crate::domain::auth::bypass::bypass_login))
         .routes(routes!(crate::domain::auth::bypass::bypass_status))
         .routes(routes!(crate::domain::auth::bypass::bypass_logout))
+        .routes(routes!(health))
         .split_for_parts();
 
     let api_router = router
-        .merge(Scalar::with_url("/api/scalar", api))
+        .merge(Scalar::with_url("/api/scalar", api.clone()))
+        .route(
+            "/api/openapi.json",
+            get(move || {
+                let api = api.clone();
+                async move { axum::Json(api) }
+            }),
+        )
         .route("/auth/login", get(crate::domain::auth::handlers::login))
         .route(
             "/auth/callback",

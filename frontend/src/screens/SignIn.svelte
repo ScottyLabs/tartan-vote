@@ -1,5 +1,7 @@
 <script lang="ts">
     import { onMount } from "svelte";
+    import { api } from "../lib/api/client";
+    import { apiUrl } from "../lib/api/base";
     import logo from "../lib/images/logoplaceholder.png";
 
     type Props = {
@@ -16,11 +18,11 @@
     onMount(() => {
         void (async () => {
             try {
-                const res = await fetch(`/auth/status`, {
+                const { data } = await api.GET("/auth/status", {
                     cache: "no-store",
                     credentials: "include",
                 });
-                if (res.ok && (await res.json()).logged_in) {
+                if (data?.logged_in) {
                     onNext();
                 }
             } catch (error) {}
@@ -28,7 +30,7 @@
     });
 
     function handleClick() {
-        window.location.href = `/auth/login`;
+        window.location.href = apiUrl("/auth/login");
     }
 
     async function handleBypass() {
@@ -36,15 +38,13 @@
         bypassError = null;
 
         try {
-            const response = await fetch(`/auth/bypass/login`, {
-                method: "POST",
+            const { response } = await api.POST("/auth/bypass/login", {
                 cache: "no-store",
                 credentials: "include",
-                headers: { "content-type": "application/json" },
-                body: JSON.stringify({
+                body: {
                     name: bypassName,
                     andrew_id: bypassAndrewId,
-                }),
+                },
             });
 
             if (!response.ok) {

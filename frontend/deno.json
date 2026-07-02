@@ -4,6 +4,7 @@
     "dev": "vite --host",
     "build": "vite build",
     "build:watch": "vite build --watch",
-    "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json"
+    "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json",
+    "generate-api": "openapi-typescript http://localhost:8080/api/openapi.json -o src/lib/api/schema.d.ts"
   }
 }

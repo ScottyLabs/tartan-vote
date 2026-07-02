@@ -1,5 +1,6 @@
 <script lang="ts">
     import { onDestroy, onMount } from "svelte";
+    import { apiUrl } from "../api/base";
 
     let {
         eventId = 0,
@@ -43,7 +44,7 @@
         loadingResults = true;
 
         try {
-            const response = await fetch(`/events/${eventId}/results`, {
+            const response = await fetch(apiUrl(`/events/${eventId}/results`), {
                 cache: "no-store",
                 credentials: "include",
             });

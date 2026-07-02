@@ -1,4 +1,6 @@
 <script lang="ts">
+    import { apiUrl } from "../lib/api/base";
+
     let {
         sessionCode,
         onBack,
@@ -54,7 +56,7 @@
                 proxy_for: trimmed.length > 0 ? trimmed : null,
             };
 
-            const url = `/session/${sessionCode}/proxy`;
+            const url = apiUrl(`/session/${sessionCode}/proxy`);
 
             const response = await fetch(url, {
                 method: "POST",
