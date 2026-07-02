@@ -40,8 +40,11 @@ Two paths exist today:
 
 ### `src/server.rs`
 
-- Mounts the bypass-auth middleware globally. There is no CORS layer: the
-  backend serves the built frontend, so all requests are same-origin.
+- Mounts the bypass-auth middleware globally and a CORS layer for SPA origins
+  (`*.scottylabs.org`, `*.scottylabs.net`, and localhost).
+- In production Kennel serves the SPA separately (`kennel.sites.frontend` with
+  `spa = true`); the backend is API-only.
+- Locally, the Vite dev server proxies API routes to the backend.
 - The `/auth/callback` endpoint is reserved for the future OIDC flow; redirect
   URIs are provisioned by governance/Kennel, not declared in `devenv.nix`.
 

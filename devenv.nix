@@ -17,11 +17,20 @@
     ricochet.appUrl = "http://localhost:8080";
 
     kennel.services.tartan-vote = {
+      customDomain = "api.tartan-vote.scottylabs.org";
+    };
+
+    kennel.sites.frontend = {
+      spa = true;
       customDomain = "tartan-vote.scottylabs.org";
     };
   };
 
   cachix.enable = false;
+
+  scripts = {
+    generate-api.exec = "cd frontend && deno task generate-api";
+  };
 
   env = {
     VAULT_ADDR = "https://secrets2.scottylabs.org";

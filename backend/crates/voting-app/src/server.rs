@@ -6,8 +6,6 @@ use utoipa_axum::{router::OpenApiRouter, routes};
 use utoipa_scalar::{Scalar, Servable};
 use voting_app_store::Store;
 
-use tower_http::services::{ServeDir, ServeFile};
-
 use crate::core::openapi::ApiDoc;
 use crate::{AppState, config::Config};
 
@@ -32,8 +30,6 @@ pub async fn setup(config: Config) {
         .routes(routes!(crate::domain::auth::bypass::bypass_status))
         .routes(routes!(crate::domain::auth::bypass::bypass_logout))
         .split_for_parts();
-
-    let serve_frontend = app_state.config.frontend_dist.clone();
 
     let api_router = router
         .merge(Scalar::with_url("/api/scalar", api))
@@ -108,21 +104,10 @@ pub async fn setup(config: Config) {
         .route(
             "/events/{session_code}/check",
             get(crate::domain::event::handlers::check_event),
-        );
-
-    let api_router = if let Some(dist) = serve_frontend {
-        println!("Serving frontend from {}", dist.display());
-        let spa = ServeDir::new(&dist)
-            .append_index_html_on_directories(true)
-            .not_found_service(ServeFile::new(dist.join("index.html")));
-        api_router.fallback_service(spa)
-    } else {
-        api_router
-            .route("/", get(crate::domain::auth::handlers::demo_home))
-            .fallback(get(crate::domain::auth::handlers::demo_not_found))
-    };
-
-    let api_router = api_router
+        )
+        .route("/", get(crate::domain::auth::handlers::demo_home))
+        .fallback(get(crate::domain::auth::handlers::demo_not_found))
+        .layer(crate::core::cors::layer())
         .layer(middleware::from_fn_with_state(
             app_state.clone(),
             crate::domain::auth::bypass::bypass_auth_middleware,
