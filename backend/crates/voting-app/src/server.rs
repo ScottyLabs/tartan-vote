@@ -3,7 +3,7 @@ use migration::{Migrator, MigratorTrait};
 use sea_orm::Database;
 use utoipa::OpenApi;
 use utoipa_axum::{router::OpenApiRouter, routes};
-use utoipa_swagger_ui::SwaggerUi;
+use utoipa_scalar::{Scalar, Servable};
 use voting_app_store::Store;
 
 use tower_http::services::{ServeDir, ServeFile};
@@ -36,7 +36,7 @@ pub async fn setup(config: Config) {
     let serve_frontend = app_state.config.frontend_dist.clone();
 
     let api_router = router
-        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", api))
+        .merge(Scalar::with_url("/api/scalar", api))
         .route("/auth/login", get(crate::domain::auth::handlers::login))
         .route(
             "/auth/callback",
