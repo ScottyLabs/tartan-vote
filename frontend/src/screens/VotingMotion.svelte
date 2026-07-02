@@ -1,5 +1,6 @@
 <script lang="ts">
     import { onDestroy, onMount } from "svelte";
+    import { apiUrl } from "../lib/api/base";
     import { User } from "../lib/models/User";
 
     type ActiveEvent = {
@@ -74,7 +75,7 @@
         if (!sessionCode || !event || leavingMotion) return;
 
         try {
-            const response = await fetch(`/events/${sessionCode}/check`, {
+            const response = await fetch(apiUrl(`/events/${sessionCode}/check`), {
                 cache: "no-store",
                 credentials: "include",
             });
@@ -108,7 +109,7 @@
 
         try {
             const response = await fetch(
-                `/events/${event.id}/vote-instances`,
+                apiUrl(`/events/${event.id}/vote-instances`),
                 {
                     cache: "no-store",
                     credentials: "include",
@@ -153,7 +154,7 @@
         error = null;
 
         try {
-            const response = await fetch(`/events/${event.id}/vote`, {
+            const response = await fetch(apiUrl(`/events/${event.id}/vote`), {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 credentials: "include",
@@ -168,7 +169,7 @@
                 throw new Error(payload?.error ?? `Failed: ${response.status}`);
             }
 
-            const resultsResponse = await fetch(`/events/${event.id}/results`, {
+            const resultsResponse = await fetch(apiUrl(`/events/${event.id}/results`), {
                 cache: "no-store",
                 credentials: "include",
             });

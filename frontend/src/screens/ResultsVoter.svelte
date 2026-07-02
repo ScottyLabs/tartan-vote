@@ -1,5 +1,6 @@
 <script lang="ts">
     import { onDestroy, onMount } from "svelte";
+    import { apiUrl } from "../lib/api/base";
     import { User } from "../lib/models/User";
 
     type ActiveEvent = {
@@ -81,7 +82,7 @@
         if (!sessionCode || leavingResults) return;
 
         try {
-            const response = await fetch(`/session/${sessionCode}/status`, {
+            const response = await fetch(apiUrl(`/session/${sessionCode}/status`), {
                 cache: "no-store",
                 credentials: "include",
             });
@@ -111,7 +112,7 @@
         error = null;
 
         try {
-            const response = await fetch(`/events/${event.id}/results`, {
+            const response = await fetch(apiUrl(`/events/${event.id}/results`), {
                 cache: "no-store",
                 credentials: "include",
             });

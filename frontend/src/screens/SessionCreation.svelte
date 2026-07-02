@@ -1,5 +1,6 @@
 <script lang="ts">
     import { onDestroy, onMount } from "svelte";
+    import { apiUrl } from "../lib/api/base";
     import LongTextInput from "../lib/components/longTextInput.svelte";
     import SelectMenu from "../lib/components/selectMenu.svelte";
     import Popup from "../lib/components/popup.svelte";
@@ -263,7 +264,7 @@
 
         try {
             const response = await fetch(
-                `/session/${sessionCode}/attendance`,
+                apiUrl(`/session/${sessionCode}/attendance`),
                 {
                     cache: "no-store",
                     credentials: "include",
@@ -307,7 +308,7 @@
     async function exportFile(kind: "attendance" | "votes", format: "pdf" | "csv") {
         try {
             const response = await fetch(
-                `/session/${sessionCode}/export/${kind}/${format}`,
+                apiUrl(`/session/${sessionCode}/export/${kind}/${format}`),
                 { method: "GET", credentials: "include" }
             );
 
@@ -339,7 +340,7 @@
             const backendEventType =
                 draft.event_type === "motion" ? "Motion" : "Election";
 
-            const response = await fetch(`/events/create/${sessionCode}`, {
+            const response = await fetch(apiUrl(`/events/create/${sessionCode}`), {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 credentials: "include",
@@ -380,7 +381,7 @@
         endMeetingError = null;
 
         try {
-            const response = await fetch(`/session/${sessionCode}/end`, {
+            const response = await fetch(apiUrl(`/session/${sessionCode}/end`), {
                 cache: "no-store",
                 credentials: "include",
             });

@@ -1,5 +1,7 @@
 <script lang="ts">
     import { onMount } from "svelte";
+    import { api } from "../lib/api/client";
+    import { apiUrl } from "../lib/api/base";
 
     let {
         toVoter,
@@ -28,12 +30,11 @@
     onMount(() => {
         void (async () => {
             try {
-                const res = await fetch(`/auth/status`, {
+                const { data: status } = await api.GET("/auth/status", {
                     cache: "no-store",
                     credentials: "include",
                 });
-                if (res.ok) {
-                    const status = await res.json();
+                if (status) {
                     authStatus = {
                         logged_in: status.logged_in ?? false,
                         user_id: status.user_id ?? -1,
@@ -53,7 +54,7 @@
         sessionCode = sessionCode.toUpperCase();
 
         const response = await fetch(
-            `/session/join/${sessionCode}`,
+            apiUrl(`/session/join/${sessionCode}`),
             { cache: "no-store", credentials: "include" },
         );
 
@@ -67,7 +68,7 @@
     }
 
     function handleSignInClick() {
-        window.location.href = `/auth/login`;
+        window.location.href = apiUrl("/auth/login");
     }
 
     async function handleCreateSessionClick() {
@@ -75,7 +76,7 @@
         createError = null;
 
         try {
-            const response = await fetch(`/session/create`, {
+            const response = await fetch(apiUrl("/session/create"), {
                 cache: "no-store",
                 credentials: "include",
             });
