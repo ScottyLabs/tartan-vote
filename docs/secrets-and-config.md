@@ -123,9 +123,10 @@ Kennel deploys one artifact declared in `devenv.nix`:
 | --- | --- | --- | --- |
 | Service | `tartan-vote` | `packages.tartan-vote` | `tartan-vote.scottylabs.org` |
 
-The `tartan-vote` service serves both the API and the built frontend. It declares
-`oidc.redirectPaths = [ "/auth/callback" ]`. On every
-deploy, Kennel reconciles Keycloak clients and writes OIDC credentials to OpenBao:
+The `tartan-vote` service serves both the API and the built frontend. OIDC is
+provisioned by the governance `oidc_client` feature, not declared in `devenv.nix`.
+On every deploy, Kennel reconciles Keycloak clients and writes OIDC credentials
+to OpenBao:
 
 | OpenBao path | Written by |
 | --- | --- |

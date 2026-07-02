@@ -18,7 +18,6 @@
 
     kennel.services.tartan-vote = {
       customDomain = "tartan-vote.scottylabs.org";
-      oidc.redirectPaths = [ "/auth/callback" ];
     };
   };
 
