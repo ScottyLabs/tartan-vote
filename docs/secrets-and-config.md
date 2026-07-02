@@ -23,15 +23,15 @@ how secrets are managed with OpenBao + secretspec.
 
 ## Where configuration comes from
 
-The app is same-origin — the backend serves the built frontend — so it needs
-almost no configuration. The backend reads:
+The app is split across two Kennel deployments in production: a backend service
+and a static SPA site (`spa = true`). The backend reads:
 
 | Variable | Required | Source |
 | --- | --- | --- |
 | `DATABASE_URL` | yes | devenv's managed Postgres locally; Kennel in deployment |
 | `PORT` / `BIND_ADDR` | no (defaults to `0.0.0.0:8080`) | set by the deployment platform |
 | `SENTRY_DSN` | no | secretspec `prod` profile |
-| `FRONTEND_DIST` | no (falls back to the Nix-bundled path, then `frontend/dist`) | override for the built frontend directory |
+| `APP_URL` | no | Kennel injects the API service's public URL at deploy time |
 
 Real secrets (`OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, and the
 governance-provisioned `KEYCLOAK_URL`, `KEYCLOAK_REALM`, `OAUTH_RELAY_URL`,
@@ -117,14 +117,26 @@ profile  = "dev"
 
 ## Kennel deployment & OIDC auto-provisioning
 
-Kennel deploys one artifact declared in `devenv.nix`:
+Kennel deploys two artifacts declared in `devenv.nix`:
 
 | Kind | Name | Package | Custom domain |
 | --- | --- | --- | --- |
-| Service | `tartan-vote` | `packages.tartan-vote` | `tartan-vote.scottylabs.org` |
+| Service | `tartan-vote` | `packages.tartan-vote` | `api.tartan.vote` |
+| Site | `frontend` | `packages.frontend` | `tartan.vote` |
 
-The `tartan-vote` service serves both the API and the built frontend. OIDC is
-provisioned by the governance `oidc_client` feature, not declared in `devenv.nix`.
+The frontend site is deployed with `spa = true`, so Caddy serves `index.html`
+for unmatched routes. The SPA calls the API on the service domain; locally, the
+Vite dev server proxies `/api`, `/auth`, `/session`, and `/events` to the
+backend on `localhost:8080`.
+
+Governance declares the public frontend URL as `public_url = "https://tartan.vote"`
+in `data/teams/tartan-vote.toml`. The API is served separately at `api.tartan.vote`
+(`kennel.services.tartan-vote.customDomain`). At runtime, `frontend/src/lib/api/base.ts`
+maps the browser hostname to the API origin (`tartan.vote` → `api.tartan.vote`,
+or the matching `*.scottylabs.net` preview pair). `VITE_API_BASE` is only a
+local-dev override; Kennel's `buildDenoTask` does not bake it into production builds.
+
+OIDC is provisioned by the governance `oidc_client` feature, not declared in `devenv.nix`.
 On every deploy, Kennel reconciles Keycloak clients and writes OIDC credentials
 to OpenBao:
 
@@ -137,7 +149,7 @@ to OpenBao:
 
 Redirect URIs Kennel registers include
 `https://tartan-vote-tartan-vote-main.scottylabs.net/auth/callback` and
-`https://tartan-vote.scottylabs.org/auth/callback` (plus staging/PR variants).
+`https://api.tartan.vote/auth/callback` (plus staging/PR variants).
 
 After a successful main-branch deploy, verify OIDC secrets:
 

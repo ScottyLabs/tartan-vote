@@ -1,3 +1,3 @@
 pub mod auth;
-pub mod frontend;
+pub mod cors;
 pub mod openapi;

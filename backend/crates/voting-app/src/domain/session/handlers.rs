@@ -390,7 +390,6 @@ mod tests {
                 database_url: String::new(),
                 bind_addr: String::new(),
                 sentry_dsn: None,
-                frontend_dist: None,
             },
         }
     }

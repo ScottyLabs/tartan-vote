@@ -36,13 +36,7 @@
             pname = "tartan-vote";
             buildInputs = [ pkgs.openssl ];
             nativeBuildInputs = [ pkgs.pkg-config ];
-            buildArgs = {
-              cargoExtraArgs = "-p backend";
-              postInstall = ''
-                mkdir -p $out/share/tartan-vote/static
-                cp -r ${frontend}/dist/* $out/share/tartan-vote/static/
-              '';
-            };
+            buildArgs.cargoExtraArgs = "-p backend";
           };
 
           default = self.packages.${system}.tartan-vote;
