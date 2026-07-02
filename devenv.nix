@@ -24,17 +24,6 @@
 
   cachix.enable = false;
 
-  # The ScottyLabs deno module runs `oxlint --deny all`, which force-enables
-  # every opt-in rule -- including contradictory restriction/style rules that
-  # ban async/await, ternaries, null, magic numbers, etc. Allow those categories
-  # so only the meaningful ones (correctness, suspicious, perf) stay enforced.
-  git-hooks.hooks.oxlint.settings.allow = [
-    "restriction"
-    "style"
-    "pedantic"
-    "nursery"
-  ];
-
   env = {
     VAULT_ADDR = "https://secrets2.scottylabs.org";
     SECRETSPEC_PROFILE = "dev";
