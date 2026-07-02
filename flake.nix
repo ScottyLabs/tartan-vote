@@ -31,9 +31,9 @@
         {
           inherit frontend;
 
-          api = helpers.buildRustService {
+          tartan-vote = helpers.buildRustService {
             src = ./.;
-            pname = "api";
+            pname = "tartan-vote";
             buildInputs = [ pkgs.openssl ];
             nativeBuildInputs = [ pkgs.pkg-config ];
             buildArgs = {
@@ -45,7 +45,7 @@
             };
           };
 
-          default = self.packages.${system}.api;
+          default = self.packages.${system}.tartan-vote;
         }
       );
     };

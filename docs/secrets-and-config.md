@@ -117,14 +117,14 @@ profile  = "dev"
 
 ## Kennel deployment & OIDC auto-provisioning
 
-Kennel deploys two artifacts declared in `devenv.nix`:
+Kennel deploys one artifact declared in `devenv.nix`:
 
 | Kind | Name | Package | Custom domain |
 | --- | --- | --- | --- |
-| Service | `api` | `packages.api` | `api.tartan-vote.scottylabs.org` |
-| Site | `frontend` | `packages.frontend` | `tartan-vote.scottylabs.org` |
+| Service | `tartan-vote` | `packages.tartan-vote` | `tartan-vote.scottylabs.org` |
 
-The `api` service declares `oidc.redirectPaths = [ "/auth/callback" ]`. On every
+The `tartan-vote` service serves both the API and the built frontend. It declares
+`oidc.redirectPaths = [ "/auth/callback" ]`. On every
 deploy, Kennel reconciles Keycloak clients and writes OIDC credentials to OpenBao:
 
 | OpenBao path | Written by |
@@ -135,8 +135,8 @@ deploy, Kennel reconciles Keycloak clients and writes OIDC credentials to OpenBa
 | `secret/secretspec/tartan-vote/preview/OIDC_CLIENT_*` | Kennel (same staging credentials) |
 
 Redirect URIs Kennel registers include
-`https://tartan-vote-api-main.scottylabs.net/auth/callback` and
-`https://api.tartan-vote.scottylabs.org/auth/callback` (plus staging/PR variants).
+`https://tartan-vote-tartan-vote-main.scottylabs.net/auth/callback` and
+`https://tartan-vote.scottylabs.org/auth/callback` (plus staging/PR variants).
 
 After a successful main-branch deploy, verify OIDC secrets:
 

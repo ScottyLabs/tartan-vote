@@ -16,7 +16,7 @@
     ricochet.enable = true;
     ricochet.appUrl = "http://localhost:8080";
 
-    kennel.services.api = {
+    kennel.services.tartan-vote = {
       customDomain = "tartan-vote.scottylabs.org";
       oidc.redirectPaths = [ "/auth/callback" ];
     };

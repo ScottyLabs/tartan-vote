@@ -42,7 +42,7 @@ Two paths exist today:
 
 - Mounts the bypass-auth middleware globally. There is no CORS layer: the
   backend serves the built frontend, so all requests are same-origin.
-- The `api` service declares `oidc.redirectPaths = [ "/auth/callback" ]` in
+- The `tartan-vote` service declares `oidc.redirectPaths = [ "/auth/callback" ]` in
   `devenv.nix`; the endpoint is reserved for the future OIDC flow.
 
 ## Env vars
