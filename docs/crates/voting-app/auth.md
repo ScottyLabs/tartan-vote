@@ -40,7 +40,8 @@ Two paths exist today:
 
 ### `src/server.rs`
 
-- Mounts CORS and the bypass-auth middleware globally.
+- Mounts the bypass-auth middleware globally. There is no CORS layer: the
+  backend serves the built frontend, so all requests are same-origin.
 - The `api` service declares `oidc.redirectPaths = [ "/auth/callback" ]` in
   `devenv.nix`; the endpoint is reserved for the future OIDC flow.
 
@@ -53,8 +54,10 @@ Auth-related configuration is provided automatically inside `devenv shell` (see
   `oidc_client` feature).
 - `KEYCLOAK_URL`, `KEYCLOAK_REALM`, `OAUTH_RELAY_URL`, `PROJECT_GROUP`,
   `PROJECT_ADMIN_GROUP` — provisioned by governance for the OIDC flow.
-- `APP_BASE_URL`, `FRONTEND_BASE_URL`, `CORS_ALLOWED_ORIGINS` — derived from
-  `DEV_HOST`.
+
+None of these are read by the backend yet; they are reserved for the planned
+OIDC implementation. The stubs redirect to `/` (same-origin), so no base-URL
+configuration is needed.
 
 The local OAuth relay is enabled with `scottylabs.ricochet.enable` in
 `devenv.nix`; it exports `APP_URL` so the relay can return to the backend
