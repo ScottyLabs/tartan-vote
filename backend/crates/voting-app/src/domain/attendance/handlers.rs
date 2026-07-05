@@ -6,9 +6,26 @@ use axum::{
     http::StatusCode,
 };
 use entity::enums::JoinLeft;
-use serde_json::json;
+use serde::Serialize;
 use std::collections::HashMap;
+use utoipa::ToSchema;
 use voting_app_store::Store;
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct AttendeeRecord {
+    pub id: i32,
+    pub name: String,
+    pub andrew_id: String,
+    pub is_proxy_holder: bool,
+    pub proxy_for: Vec<String>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct AttendanceResponse {
+    pub session_code: String,
+    pub headcount: usize,
+    pub attendees: Vec<AttendeeRecord>,
+}
 
 pub async fn get_attendance(
     store: &Store,
@@ -43,12 +60,24 @@ pub async fn get_attendance(
         })
 }
 
+#[utoipa::path(
+    get,
+    path = "/session/{session_code}/attendance",
+    tag = "attendance",
+    params(
+        ("session_code" = String, Path, description = "Session join code")
+    ),
+    responses(
+        (status = 200, description = "Attendance list with proxy information", body = AttendanceResponse),
+        (status = 404, description = "Session not found"),
+    )
+)]
 #[axum::debug_handler]
 pub async fn attendance(
     _user: SyncedUser,
     State(state): State<AppState>,
     Path(session_code): Path<String>,
-) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+) -> Result<Json<AttendanceResponse>, (StatusCode, String)> {
     let session = state
         .store
         .sessions()
@@ -88,26 +117,23 @@ pub async fn attendance(
         proxy_map.entry(row.user_id).or_default().push(proxy_for);
     }
 
-    let attendees: Vec<serde_json::Value> = users
+    let attendees: Vec<AttendeeRecord> = users
         .into_iter()
         .map(|user| {
             let proxy_for = proxy_map.remove(&user.id).unwrap_or_default();
-
-            json!({
-                "id": user.id,
-                "name": user.name,
-                "andrew_id": user.andrew_id,
-                "is_proxy_holder": !proxy_for.is_empty(),
-                "proxy_for": proxy_for,
-            })
+            AttendeeRecord {
+                id: user.id,
+                name: user.name,
+                andrew_id: user.andrew_id,
+                is_proxy_holder: !proxy_for.is_empty(),
+                proxy_for,
+            }
         })
         .collect();
 
-    let headcount = attendees.len();
-
-    Ok(Json(json!({
-        "session_code": session_code,
-        "headcount": headcount,
-        "attendees": attendees,
-    })))
+    Ok(Json(AttendanceResponse {
+        headcount: attendees.len(),
+        session_code,
+        attendees,
+    }))
 }
