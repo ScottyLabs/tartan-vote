@@ -387,13 +387,9 @@ mod tests {
             store: Store::new(db.clone()),
             db,
             config: crate::config::Config {
-                app_base_url: String::new(),
-                frontend_base_url: String::new(),
-                cors_allowed_origins: vec![],
-                better_auth_base_url: String::new(),
-                better_auth_provider_id: String::new(),
                 database_url: String::new(),
                 bind_addr: String::new(),
+                sentry_dsn: None,
             },
         }
     }

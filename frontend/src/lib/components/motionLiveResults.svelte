@@ -1,5 +1,6 @@
 <script lang="ts">
     import { onDestroy, onMount } from "svelte";
+    import { apiUrl } from "../api/base";
 
     let {
         eventId = 0,
@@ -8,8 +9,6 @@
         eventId: number;
         eventType: string;
     } = $props();
-
-    const API_BASE = import.meta.env.VITE_API_BASE || "";
 
     type MotionResults = {
         pass: number;
@@ -45,7 +44,7 @@
         loadingResults = true;
 
         try {
-            const response = await fetch(`${API_BASE}/events/${eventId}/results`, {
+            const response = await fetch(apiUrl(`/events/${eventId}/results`), {
                 cache: "no-store",
                 credentials: "include",
             });

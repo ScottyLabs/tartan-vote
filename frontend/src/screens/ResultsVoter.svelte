@@ -1,5 +1,6 @@
 <script lang="ts">
     import { onDestroy, onMount } from "svelte";
+    import { apiUrl } from "../lib/api/base";
     import { User } from "../lib/models/User";
 
     type ActiveEvent = {
@@ -39,8 +40,6 @@
             percent: number;
         }>;
     };
-
-    const API_BASE = import.meta.env.VITE_API_BASE || "";
 
     let loading = $state(false);
     let error = $state<string | null>(null);
@@ -83,7 +82,7 @@
         if (!sessionCode || leavingResults) return;
 
         try {
-            const response = await fetch(`${API_BASE}/session/${sessionCode}/status`, {
+            const response = await fetch(apiUrl(`/session/${sessionCode}/status`), {
                 cache: "no-store",
                 credentials: "include",
             });
@@ -113,7 +112,7 @@
         error = null;
 
         try {
-            const response = await fetch(`${API_BASE}/events/${event.id}/results`, {
+            const response = await fetch(apiUrl(`/events/${event.id}/results`), {
                 cache: "no-store",
                 credentials: "include",
             });

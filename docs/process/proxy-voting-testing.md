@@ -5,7 +5,6 @@
 - [ ] Backend compiled successfully: `cargo check` passes
 - [ ] Frontend compiled successfully: `npm run check` passes
 - [ ] Database exists and migrations have been run
-- [ ] `VITE_API_BASE` environment variable correctly points to backend
 - [ ] Auth service running if required
 - [ ] Fresh database state recommended
 

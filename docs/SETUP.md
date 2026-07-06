@@ -19,7 +19,7 @@ git clone https://codeberg.org/ScottyLabs/tartan-vote.git
 cd tartan-vote
 ```
 
-Run `direnv allow` (or `devenv shell`) to enter the development environment. This starts PostgreSQL and exposes Cargo, Deno, Node, and other tooling.
+Run `direnv allow` (or `devenv shell`) to enter the development environment. This exposes Cargo, Deno, Node, PostgreSQL, and other tooling.
 
 ### Secrets
 
@@ -34,45 +34,25 @@ bao login -method=oidc
 
 If `devenv shell` reports missing secrets or you get `403 permission denied`, see
 [secrets-and-config.md](secrets-and-config.md), which documents the full secrets
-model, the `DEV_HOST` override for cross-machine testing, and troubleshooting.
-
-### Better Auth migrations
-
-On first setup (or after auth schema changes), run migrations from the auth service:
-
-```bash
-cd auth-service
-npm run migrate
-```
+model and troubleshooting.
 
 ### Run everything
 
-From the repo root, start all three processes with devenv:
+From the repo root, inside the devenv shell:
 
 ```bash
+# 1. Start the managed services (Postgres, OAuth relay)
 devenv up
+
+# 2. In another terminal: build the frontend into frontend/dist
+cd frontend && deno task build && cd ..
+
+# 3. Run the backend; it serves the API and the built frontend on :8080
+cargo run
 ```
 
-This runs:
+Then open http://localhost:8080.
 
-- **api** — Rust backend (`cargo run`)
-- **auth** — Better Auth service (`node server.mjs`)
-- **frontend** — Svelte dev server (`deno run dev --host`)
-
-You can also start processes individually:
-
-```bash
-devenv processes up api
-devenv processes up auth
-devenv processes up frontend
-```
-
-### Cross-machine testing
-
-To serve on one machine and browse from another, set your LAN IP in a git-ignored `.env.local`:
-
-```bash
-echo 'DEV_HOST=192.168.1.20' > .env.local
-```
-
-Re-enter the shell, then register `http://<your-ip>:8080/auth/callback` on the Keycloak client. See [secrets-and-config.md](secrets-and-config.md).
+When working on the frontend, run `deno task build:watch` in a separate
+terminal instead of the one-off build; it rebuilds `frontend/dist` on save, and
+a browser refresh picks up the changes.

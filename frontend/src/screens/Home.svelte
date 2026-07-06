@@ -1,6 +1,7 @@
 <script lang="ts">
     import { onMount } from "svelte";
-    import { authClient } from "../lib/auth-client";
+    import { api } from "../lib/api/client";
+    import { apiUrl } from "../lib/api/base";
 
     let {
         toVoter,
@@ -26,46 +27,19 @@
     let joining = $state<boolean>(false);
     let creating = $state<boolean>(false);
 
-    const API_BASE = import.meta.env.VITE_API_BASE || "";
-    const BETTER_AUTH_PROVIDER_ID =
-        import.meta.env.VITE_BETTER_AUTH_PROVIDER_ID || "cmu-sso";
-
     onMount(() => {
         void (async () => {
             try {
-                const bypassRes = await fetch(`${API_BASE}/auth/status`, {
+                const { data: status } = await api.GET("/auth/status", {
                     cache: "no-store",
                     credentials: "include",
                 });
-                if (bypassRes.ok) {
-                    const bypass = await bypassRes.json();
-                    if (bypass.logged_in) {
-                        authStatus = {
-                            logged_in: true,
-                            user_id: bypass.user_id ?? -1,
-                            user_name: bypass.user_name ?? "Unknown User",
-                            user_andrew_id: bypass.user_andrew_id ?? "",
-                            oidc_subject: null,
-                        };
-                        return;
-                    }
-                }
-
-                const { data } = await authClient.getSession();
-                if (data?.user) {
+                if (status) {
                     authStatus = {
-                        logged_in: true,
-                        user_id: -1,
-                        user_name: data.user.name ?? "Unknown User",
-                        user_andrew_id: data.user.email ?? "",
-                        oidc_subject: data.user.id,
-                    };
-                } else {
-                    authStatus = {
-                        logged_in: false,
-                        user_id: -1,
-                        user_name: "",
-                        user_andrew_id: "",
+                        logged_in: status.logged_in ?? false,
+                        user_id: status.user_id ?? -1,
+                        user_name: status.user_name ?? "Unknown User",
+                        user_andrew_id: status.user_andrew_id ?? "",
                         oidc_subject: null,
                     };
                 }
@@ -80,7 +54,7 @@
         sessionCode = sessionCode.toUpperCase();
 
         const response = await fetch(
-            `${API_BASE}/session/join/${sessionCode}`,
+            apiUrl(`/session/join/${sessionCode}`),
             { cache: "no-store", credentials: "include" },
         );
 
@@ -93,11 +67,8 @@
         toVoter(sessionCode);
     }
 
-    async function handleSignInClick() {
-        await authClient.signIn.oauth2({
-            providerId: BETTER_AUTH_PROVIDER_ID,
-            callbackURL: window.location.origin,
-        });
+    function handleSignInClick() {
+        window.location.href = apiUrl("/auth/login");
     }
 
     async function handleCreateSessionClick() {
@@ -105,7 +76,7 @@
         createError = null;
 
         try {
-            const response = await fetch(`${API_BASE}/session/create`, {
+            const response = await fetch(apiUrl("/session/create"), {
                 cache: "no-store",
                 credentials: "include",
             });

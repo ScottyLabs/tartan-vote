@@ -12,8 +12,6 @@
     import { Event } from "./lib/models/Event";
     import { User } from "./lib/models/User";
 
-    const API_BASE = import.meta.env.VITE_API_BASE || "";
-
     type ActiveEvent = {
         id: number;
         name: string;

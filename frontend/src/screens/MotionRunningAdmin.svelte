@@ -1,5 +1,6 @@
 <script lang="ts">
     import MotionLiveResults from "../lib/components/motionLiveResults.svelte";
+    import { apiUrl } from "../lib/api/base";
 
     let {
         event,
@@ -19,8 +20,6 @@
         onEnd: () => void;
     } = $props();
 
-    const API_BASE = import.meta.env.VITE_API_BASE || "";
-
     let ending = $state(false);
     let error = $state<string | null>(null);
 
@@ -35,7 +34,7 @@
         error = null;
 
         try {
-            const response = await fetch(`${API_BASE}/events/${event.id}/end`, {
+            const response = await fetch(apiUrl(`/events/${event.id}/end`), {
                 cache: "no-store",
                 credentials: "include",
             });

@@ -7,7 +7,6 @@ Tartan Vote is a CMU Undergraduate Senate-commissioned, ScottyLabs-developed vot
 - Svelte
 - Rust
 - PostgreSQL
-- Better Auth
 
 ## Assumptions about the reader
 
@@ -55,14 +54,17 @@ direnv allow
 # or: devenv shell
 ```
 
-Start all dev processes:
+Run the app (inside the devenv shell, from the repo root):
 
 ```bash
 devenv up
-# or: devenv processes up
+# add --detach or -d to run it in the background
+# devenv processes down to shut it down
+cd frontend && deno task build
+cargo run
 ```
 
-This starts the API (`api`), Better Auth service (`auth`), and Svelte frontend (`frontend`). Inside the devenv shell, constants, host URLs, `DATABASE_URL`, and secrets are provided automatically.
+Then open http://localhost:8080. Inside the devenv shell, `DATABASE_URL` and secrets are provided automatically.
 
 ### Deployment
 

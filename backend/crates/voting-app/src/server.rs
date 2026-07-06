@@ -1,19 +1,20 @@
 use axum::{middleware, routing::get};
-use http::{HeaderValue, Method, header};
 use migration::{Migrator, MigratorTrait};
 use sea_orm::Database;
-use tower_http::cors::CorsLayer;
 use utoipa::OpenApi;
 use utoipa_axum::{router::OpenApiRouter, routes};
-use utoipa_swagger_ui::SwaggerUi;
+use utoipa_scalar::{Scalar, Servable};
 use voting_app_store::Store;
 
 use crate::core::openapi::ApiDoc;
 use crate::{AppState, config::Config};
 
-pub async fn setup() {
-    let config = Config::from_env().expect("failed to load configuration");
+#[utoipa::path(get, path = "/api/health", tag = "health", responses((status = OK, body = str)))]
+async fn health() -> &'static str {
+    "OK"
+}
 
+pub async fn setup(config: Config) {
     let db = Database::connect(&config.database_url)
         .await
         .expect("failed to connect to database");
@@ -28,39 +29,23 @@ pub async fn setup() {
 
     let bind_addr = app_state.config.bind_addr.clone();
 
-    let allowed_origins = app_state
-        .config
-        .cors_allowed_origins
-        .iter()
-        .map(|origin| {
-            origin
-                .parse::<HeaderValue>()
-                .expect("valid CORS_ALLOWED_ORIGINS entry")
-        })
-        .collect::<Vec<_>>();
-
-    let cors_layer = CorsLayer::new()
-        .allow_origin(allowed_origins)
-        .allow_methods([
-            Method::GET,
-            Method::POST,
-            Method::PUT,
-            Method::DELETE,
-            Method::OPTIONS,
-        ])
-        .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION, header::ACCEPT])
-        .allow_credentials(true);
-
     let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
         .routes(routes!(crate::domain::auth::handlers::auth_status))
         .routes(routes!(crate::domain::auth::bypass::bypass_login))
         .routes(routes!(crate::domain::auth::bypass::bypass_status))
         .routes(routes!(crate::domain::auth::bypass::bypass_logout))
+        .routes(routes!(health))
         .split_for_parts();
 
     let api_router = router
-        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", api))
-        .route("/", get(crate::domain::auth::handlers::demo_home)) // demo only
+        .merge(Scalar::with_url("/api/scalar", api.clone()))
+        .route(
+            "/api/openapi.json",
+            get(move || {
+                let api = api.clone();
+                async move { axum::Json(api) }
+            }),
+        )
         .route("/auth/login", get(crate::domain::auth::handlers::login))
         .route(
             "/auth/callback",
@@ -133,16 +118,13 @@ pub async fn setup() {
             "/events/{session_code}/check",
             get(crate::domain::event::handlers::check_event),
         )
-        .fallback(get(crate::domain::auth::handlers::demo_not_found)) // demo only
-        .layer(middleware::from_fn_with_state(
-            app_state.clone(),
-            crate::core::auth::middleware::sync_user_middleware,
-        ))
+        .route("/", get(crate::domain::auth::handlers::demo_home))
+        .fallback(get(crate::domain::auth::handlers::demo_not_found))
+        .layer(crate::core::cors::layer())
         .layer(middleware::from_fn_with_state(
             app_state.clone(),
             crate::domain::auth::bypass::bypass_auth_middleware,
         ))
-        .layer(cors_layer)
         .with_state(app_state);
 
     let listener = tokio::net::TcpListener::bind(&bind_addr)
