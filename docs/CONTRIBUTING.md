@@ -19,7 +19,7 @@ Direct pushes to main are blocked. You should create a branch (if you are a cont
 ## Style Guide
 
 - All Rust code should be formatted using `cargo fmt` and linted with `cargo clippy`. The CI/CD will check that all PR'ed code passes `cargo fmt` and `cargo clippy`.
-- All Svelte code should checked with `deno run check`. The CI/CD will automatically check this too.
+- All Svelte code should be checked with `deno task check`. The CI/CD will automatically check this too.
 
 ### Commit Guidelines
 
