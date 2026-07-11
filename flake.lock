@@ -325,22 +325,6 @@
         "type": "github"
       }
     },
-    "nixpkgs-deno": {
-      "locked": {
-        "lastModified": 1782281949,
-        "narHash": "sha256-LoO3M9NswSI10SUCGIBybW7xl+dfnknWkJTlVRuobJk=",
-        "owner": "ap-1",
-        "repo": "nixpkgs",
-        "rev": "d57f9b1e069ae53bb96724cf9fc4149c6415c4ee",
-        "type": "github"
-      },
-      "original": {
-        "owner": "ap-1",
-        "ref": "deno-keep-denort",
-        "repo": "nixpkgs",
-        "type": "github"
-      }
-    },
     "nixpkgs-src": {
       "flake": false,
       "locked": {
@@ -502,18 +486,18 @@
         "nixpkgs": [
           "nixpkgs"
         ],
-        "nixpkgs-deno": "nixpkgs-deno",
         "pyproject-build-systems": "pyproject-build-systems",
         "pyproject-nix": "pyproject-nix",
         "ricochet": "ricochet",
+        "treefmt-nix": "treefmt-nix_2",
         "uv2nix": "uv2nix"
       },
       "locked": {
-        "lastModified": 1782582869,
-        "narHash": "sha256-QLECiyhoEMA/4gMO2Eaj+sYcNhbglXBWU9E/fKgW6yQ=",
+        "lastModified": 1783726435,
+        "narHash": "sha256-aVSDtYdkBYuh41Os6d3bm7LWvXma6JDGFZ1IdiF1KQY=",
         "ref": "refs/heads/main",
-        "rev": "b86c886ac62ad5e80432c9733b94ad657476f05e",
-        "revCount": 51,
+        "rev": "899bba66256c81ec86087f9743511af3f373b136",
+        "revCount": 75,
         "type": "git",
         "url": "https://codeberg.org/ScottyLabs/devenv"
       },
@@ -538,6 +522,27 @@
         "owner": "numtide",
         "repo": "treefmt-nix",
         "rev": "790751ff7fd3801feeaf96d7dc416a8d581265ba",
+        "type": "github"
+      },
+      "original": {
+        "owner": "numtide",
+        "repo": "treefmt-nix",
+        "type": "github"
+      }
+    },
+    "treefmt-nix_2": {
+      "inputs": {
+        "nixpkgs": [
+          "scottylabs",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1780220602,
+        "narHash": "sha256-eynAfOmbmxJnkp7YewvCEbShNnnYJ9gLLqkzsYtBPeM=",
+        "owner": "numtide",
+        "repo": "treefmt-nix",
+        "rev": "db947814a175b7ca6ded66e21383d938df01c227",
         "type": "github"
       },
       "original": {

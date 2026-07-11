@@ -1,4 +1,6 @@
-# Svelte + TS + Vite
+# Svelte + TS + Vite frontend
+
+The active frontend is now the SvelteKit app in `frontend/`. The previous Vite app is preserved in `old-frontend/`.
 
 Note from the documenter (Yiyoung): I will edit this documentation eventually™. Some parts of this documentation are still helpful, though...
 

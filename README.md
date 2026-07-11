@@ -4,7 +4,7 @@ Tartan Vote is a CMU Undergraduate Senate-commissioned, ScottyLabs-developed vot
 
 ### Built With
 
-- Svelte
+- SvelteKit
 - Rust
 - PostgreSQL
 
