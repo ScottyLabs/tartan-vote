@@ -35,6 +35,9 @@
   cachix.enable = false;
 
   git-hooks.excludes = [ "old-frontend/.*" ];
+  git-hooks.hooks.deno-check.entry = lib.mkForce ''
+    bash -c 'cd frontend && args=(); for f in "$@"; do args+=("''${f#frontend/}"); done; deno check "''${args[@]}"' --
+  '';
   git-hooks.hooks.deno-test.entry = lib.mkForce "deno test --ignore=.devenv,.direnv,old-frontend --permit-no-files";
 
   treefmt.config.settings.excludes = [ "old-frontend/**" ];
