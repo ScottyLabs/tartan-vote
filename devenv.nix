@@ -1,14 +1,24 @@
-{ config, pkgs, lib, inputs, ... }:
+{
+  config,
+  pkgs,
+  lib,
+  inputs,
+  ...
+}:
 
 let
   denoPackages = pkgs.callPackage ./nix/deno-package.nix { };
 
-  cleanJsSrc = path:
+  cleanJsSrc =
+    path:
     lib.cleanSourceWith {
       src = path;
-      filter = p: _t:
-        let base = baseNameOf p;
-        in !(builtins.elem base [
+      filter =
+        p: _t:
+        let
+          base = baseNameOf p;
+        in
+        !(builtins.elem base [
           "node_modules"
           "package-lock.json"
           "dist"
@@ -31,7 +41,6 @@ in
 
     kennel.services.api = {
       customDomain = "api.tartan-vote.scottylabs.org";
-      oidc.redirectPaths = [ "/auth/callback" ];
     };
     kennel.services.auth = {
       customDomain = "auth.tartan-vote.scottylabs.org";
