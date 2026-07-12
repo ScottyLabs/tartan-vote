@@ -1,11 +1,21 @@
-use axum::{middleware, routing::get};
+use axum::{
+    Router, error_handling::HandleErrorLayer, middleware, response::IntoResponse, routing::get,
+};
+use axum_oidc::{OidcAuthLayer, OidcLoginLayer, error::MiddlewareError, handle_oidc_redirect};
 use migration::{Migrator, MigratorTrait};
 use sea_orm::Database;
+use tower::ServiceBuilder;
+use tower_sessions::{
+    Expiry, SessionManagerLayer,
+    cookie::{SameSite, time::Duration},
+};
+use tower_sessions_sqlx_store::PostgresStore;
 use utoipa::OpenApi;
 use utoipa_axum::{router::OpenApiRouter, routes};
 use utoipa_scalar::{Scalar, Servable};
 use voting_app_store::Store;
 
+use crate::core::auth::oidc::{self, GroupClaims, SessionWrapper};
 use crate::core::openapi::ApiDoc;
 use crate::{AppState, config::Config};
 
@@ -41,7 +51,7 @@ pub async fn setup(config: Config) {
         .routes(routes!(crate::domain::attendance::handlers::attendance))
         .split_for_parts();
 
-    let api_router = router
+    let base_router = router
         .merge(Scalar::with_url("/api/scalar", api.clone()))
         .route(
             "/api/openapi.json",
@@ -50,12 +60,6 @@ pub async fn setup(config: Config) {
                 async move { axum::Json(api) }
             }),
         )
-        .route("/auth/login", get(crate::domain::auth::handlers::login))
-        .route(
-            "/auth/callback",
-            get(crate::domain::auth::handlers::callback),
-        )
-        .route("/auth/logout", get(crate::domain::auth::handlers::logout))
         .route(
             "/events/{id}/vote",
             axum::routing::post(crate::domain::votes::handlers::cast_vote),
@@ -107,12 +111,80 @@ pub async fn setup(config: Config) {
             get(crate::domain::session::export::export_session_events_json),
         )
         .route("/", get(crate::domain::auth::handlers::demo_home))
-        .fallback(get(crate::domain::auth::handlers::demo_not_found))
-        .layer(crate::core::cors::layer())
+        .fallback(get(crate::domain::auth::handlers::demo_not_found));
+
+    // A server-side session store holds the OIDC token set (and is what `/auth/logout`
+    // flushes). Backed by the existing Postgres connection so sessions survive backend
+    // restarts/deploys and stay consistent across multiple instances. The session table
+    // is created on startup via `migrate()`.
+    let session_store = PostgresStore::new(app_state.db.get_postgres_connection_pool().clone());
+    session_store
+        .migrate()
+        .await
+        .expect("failed to run session store migrations");
+    let session_layer = SessionManagerLayer::new(session_store)
+        .with_secure(false)
+        .with_same_site(SameSite::Lax)
+        .with_expiry(Expiry::OnInactivity(Duration::hours(1)));
+
+    let auth_routes: Router<AppState> = if app_state.config.oidc.is_some() {
+        let login_layer = ServiceBuilder::new()
+            .layer(HandleErrorLayer::new(|e: MiddlewareError| async move {
+                tracing::error!("OIDC login error: {:?}", e);
+                e.into_response()
+            }))
+            .layer(OidcLoginLayer::<GroupClaims, SessionWrapper>::new());
+
+        Router::new()
+            .route(
+                "/auth/login",
+                get(crate::domain::auth::handlers::login).layer(login_layer),
+            )
+            .route(
+                "/auth/callback",
+                get(handle_oidc_redirect::<GroupClaims, SessionWrapper>),
+            )
+            .route("/auth/logout", get(crate::domain::auth::handlers::logout))
+    } else {
+        Router::new()
+            .route("/auth/login", get(crate::domain::auth::handlers::login))
+            .route(
+                "/auth/callback",
+                get(crate::domain::auth::handlers::callback),
+            )
+            .route("/auth/logout", get(crate::domain::auth::handlers::logout))
+    };
+
+    let mut api_router = base_router.merge(auth_routes);
+
+    if let Some(oidc_settings) = app_state.config.oidc.clone() {
+        let client = oidc::build_client(&oidc_settings)
+            .await
+            .expect("failed to build OIDC client (Keycloak discovery)");
+        tracing::info!("OIDC discovery completed");
+
+        let oidc_auth_layer = ServiceBuilder::new()
+            .layer(HandleErrorLayer::new(|e: MiddlewareError| async move {
+                tracing::error!("OIDC auth error: {:?}", e);
+                e.into_response()
+            }))
+            .layer(OidcAuthLayer::<GroupClaims, SessionWrapper>::new(client));
+
+        api_router = api_router
+            .layer(middleware::from_fn_with_state(
+                app_state.clone(),
+                crate::core::auth::middleware::sync_user_middleware,
+            ))
+            .layer(oidc_auth_layer);
+    }
+
+    let api_router = api_router
         .layer(middleware::from_fn_with_state(
             app_state.clone(),
             crate::domain::auth::bypass::bypass_auth_middleware,
         ))
+        .layer(session_layer)
+        .layer(crate::core::cors::layer())
         .with_state(app_state);
 
     let listener = tokio::net::TcpListener::bind(&bind_addr)

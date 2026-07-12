@@ -3,6 +3,7 @@ use axum::{
     response::{Html, IntoResponse, Redirect},
 };
 use serde::Serialize;
+use tower_sessions::Session;
 use utoipa::ToSchema;
 
 use crate::core::auth::middleware::SyncedUser;
@@ -19,13 +20,16 @@ pub async fn login() -> impl IntoResponse {
     Redirect::to("/")
 }
 
-// TODO: OIDC authorization-code callback. Exchange the code for tokens via the
-// Ricochet relay / Keycloak, establish a session, then redirect to the frontend.
+/// OIDC callback fallback used only when OIDC is not configured. When it is, the
+/// route is served by `axum_oidc::handle_oidc_redirect` instead (see `server.rs`).
 pub async fn callback() -> impl IntoResponse {
     Redirect::to("/")
 }
 
-pub async fn logout() -> impl IntoResponse {
+/// Clears the server-side session and returns to the app root. The Keycloak SSO
+/// session is left intact, so signing back in does not re-prompt for credentials.
+pub async fn logout(session: Session) -> impl IntoResponse {
+    let _ = session.flush().await;
     Redirect::to("/")
 }
 
