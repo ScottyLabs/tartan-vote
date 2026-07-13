@@ -11,24 +11,29 @@ use sea_orm::{
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashSet;
+use utoipa::ToSchema;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateEventRequest {
     pub name: String,
     #[serde(alias = "vote_type")]
     pub event_type: String,
+    #[schema(value_type = Option<String>, format = DateTime)]
     pub start_time: Option<chrono::DateTime<chrono::FixedOffset>>,
+    #[schema(value_type = Option<String>, format = DateTime)]
     pub end_time: Option<chrono::DateTime<chrono::FixedOffset>>,
     #[serde(default)]
+    #[schema(value_type = Object, nullable = true)]
     pub data: Option<serde_json::Value>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct CreateEventResponse {
     pub id: i32,
     pub name: String,
     pub event_type: EventType,
     pub status: StatusOption,
+    #[schema(value_type = String, format = DateTime)]
     pub start_time: chrono::DateTime<chrono::FixedOffset>,
 }
 
@@ -80,12 +85,38 @@ fn validate_proxy_assignments(
     Ok(())
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct EndEventResponse {
     pub id: i32,
     pub status: StatusOption,
 }
 
+#[derive(Debug, Serialize, ToSchema)]
+pub struct CheckEventActiveEvent {
+    pub id: i32,
+    pub name: String,
+    pub event_type: EventType,
+    #[schema(value_type = Object)]
+    pub data: serde_json::Value,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct CheckEventResponse {
+    pub active_event: Option<CheckEventActiveEvent>,
+}
+
+#[utoipa::path(
+    get,
+    path = "/events/{session_code}/check",
+    tag = "events",
+    params(
+        ("session_code" = String, Path, description = "Session join code")
+    ),
+    responses(
+        (status = 200, description = "Active event for the session, or null", body = CheckEventResponse),
+        (status = 404, description = "Session not found"),
+    )
+)]
 pub async fn check_event(
     _user: SyncedUser,
     State(state): State<AppState>,
@@ -110,21 +141,39 @@ pub async fn check_event(
     match store.events().find_active_by_session_id(session.id).await {
         Ok(Some(event)) => (
             StatusCode::OK,
-            Json(json!({
-                "active_event": {
-                    "id": event.id,
-                    "name": event.name,
-                    "event_type": event.event_type,
-                    "data": event.data,
-                }
-            })),
+            Json(CheckEventResponse {
+                active_event: Some(CheckEventActiveEvent {
+                    id: event.id,
+                    name: event.name,
+                    event_type: event.event_type,
+                    data: event.data,
+                }),
+            }),
         )
             .into_response(),
-        Ok(None) => (StatusCode::OK, Json(json!({ "active_event": null }))).into_response(),
+        Ok(None) => (
+            StatusCode::OK,
+            Json(CheckEventResponse { active_event: None }),
+        )
+            .into_response(),
         Err(_) => (StatusCode::INTERNAL_SERVER_ERROR).into_response(),
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/events/create/{session_code}",
+    tag = "events",
+    params(
+        ("session_code" = String, Path, description = "Session join code")
+    ),
+    request_body = CreateEventRequest,
+    responses(
+        (status = 201, description = "Event created", body = CreateEventResponse),
+        (status = 400, description = "Invalid event_type or proxy configuration"),
+        (status = 404, description = "Session not found"),
+    )
+)]
 pub async fn create_event(
     user: SyncedUser,
     State(state): State<AppState>,
@@ -356,6 +405,19 @@ pub async fn create_event(
         .into_response()
 }
 
+#[utoipa::path(
+    post,
+    path = "/events/{id}/end",
+    tag = "events",
+    params(
+        ("id" = i32, Path, description = "Event ID")
+    ),
+    responses(
+        (status = 200, description = "Event ended (or already inactive)", body = EndEventResponse),
+        (status = 403, description = "Only the event creator can end this event"),
+        (status = 404, description = "Event not found"),
+    )
+)]
 pub async fn end_event(
     user: SyncedUser,
     State(state): State<AppState>,

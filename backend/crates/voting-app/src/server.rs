@@ -35,6 +35,10 @@ pub async fn setup(config: Config) {
         .routes(routes!(crate::domain::auth::bypass::bypass_status))
         .routes(routes!(crate::domain::auth::bypass::bypass_logout))
         .routes(routes!(health))
+        .routes(routes!(crate::domain::event::handlers::create_event))
+        .routes(routes!(crate::domain::event::handlers::check_event))
+        .routes(routes!(crate::domain::event::handlers::end_event))
+        .routes(routes!(crate::domain::attendance::handlers::attendance))
         .split_for_parts();
 
     let api_router = router
@@ -73,19 +77,7 @@ pub async fn setup(config: Config) {
             "/events/{id}/export",
             get(crate::domain::votes::handlers::export_event_results),
         )
-        .route(
-            "/events/{id}/end",
-            axum::routing::get(crate::domain::event::handlers::end_event),
-        )
-        .route(
-            "/events/create/{session_code}",
-            axum::routing::post(crate::domain::event::handlers::create_event),
-        )
         .route("/health", get(|| async { "OK" }))
-        .route(
-            "/session/{session_code}/attendance",
-            get(crate::domain::attendance::handlers::attendance),
-        )
         .route(
             "/session/create",
             get(crate::domain::session::handlers::create_session),
@@ -113,10 +105,6 @@ pub async fn setup(config: Config) {
         .route(
             "/session/{session_code}/events/export",
             get(crate::domain::session::export::export_session_events_json),
-        )
-        .route(
-            "/events/{session_code}/check",
-            get(crate::domain::event::handlers::check_event),
         )
         .route("/", get(crate::domain::auth::handlers::demo_home))
         .fallback(get(crate::domain::auth::handlers::demo_not_found))
