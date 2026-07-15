@@ -1,0 +1,14 @@
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0436"
+reason = "No fixed version is available; pulled by utoipa-axum as a build-time proc-macro dependency. Revisit when upstream releases a fix or replacement."
+ignoreUntil = 2026-10-15
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0173"
+reason = "No fixed version is available; pulled by SeaORM derive macros through sea-bae/proc-macro-error2. Revisit when upstream releases a fix or replacement."
+ignoreUntil = 2026-10-15
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2023-0071"
+reason = "No fixed version is available; present through sqlx lockfile metadata for the unused MySQL path, while cargo tree shows no rsa dependency path for current or all targets."
+ignoreUntil = 2026-10-15

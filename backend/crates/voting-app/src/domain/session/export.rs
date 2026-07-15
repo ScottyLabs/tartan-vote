@@ -11,7 +11,6 @@ use axum::{
 use entity::enums::JoinLeft;
 use entity::event;
 use entity::session::{self, Entity as Session};
-use genpdf::elements::FrameCellDecorator;
 use sea_orm::{
     ColumnTrait, DatabaseConnection, DbBackend, EntityTrait, FromQueryResult, QueryFilter,
     QueryOrder, Statement,
@@ -142,34 +141,173 @@ async fn get_vote_counts(
     Some(counts.into_iter().map(|r| (r.option, r.count)).collect())
 }
 
-fn load_font_family() -> genpdf::fonts::FontFamily<genpdf::fonts::FontData> {
-    let font_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/fonts");
-    genpdf::fonts::FontFamily {
-        regular: genpdf::fonts::FontData::new(
-            std::fs::read(format!("{}/liberation-sans.regular.ttf", font_dir))
-                .expect("Failed to read regular font"),
-            None,
-        )
-        .expect("Failed to load regular font"),
-        bold: genpdf::fonts::FontData::new(
-            std::fs::read(format!("{}/liberation-sans.bold.ttf", font_dir))
-                .expect("Failed to read bold font"),
-            None,
-        )
-        .expect("Failed to load bold font"),
-        italic: genpdf::fonts::FontData::new(
-            std::fs::read(format!("{}/liberation-sans.italic.ttf", font_dir))
-                .expect("Failed to read italic font"),
-            None,
-        )
-        .expect("Failed to load italic font"),
-        bold_italic: genpdf::fonts::FontData::new(
-            std::fs::read(format!("{}/liberation-sans.bold-italic.ttf", font_dir))
-                .expect("Failed to read bold-italic font"),
-            None,
-        )
-        .expect("Failed to load bold-italic font"),
+#[derive(Clone, Copy)]
+enum PdfFont {
+    Helvetica,
+    Courier,
+}
+
+struct PdfLine {
+    font: PdfFont,
+    size: f32,
+    text: String,
+}
+
+impl PdfLine {
+    fn text(text: impl Into<String>) -> Self {
+        Self {
+            font: PdfFont::Helvetica,
+            size: 12.0,
+            text: text.into(),
+        }
     }
+
+    fn title(text: impl Into<String>) -> Self {
+        Self {
+            font: PdfFont::Helvetica,
+            size: 16.0,
+            text: text.into(),
+        }
+    }
+
+    fn table(text: impl Into<String>) -> Self {
+        Self {
+            font: PdfFont::Courier,
+            size: 9.0,
+            text: text.into(),
+        }
+    }
+}
+
+fn pdf_text(text: &str) -> String {
+    let mut escaped = String::with_capacity(text.len());
+    for ch in text.chars() {
+        match ch {
+            '(' | ')' | '\\' => {
+                escaped.push('\\');
+                escaped.push(ch);
+            }
+            '\n' | '\r' => escaped.push(' '),
+            ch if ch.is_ascii() && !ch.is_control() => escaped.push(ch),
+            _ => escaped.push('?'),
+        }
+    }
+    escaped
+}
+
+fn render_pdf(title: &str, lines: Vec<PdfLine>) -> Vec<u8> {
+    const PAGE_WIDTH: f32 = 612.0;
+    const PAGE_HEIGHT: f32 = 792.0;
+    const LEFT_MARGIN: f32 = 50.0;
+    const TOP_MARGIN: f32 = 50.0;
+    const BOTTOM_MARGIN: f32 = 50.0;
+
+    let mut pages = Vec::<String>::new();
+    let mut content = String::new();
+    let mut y = PAGE_HEIGHT - TOP_MARGIN;
+
+    for line in lines {
+        let line_height = line.size + 5.0;
+        if y - line_height < BOTTOM_MARGIN && !content.is_empty() {
+            pages.push(content);
+            content = String::new();
+            y = PAGE_HEIGHT - TOP_MARGIN;
+        }
+
+        let font_name = match line.font {
+            PdfFont::Helvetica => "F1",
+            PdfFont::Courier => "F2",
+        };
+        content.push_str(&format!(
+            "BT /{} {} Tf {} {} Td ({}) Tj ET\n",
+            font_name,
+            line.size,
+            LEFT_MARGIN,
+            y,
+            pdf_text(&line.text)
+        ));
+        y -= line_height;
+    }
+
+    if content.is_empty() {
+        content.push_str(&format!(
+            "BT /F1 12 Tf {} {} Td ({}) Tj ET\n",
+            LEFT_MARGIN,
+            PAGE_HEIGHT - TOP_MARGIN,
+            pdf_text(title)
+        ));
+    }
+    pages.push(content);
+
+    let page_count = pages.len();
+    let first_content_id = 5;
+    let first_page_id = first_content_id + page_count;
+    let mut objects = Vec::<String>::new();
+
+    objects.push("<< /Type /Catalog /Pages 2 0 R >>".to_string());
+
+    let kids = (0..page_count)
+        .map(|index| format!("{} 0 R", first_page_id + index))
+        .collect::<Vec<_>>()
+        .join(" ");
+    objects.push(format!(
+        "<< /Type /Pages /Kids [{}] /Count {} >>",
+        kids, page_count
+    ));
+    objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>".to_string());
+    objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>".to_string());
+
+    for page in &pages {
+        objects.push(format!(
+            "<< /Length {} >>\nstream\n{}endstream",
+            page.len(),
+            page
+        ));
+    }
+
+    for index in 0..page_count {
+        objects.push(format!(
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {} {}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents {} 0 R >>",
+            PAGE_WIDTH,
+            PAGE_HEIGHT,
+            first_content_id + index
+        ));
+    }
+
+    let mut pdf = String::from("%PDF-1.4\n");
+    let mut offsets = Vec::with_capacity(objects.len() + 1);
+    offsets.push(0);
+    for (index, object) in objects.iter().enumerate() {
+        offsets.push(pdf.len());
+        pdf.push_str(&format!("{} 0 obj\n{}\nendobj\n", index + 1, object));
+    }
+
+    let xref_offset = pdf.len();
+    pdf.push_str(&format!("xref\n0 {}\n", objects.len() + 1));
+    pdf.push_str("0000000000 65535 f \n");
+    for offset in offsets.iter().skip(1) {
+        pdf.push_str(&format!("{:010} 00000 n \n", offset));
+    }
+    pdf.push_str(&format!(
+        "trailer\n<< /Size {} /Root 1 0 R /Info << /Title ({}) >> >>\nstartxref\n{}\n%%EOF\n",
+        objects.len() + 1,
+        pdf_text(title),
+        xref_offset
+    ));
+
+    pdf.into_bytes()
+}
+
+fn fixed_width(value: &str, width: usize) -> String {
+    let mut value = value.replace(['\n', '\r'], " ");
+    if value.chars().count() > width {
+        value = value
+            .chars()
+            .take(width.saturating_sub(3))
+            .collect::<String>();
+        value.push_str("...");
+    }
+    format!("{value:<width$}")
 }
 
 fn build_attendance_csv(rows: &[AttendanceRow]) -> Vec<u8> {
@@ -204,116 +342,80 @@ fn build_vote_csv(counts: &[(String, i64)]) -> Vec<u8> {
 }
 
 fn build_attendance_pdf(session_code: &str, rows: &[AttendanceRow]) -> Vec<u8> {
-    let mut doc = genpdf::Document::new(load_font_family());
-    doc.set_title(format!("Session Attendance: {}", session_code));
-    let mut decorator = genpdf::SimplePageDecorator::new();
-    decorator.set_margins(10);
-    doc.set_page_decorator(decorator);
-
-    doc.push(genpdf::elements::Paragraph::new(format!(
-        "Session: {}",
-        session_code
-    )));
-    doc.push(genpdf::elements::Paragraph::new(format!(
-        "Total Attendees: {}",
-        rows.len()
-    )));
-    doc.push(genpdf::elements::Break::new(1));
-
-    doc.push(genpdf::elements::Paragraph::new("--- Attendance ---"));
-    let mut table = genpdf::elements::TableLayout::new(vec![1, 2, 2, 1, 3]);
-    table.set_cell_decorator(FrameCellDecorator::new(true, true, false));
-    let cell = |text: &str| {
-        genpdf::elements::PaddedElement::new(
-            genpdf::elements::Paragraph::new(text).aligned(genpdf::Alignment::Center),
-            genpdf::Margins::trbl(2, 1, 2, 1),
-        )
-    };
-
-    let mut header = table.row();
-    header.push_element(cell("User ID"));
-    header.push_element(cell("Name"));
-    header.push_element(cell("Andrew ID"));
-    header.push_element(cell("Proxy Holder"));
-    header.push_element(cell("Proxy For"));
-    header.push().expect("Failed to push header row");
+    let title = format!("Session Attendance: {}", session_code);
+    let mut lines = vec![
+        PdfLine::title(title.clone()),
+        PdfLine::text(format!("Session: {}", session_code)),
+        PdfLine::text(format!("Total Attendees: {}", rows.len())),
+        PdfLine::text(""),
+        PdfLine::text("--- Attendance ---"),
+        PdfLine::table(format!(
+            "{}  {}  {}  {}  {}",
+            fixed_width("User ID", 7),
+            fixed_width("Name", 18),
+            fixed_width("Andrew ID", 12),
+            fixed_width("Proxy", 6),
+            fixed_width("Proxy For", 28)
+        )),
+        PdfLine::table("-".repeat(82)),
+    ];
 
     for attendance_row in rows {
-        let mut table_row = table.row();
-        table_row.push_element(cell(&attendance_row.user.id.to_string()));
-        table_row.push_element(cell(&attendance_row.user.name));
-        table_row.push_element(cell(&attendance_row.user.andrew_id));
-        table_row.push_element(cell(if attendance_row.proxy_for.is_empty() {
-            "No"
-        } else {
-            "Yes"
-        }));
-        table_row.push_element(cell(&attendance_row.proxy_for.join(", ")));
-        table_row.push().expect("Failed to push row");
+        lines.push(PdfLine::table(format!(
+            "{}  {}  {}  {}  {}",
+            fixed_width(&attendance_row.user.id.to_string(), 7),
+            fixed_width(&attendance_row.user.name, 18),
+            fixed_width(&attendance_row.user.andrew_id, 12),
+            fixed_width(
+                if attendance_row.proxy_for.is_empty() {
+                    "No"
+                } else {
+                    "Yes"
+                },
+                6
+            ),
+            fixed_width(&attendance_row.proxy_for.join(", "), 28)
+        )));
     }
-    doc.push(table);
 
-    let mut buf = Vec::new();
-    doc.render(&mut buf).expect("Failed to render PDF");
-    buf
+    render_pdf(&title, lines)
 }
 
 fn build_vote_pdf(session_code: &str, counts: &[(String, i64)]) -> Vec<u8> {
     let total: i64 = counts.iter().map(|(_, c)| c).sum();
-    let mut doc = genpdf::Document::new(load_font_family());
-    doc.set_title(format!("Vote Results: {}", session_code));
-    let mut decorator = genpdf::SimplePageDecorator::new();
-    decorator.set_margins(10);
-    doc.set_page_decorator(decorator);
+    let title = format!("Vote Results: {}", session_code);
+    let mut lines = vec![
+        PdfLine::title(title.clone()),
+        PdfLine::text(format!("Session: {}", session_code)),
+        PdfLine::text(format!("Total Votes: {}", total)),
+        PdfLine::text(""),
+        PdfLine::text("--- Results ---"),
+    ];
 
-    doc.push(genpdf::elements::Paragraph::new(format!(
-        "Session: {}",
-        session_code
-    )));
-    doc.push(genpdf::elements::Paragraph::new(format!(
-        "Total Votes: {}",
-        total
-    )));
-    doc.push(genpdf::elements::Break::new(1));
-
-    doc.push(genpdf::elements::Paragraph::new("--- Results ---"));
     for (option, count) in counts {
         let pct = if total > 0 { count * 100 / total } else { 0 };
-        doc.push(genpdf::elements::Paragraph::new(format!(
-            "{}: {} ({}%)",
-            option, count, pct
+        lines.push(PdfLine::text(format!("{}: {} ({}%)", option, count, pct)));
+    }
+    lines.push(PdfLine::text(""));
+    lines.push(PdfLine::table(format!(
+        "{}  {}  {}",
+        fixed_width("Option", 36),
+        fixed_width("Count", 8),
+        fixed_width("%", 4)
+    )));
+    lines.push(PdfLine::table("-".repeat(54)));
+
+    for (option, count) in counts {
+        let pct = if total > 0 { count * 100 / total } else { 0 };
+        lines.push(PdfLine::table(format!(
+            "{}  {}  {}",
+            fixed_width(option, 36),
+            fixed_width(&count.to_string(), 8),
+            fixed_width(&format!("{}%", pct), 4)
         )));
     }
-    doc.push(genpdf::elements::Break::new(1));
 
-    let mut table = genpdf::elements::TableLayout::new(vec![3, 1, 1]);
-    table.set_cell_decorator(FrameCellDecorator::new(true, true, false));
-    let cell = |text: &str| {
-        genpdf::elements::PaddedElement::new(
-            genpdf::elements::Paragraph::new(text).aligned(genpdf::Alignment::Center),
-            genpdf::Margins::trbl(2, 1, 2, 1),
-        )
-    };
-
-    let mut header = table.row();
-    header.push_element(cell("Option"));
-    header.push_element(cell("Count"));
-    header.push_element(cell("%"));
-    header.push().expect("Failed to push header row");
-
-    for (option, count) in counts {
-        let pct = if total > 0 { count * 100 / total } else { 0 };
-        let mut row = table.row();
-        row.push_element(cell(option));
-        row.push_element(cell(&count.to_string()));
-        row.push_element(cell(&format!("{}%", pct)));
-        row.push().expect("Failed to push row");
-    }
-    doc.push(table);
-
-    let mut buf = Vec::new();
-    doc.render(&mut buf).expect("Failed to render PDF");
-    buf
+    render_pdf(&title, lines)
 }
 
 async fn get_attendance_rows_with_store(store: &Store, session_code: &str) -> Vec<AttendanceRow> {
@@ -621,7 +723,7 @@ mod integration_tests {
     }
 
     #[tokio::test]
-    #[ignore = "requires DATABASE_URL and font files"]
+    #[ignore = "requires DATABASE_URL"]
     async fn test_attendance_pdf_with_db() {
         let db = test_db().await;
         let code = "ATST01";
@@ -779,7 +881,7 @@ mod integration_tests {
     // --- vote PDF / CSV ---
 
     #[tokio::test]
-    #[ignore = "requires DATABASE_URL and font files"]
+    #[ignore = "requires DATABASE_URL"]
     async fn test_vote_pdf_single() {
         let db = test_db().await;
         let code = "VTST01";
@@ -830,7 +932,7 @@ mod integration_tests {
     }
 
     #[tokio::test]
-    #[ignore = "requires DATABASE_URL and font files"]
+    #[ignore = "requires DATABASE_URL"]
     async fn test_vote_pdf_split_votes() {
         // 10 voters: 5 pass, 3 reject, 2 abstain
         let db = test_db().await;
@@ -905,7 +1007,7 @@ mod integration_tests {
     // --- attendance PDF / CSV ---
 
     #[tokio::test]
-    #[ignore = "requires DATABASE_URL and font files"]
+    #[ignore = "requires DATABASE_URL"]
     async fn test_attendance_pdf_single() {
         let db = test_db().await;
         let code = "ATST01";
@@ -954,7 +1056,7 @@ mod integration_tests {
     }
 
     #[tokio::test]
-    #[ignore = "requires DATABASE_URL and font files"]
+    #[ignore = "requires DATABASE_URL"]
     async fn test_attendance_pdf_many_users() {
         // 10 users all joined
         let db = test_db().await;
@@ -1023,7 +1125,7 @@ mod integration_tests {
     }
 
     #[tokio::test]
-    #[ignore = "requires DATABASE_URL and font files"]
+    #[ignore = "requires DATABASE_URL"]
     async fn test_vote_pdf_large() {
         // 20 voters: 12 pass, 5 reject, 3 abstain
         let db = test_db().await;
@@ -1166,10 +1268,9 @@ mod tests {
         assert!(csv.contains("pass,0,0"));
     }
 
-    // --- attendance PDF (requires fonts) ---
+    // --- attendance PDF ---
 
     #[test]
-    #[ignore = "requires LiberationSans font files in ./fonts directory"]
     fn test_attendance_pdf_returns_bytes() {
         let rows = vec![
             mock_attendance_row(1, "Alice", "alice1", vec![]),
@@ -1181,7 +1282,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "requires LiberationSans font files in ./fonts directory"]
     fn test_attendance_pdf_empty() {
         let bytes = build_attendance_pdf("ABC123", &[]);
         assert!(!bytes.is_empty());
@@ -1200,10 +1300,9 @@ mod tests {
         std::fs::write("/tmp/test_attendance.pdf", &bytes).expect("Failed to write PDF");
     }
 
-    // --- vote PDF (requires fonts) ---
+    // --- vote PDF ---
 
     #[test]
-    #[ignore = "requires LiberationSans font files in ./fonts directory"]
     fn test_vote_pdf_returns_bytes() {
         let counts = vec![
             ("pass".to_string(), 6),
@@ -1216,7 +1315,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "requires LiberationSans font files in ./fonts directory"]
     fn test_vote_pdf_empty() {
         let bytes = build_vote_pdf("ABC123", &[]);
         assert!(!bytes.is_empty());

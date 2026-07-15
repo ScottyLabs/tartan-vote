@@ -6,4 +6,4 @@ license.workspace = true
 
 [dependencies]
 entity = { version = "0.1.0", path = "../entity"}
-sea-orm = "=2.0.0-rc.37"
+sea-orm = { version = "=2.0.0-rc.37", default-features = false, features = ["macros", "runtime-tokio-rustls", "sqlx-postgres", "with-chrono", "with-json"] }
