@@ -74,3 +74,52 @@ impl From<(StatusCode, String)> for AppError {
         AppError::with_status(status, message)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    async fn response_json(response: Response) -> serde_json::Value {
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("response body should be readable");
+        serde_json::from_slice(&bytes).expect("response body should be JSON")
+    }
+
+    #[tokio::test]
+    async fn app_error_returns_consistent_json_body() {
+        let response = AppError::bad_request("Invalid vote option").into_response();
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        let body = response_json(response).await;
+        assert_eq!(body, json!({ "error": "Invalid vote option" }));
+    }
+
+    #[tokio::test]
+    async fn app_error_maps_common_status_codes() {
+        let cases = [
+            (AppError::not_found("missing"), StatusCode::NOT_FOUND),
+            (AppError::forbidden("nope"), StatusCode::FORBIDDEN),
+            (AppError::conflict("exists"), StatusCode::CONFLICT),
+            (
+                AppError::internal("failed"),
+                StatusCode::INTERNAL_SERVER_ERROR,
+            ),
+        ];
+
+        for (error, expected_status) in cases {
+            let response = error.into_response();
+            assert_eq!(response.status(), expected_status);
+        }
+    }
+
+    #[tokio::test]
+    async fn db_errors_do_not_leak_internal_details() {
+        let error = AppError::from(DbErr::Custom("connection string leaked here".to_string()));
+        let response = error.into_response();
+
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        let body = response_json(response).await;
+        assert_eq!(body, json!({ "error": "Database error" }));
+    }
+}
