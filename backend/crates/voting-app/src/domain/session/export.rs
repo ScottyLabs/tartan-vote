@@ -1,5 +1,6 @@
 use crate::AppState;
 use crate::core::auth::middleware::SyncedUser;
+use crate::core::error::AppError;
 use crate::domain::attendance::handlers::get_attendance;
 use axum::{
     Json,
@@ -391,28 +392,12 @@ pub async fn export_session_data(
     _user: SyncedUser,
     State(state): State<AppState>,
     Path((session_code, kind, format)): Path<(String, String, String)>,
-) -> impl IntoResponse {
-    let kind = match ExportKind::parse(&kind) {
-        Some(kind) => kind,
-        None => {
-            return (
-                StatusCode::BAD_REQUEST,
-                "Invalid export kind. Use 'attendance' or 'vote'.",
-            )
-                .into_response();
-        }
-    };
+) -> Result<impl IntoResponse, AppError> {
+    let kind = ExportKind::parse(&kind)
+        .ok_or_else(|| AppError::bad_request("Invalid export kind. Use 'attendance' or 'vote'."))?;
 
-    let format = match ExportFormat::parse(&format) {
-        Some(format) => format,
-        None => {
-            return (
-                StatusCode::BAD_REQUEST,
-                "Invalid export format. Use 'pdf' or 'csv'.",
-            )
-                .into_response();
-        }
-    };
+    let format = ExportFormat::parse(&format)
+        .ok_or_else(|| AppError::bad_request("Invalid export format. Use 'pdf' or 'csv'."))?;
 
     let bytes = match (kind, format) {
         (ExportKind::Attendance, ExportFormat::Pdf) => {
@@ -440,18 +425,10 @@ pub async fn export_session_data(
     );
 
     let content_disposition =
-        match HeaderValue::from_str(&format!("attachment; filename=\"{}\"", filename)) {
-            Ok(value) => value,
-            Err(_) => {
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "Failed to build response headers",
-                )
-                    .into_response();
-            }
-        };
+        HeaderValue::from_str(&format!("attachment; filename=\"{}\"", filename))
+            .map_err(|_| AppError::internal("Failed to build response headers"))?;
 
-    (
+    Ok((
         StatusCode::OK,
         [
             (
@@ -462,77 +439,39 @@ pub async fn export_session_data(
         ],
         bytes,
     )
-        .into_response()
+        .into_response())
 }
 
 pub async fn export_session_events_json(
     user: SyncedUser,
     State(state): State<AppState>,
     Path(session_code): Path<String>,
-) -> impl IntoResponse {
-    let session = match Session::find()
+) -> Result<impl IntoResponse, AppError> {
+    let session = Session::find()
         .filter(session::Column::JoinCode.eq(session_code.clone()))
         .one(&state.db)
-        .await
-    {
-        Ok(Some(session)) => session,
-        Ok(None) => {
-            return (
-                StatusCode::NOT_FOUND,
-                Json(serde_json::json!({"error": "Session not found"})),
-            )
-                .into_response();
-        }
-        Err(_) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": "Database error"})),
-            )
-                .into_response();
-        }
-    };
+        .await?
+        .ok_or_else(|| AppError::not_found("Session not found"))?;
 
     if session.created_by_user_id != user.0.id {
-        return (
-            StatusCode::FORBIDDEN,
-            Json(serde_json::json!({"error": "Only the session host may export events"})),
-        )
-            .into_response();
+        return Err(AppError::forbidden(
+            "Only the session host may export events",
+        ));
     }
 
-    let events = match entity::prelude::Event::find()
+    let events = entity::prelude::Event::find()
         .filter(event::Column::SessionId.eq(session.id))
         .order_by_asc(event::Column::StartTime)
         .all(&state.db)
-        .await
-    {
-        Ok(events) => events,
-        Err(_) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": "Database error"})),
-            )
-                .into_response();
-        }
-    };
+        .await?;
 
     let mut event_exports = Vec::with_capacity(events.len());
 
     for session_event in events {
-        let vote_rows = match entity::prelude::Vote::find()
+        let vote_rows = entity::prelude::Vote::find()
             .filter(entity::vote::Column::EventId.eq(session_event.id))
             .all(&state.db)
-            .await
-        {
-            Ok(rows) => rows,
-            Err(_) => {
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(serde_json::json!({"error": "Database error"})),
-                )
-                    .into_response();
-            }
-        };
+            .await?;
 
         let option_labels = session_event
             .data
@@ -591,7 +530,7 @@ pub async fn export_session_events_json(
         });
     }
 
-    (
+    Ok((
         StatusCode::OK,
         Json(SessionEventsExportResponse {
             session_code,
@@ -599,7 +538,7 @@ pub async fn export_session_events_json(
             events: event_exports,
         }),
     )
-        .into_response()
+        .into_response())
 }
 
 #[cfg(test)]

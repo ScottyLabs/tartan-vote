@@ -1,9 +1,9 @@
 use crate::AppState;
 use crate::core::auth::middleware::SyncedUser;
+use crate::core::error::AppError;
 use axum::{
     Json,
     extract::{Path, State},
-    http::StatusCode,
 };
 use entity::enums::JoinLeft;
 use serde::Serialize;
@@ -30,34 +30,18 @@ pub struct AttendanceResponse {
 pub async fn get_attendance(
     store: &Store,
     session_code: &str,
-) -> Result<Vec<entity::user::Model>, (StatusCode, String)> {
-    let session = match store
+) -> Result<Vec<entity::user::Model>, AppError> {
+    let session = store
         .sessions()
         .find_by_join_code(session_code.to_string())
-        .await
-    {
-        Ok(Some(session)) => session,
-        Ok(None) => {
-            return Err((StatusCode::NOT_FOUND, "Session not found".to_string()));
-        }
-        Err(err) => {
-            return Err((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Failed to fetch session: {err}"),
-            ));
-        }
-    };
+        .await?
+        .ok_or_else(|| AppError::not_found("Session not found"))?;
 
     store
         .user_sessions()
         .get_distinct_users(session.id)
         .await
-        .map_err(|err| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Failed to fetch attendance: {err}"),
-            )
-        })
+        .map_err(Into::into)
 }
 
 #[utoipa::path(
@@ -77,32 +61,20 @@ pub async fn attendance(
     _user: SyncedUser,
     State(state): State<AppState>,
     Path(session_code): Path<String>,
-) -> Result<Json<AttendanceResponse>, (StatusCode, String)> {
+) -> Result<Json<AttendanceResponse>, AppError> {
     let session = state
         .store
         .sessions()
         .find_by_join_code(session_code.clone())
-        .await
-        .map_err(|err| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Failed to fetch session: {err}"),
-            )
-        })?
-        .ok_or((StatusCode::NOT_FOUND, "Session not found".to_string()))?;
+        .await?
+        .ok_or_else(|| AppError::not_found("Session not found"))?;
 
     let users = get_attendance(&state.store, &session_code).await?;
     let user_session_rows = state
         .store
         .user_sessions()
         .fetch_by_session_id(session.id)
-        .await
-        .map_err(|err| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Failed to fetch user sessions: {err}"),
-            )
-        })?;
+        .await?;
 
     let mut proxy_map: HashMap<i32, Vec<String>> = HashMap::new();
     for row in user_session_rows {

@@ -6,78 +6,71 @@ use axum::{
 use sea_orm::DbErr;
 use serde_json::json;
 
-pub struct AppError {
-    status: StatusCode,
-    message: String,
+#[derive(Debug)]
+pub enum AppError {
+    NotFound(String),
+    Forbidden(String),
+    BadRequest(String),
+    Conflict(String),
+    Internal(String),
+    WithStatus { status: StatusCode, message: String },
 }
 
 impl AppError {
-    //404, 403, 400, 409, 500, 401, 502, 503
     pub fn not_found(msg: impl Into<String>) -> Self {
-        Self {
-            status: StatusCode::NOT_FOUND,
-            message: msg.into(),
-        }
+        Self::NotFound(msg.into())
     }
+
     pub fn forbidden(msg: impl Into<String>) -> Self {
-        Self {
-            status: StatusCode::FORBIDDEN,
-            message: msg.into(),
-        }
+        Self::Forbidden(msg.into())
     }
+
     pub fn bad_request(msg: impl Into<String>) -> Self {
-        Self {
-            status: StatusCode::BAD_REQUEST,
-            message: msg.into(),
-        }
+        Self::BadRequest(msg.into())
     }
+
     pub fn conflict(msg: impl Into<String>) -> Self {
-        Self {
-            status: StatusCode::CONFLICT,
-            message: msg.into(),
-        }
+        Self::Conflict(msg.into())
     }
+
     pub fn internal(msg: impl Into<String>) -> Self {
-        Self {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            message: msg.into(),
-        }
+        Self::Internal(msg.into())
     }
-    pub fn unauthorized(msg: impl Into<String>) -> Self {
-        Self {
-            status: StatusCode::UNAUTHORIZED,
-            message: msg.into(),
-        }
-    }
-    pub fn bad_gateway(msg: impl Into<String>) -> Self {
-        Self {
-            status: StatusCode::BAD_GATEWAY,
-            message: msg.into(),
-        }
-    }
-    pub fn service_unavailable(msg: impl Into<String>) -> Self {
-        Self {
-            status: StatusCode::SERVICE_UNAVAILABLE,
-            message: msg.into(),
-        }
-    }
-    //generic constructor
+
     pub fn with_status(status: StatusCode, msg: impl Into<String>) -> Self {
-        Self {
+        Self::WithStatus {
             status,
             message: msg.into(),
+        }
+    }
+
+    fn status_and_message(self) -> (StatusCode, String) {
+        match self {
+            Self::NotFound(message) => (StatusCode::NOT_FOUND, message),
+            Self::Forbidden(message) => (StatusCode::FORBIDDEN, message),
+            Self::BadRequest(message) => (StatusCode::BAD_REQUEST, message),
+            Self::Conflict(message) => (StatusCode::CONFLICT, message),
+            Self::Internal(message) => (StatusCode::INTERNAL_SERVER_ERROR, message),
+            Self::WithStatus { status, message } => (status, message),
         }
     }
 }
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
-        (self.status, Json(json!({"error": self.message}))).into_response()
+        let (status, message) = self.status_and_message();
+        (status, Json(json!({"error": message}))).into_response()
     }
 }
 
 impl From<DbErr> for AppError {
-    fn from(err: DbErr) -> Self {
-        AppError::internal(err.to_string())
+    fn from(_err: DbErr) -> Self {
+        AppError::internal("Database error")
+    }
+}
+
+impl From<(StatusCode, String)> for AppError {
+    fn from((status, message): (StatusCode, String)) -> Self {
+        AppError::with_status(status, message)
     }
 }

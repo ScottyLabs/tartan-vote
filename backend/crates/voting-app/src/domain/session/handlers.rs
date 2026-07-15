@@ -1,5 +1,6 @@
 use crate::AppState;
 use crate::core::auth::middleware::SyncedUser;
+use crate::core::error::AppError;
 use axum::{Json, extract::Path, extract::State, http::StatusCode, response::IntoResponse};
 use entity::enums::{JoinLeft, SessionStatus};
 use entity::{session, user_session};
@@ -34,7 +35,10 @@ pub struct SetSessionProxyResponse {
     pub has_proxy: bool,
 }
 
-pub async fn create_session(user: SyncedUser, State(state): State<AppState>) -> impl IntoResponse {
+pub async fn create_session(
+    user: SyncedUser,
+    State(state): State<AppState>,
+) -> Result<impl IntoResponse, AppError> {
     let store = &state.store;
 
     let session_code = petname::petname(2, "-").expect("Failed to generate session code");
@@ -48,86 +52,75 @@ pub async fn create_session(user: SyncedUser, State(state): State<AppState>) -> 
         created_by_user_id: Set(user.0.id),
         ..Default::default()
     };
-    match store.sessions().create(session).await {
-        Ok(session) => (
-            StatusCode::CREATED,
-            Json(CreateSessionResponse {
-                session_code: session.join_code,
-            }),
-        )
-            .into_response(),
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR).into_response(),
-    }
+    let session = store.sessions().create(session).await?;
+
+    Ok((
+        StatusCode::CREATED,
+        Json(CreateSessionResponse {
+            session_code: session.join_code,
+        }),
+    )
+        .into_response())
 }
 
 pub async fn status_session(
     _user: SyncedUser,
     State(state): State<AppState>,
     Path(session_code): Path<String>,
-) -> impl IntoResponse {
+) -> Result<impl IntoResponse, AppError> {
     let store = &state.store;
 
-    match store.sessions().find_by_join_code(session_code).await {
-        Ok(Some(session)) => (
-            StatusCode::OK,
-            Json(json!({ "session_ended": session.status == SessionStatus::Closed })),
-        )
-            .into_response(),
-        Ok(None) => (
-            StatusCode::NOT_FOUND,
-            Json(json!({"error": "Session not found"})),
-        )
-            .into_response(),
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR).into_response(),
-    }
+    let session = store
+        .sessions()
+        .find_by_join_code(session_code)
+        .await?
+        .ok_or_else(|| AppError::not_found("Session not found"))?;
+
+    Ok((
+        StatusCode::OK,
+        Json(json!({ "session_ended": session.status == SessionStatus::Closed })),
+    )
+        .into_response())
 }
 
 pub async fn join_session(
     user: SyncedUser,
     State(state): State<AppState>,
     Path(session_code): Path<String>,
-) -> impl IntoResponse {
+) -> Result<impl IntoResponse, AppError> {
     let store = &state.store;
 
-    match store.sessions().find_by_join_code(session_code).await {
-        Ok(Some(session)) => {
-            if session.status != SessionStatus::Open {
-                return (
-                    StatusCode::FORBIDDEN,
-                    Json(json!({"error": "Session is not open"})),
-                )
-                    .into_response();
-            }
+    let session = store
+        .sessions()
+        .find_by_join_code(session_code)
+        .await?
+        .ok_or_else(|| AppError::not_found("Session not found"))?;
 
-            let existing_joined_instance = entity::prelude::UserSession::find()
-                .filter(user_session::Column::SessionId.eq(session.id))
-                .filter(user_session::Column::UserId.eq(user.0.id))
-                .filter(user_session::Column::JoinLeft.eq(JoinLeft::Joined))
-                .filter(user_session::Column::Proxy.is_null())
-                .one(store.db())
-                .await;
-
-            match existing_joined_instance {
-                Ok(Some(_)) => return StatusCode::OK.into_response(),
-                Ok(None) => {}
-                Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
-            }
-
-            let new_user_session = user_session::ActiveModel {
-                user_id: Set(user.0.id),
-                session_id: Set(session.id),
-                join_left: Set(JoinLeft::Joined),
-                ..Default::default()
-            };
-
-            match store.user_sessions().create(new_user_session).await {
-                Ok(_) => (StatusCode::OK).into_response(),
-                Err(_) => (StatusCode::INTERNAL_SERVER_ERROR).into_response(),
-            }
-        }
-        Ok(None) => (StatusCode::NOT_FOUND).into_response(),
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR).into_response(),
+    if session.status != SessionStatus::Open {
+        return Err(AppError::forbidden("Session is not open"));
     }
+
+    let existing_joined_instance = entity::prelude::UserSession::find()
+        .filter(user_session::Column::SessionId.eq(session.id))
+        .filter(user_session::Column::UserId.eq(user.0.id))
+        .filter(user_session::Column::JoinLeft.eq(JoinLeft::Joined))
+        .filter(user_session::Column::Proxy.is_null())
+        .one(store.db())
+        .await?;
+
+    if existing_joined_instance.is_some() {
+        return Ok(StatusCode::OK.into_response());
+    }
+
+    let new_user_session = user_session::ActiveModel {
+        user_id: Set(user.0.id),
+        session_id: Set(session.id),
+        join_left: Set(JoinLeft::Joined),
+        ..Default::default()
+    };
+
+    store.user_sessions().create(new_user_session).await?;
+    Ok(StatusCode::OK.into_response())
 }
 
 fn normalize_proxy_for(proxy_for: Option<&str>) -> Option<String> {
@@ -141,53 +134,27 @@ pub async fn set_session_proxy(
     State(state): State<AppState>,
     Path(session_code): Path<String>,
     Json(body): Json<SetSessionProxyRequest>,
-) -> impl IntoResponse {
+) -> Result<impl IntoResponse, AppError> {
     let store = &state.store;
 
-    let session = match store.sessions().find_by_join_code(session_code).await {
-        Ok(Some(session)) => session,
-        Ok(None) => {
-            return (
-                StatusCode::NOT_FOUND,
-                Json(json!({"error": "Session not found"})),
-            )
-                .into_response();
-        }
-        Err(_) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"error": "Database error"})),
-            )
-                .into_response();
-        }
-    };
+    let session = store
+        .sessions()
+        .find_by_join_code(session_code)
+        .await?
+        .ok_or_else(|| AppError::not_found("Session not found"))?;
 
     if session.status != SessionStatus::Open {
-        return (
-            StatusCode::FORBIDDEN,
-            Json(json!({"error": "Session is not open"})),
-        )
-            .into_response();
+        return Err(AppError::forbidden("Session is not open"));
     }
 
     let proxy_for = normalize_proxy_for(body.proxy_for.as_deref());
 
-    let existing_instances = match entity::prelude::UserSession::find()
+    let existing_instances = entity::prelude::UserSession::find()
         .filter(user_session::Column::SessionId.eq(session.id))
         .filter(user_session::Column::UserId.eq(user.0.id))
         .filter(user_session::Column::JoinLeft.eq(JoinLeft::Joined))
         .all(store.db())
-        .await
-    {
-        Ok(instances) => instances,
-        Err(_) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"error": "Database error"})),
-            )
-                .into_response();
-        }
-    };
+        .await?;
 
     let mut base_instances = existing_instances
         .iter()
@@ -209,27 +176,18 @@ pub async fn set_session_proxy(
                 ..Default::default()
             };
 
-            if store.user_sessions().create(base).await.is_err() {
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(json!({"error": "Failed to ensure senator vote instance"})),
-                )
-                    .into_response();
-            }
+            store
+                .user_sessions()
+                .create(base)
+                .await
+                .map_err(|_| AppError::internal("Failed to ensure senator vote instance"))?;
         }
     } else {
         for base in &base_instances {
-            if entity::prelude::UserSession::delete_by_id(base.id)
+            entity::prelude::UserSession::delete_by_id(base.id)
                 .exec(store.db())
                 .await
-                .is_err()
-            {
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(json!({"error": "Failed to remove non-senator vote instance"})),
-                )
-                    .into_response();
-            }
+                .map_err(|_| AppError::internal("Failed to remove non-senator vote instance"))?;
         }
         base_instances.clear();
     }
@@ -240,13 +198,10 @@ pub async fn set_session_proxy(
                 let mut proxy_model: user_session::ActiveModel = proxy_instance.clone().into();
                 proxy_model.proxy = Set(Some(proxy_for_value));
 
-                if proxy_model.update(store.db()).await.is_err() {
-                    return (
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        Json(json!({"error": "Failed to update proxy vote instance"})),
-                    )
-                        .into_response();
-                }
+                proxy_model
+                    .update(store.db())
+                    .await
+                    .map_err(|_| AppError::internal("Failed to update proxy vote instance"))?;
             } else {
                 let proxy_instance = user_session::ActiveModel {
                     user_id: Set(user.0.id),
@@ -256,51 +211,32 @@ pub async fn set_session_proxy(
                     ..Default::default()
                 };
 
-                if store.user_sessions().create(proxy_instance).await.is_err() {
-                    return (
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        Json(json!({"error": "Failed to add proxy vote instance"})),
-                    )
-                        .into_response();
-                }
+                store
+                    .user_sessions()
+                    .create(proxy_instance)
+                    .await
+                    .map_err(|_| AppError::internal("Failed to add proxy vote instance"))?;
             }
         }
         None => {
             for proxy_instance in &proxy_instances {
-                if entity::prelude::UserSession::delete_by_id(proxy_instance.id)
+                entity::prelude::UserSession::delete_by_id(proxy_instance.id)
                     .exec(store.db())
                     .await
-                    .is_err()
-                {
-                    return (
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        Json(json!({"error": "Failed to remove proxy vote instance"})),
-                    )
-                        .into_response();
-                }
+                    .map_err(|_| AppError::internal("Failed to remove proxy vote instance"))?;
             }
             proxy_instances.clear();
         }
     }
 
-    let final_instances = match entity::prelude::UserSession::find()
+    let final_instances = entity::prelude::UserSession::find()
         .filter(user_session::Column::SessionId.eq(session.id))
         .filter(user_session::Column::UserId.eq(user.0.id))
         .filter(user_session::Column::JoinLeft.eq(JoinLeft::Joined))
         .all(store.db())
-        .await
-    {
-        Ok(instances) => instances,
-        Err(_) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"error": "Database error"})),
-            )
-                .into_response();
-        }
-    };
+        .await?;
 
-    (
+    Ok((
         StatusCode::OK,
         Json(SetSessionProxyResponse {
             vote_instance_count: final_instances.len(),
@@ -310,55 +246,52 @@ pub async fn set_session_proxy(
                 .any(|instance| instance.proxy.is_some()),
         }),
     )
-        .into_response()
+        .into_response())
 }
 
 pub async fn end_session(
     user: SyncedUser,
     State(state): State<AppState>,
     Path(session_code): Path<String>,
-) -> impl IntoResponse {
+) -> Result<impl IntoResponse, AppError> {
     let store = &state.store;
 
-    let session = match store
+    let session = store
         .sessions()
         .find_by_join_code(session_code.clone())
-        .await
-    {
-        Ok(Some(session)) => session,
-        Ok(None) => return (StatusCode::NOT_FOUND).into_response(),
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR).into_response(),
-    };
+        .await?
+        .ok_or_else(|| AppError::not_found("Session not found"))?;
 
     if session.created_by_user_id != user.0.id {
-        return (StatusCode::FORBIDDEN).into_response();
+        return Err(AppError::forbidden(
+            "Only the session creator can end this session",
+        ));
     }
 
     if session.status == SessionStatus::Closed {
-        return (
+        return Ok((
             StatusCode::OK,
             Json(EndSessionResponse {
                 session_code,
                 status: SessionStatus::Closed,
             }),
         )
-            .into_response();
+            .into_response());
     }
 
     let mut session_to_update = session.into_active_model();
     session_to_update.status = Set(SessionStatus::Closed);
 
-    match store.sessions().update(session_to_update).await {
-        Ok(updated) => (
-            StatusCode::OK,
-            Json(EndSessionResponse {
-                session_code: updated.join_code,
-                status: updated.status,
-            }),
-        )
-            .into_response(),
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR).into_response(),
-    }
+    let updated = store.sessions().update(session_to_update).await?;
+
+    Ok((
+        StatusCode::OK,
+        Json(EndSessionResponse {
+            session_code: updated.join_code,
+            status: updated.status,
+        }),
+    )
+        .into_response())
 }
 
 #[cfg(test)]

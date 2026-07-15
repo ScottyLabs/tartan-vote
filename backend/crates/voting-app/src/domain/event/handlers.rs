@@ -1,5 +1,6 @@
 use crate::AppState;
 use crate::core::auth::middleware::SyncedUser;
+use crate::core::error::AppError;
 use axum::{Json, extract::Path, extract::State, http::StatusCode, response::IntoResponse};
 use chrono::{FixedOffset, Utc};
 use entity::enums::{EventType, StatusOption};
@@ -121,43 +122,28 @@ pub async fn check_event(
     _user: SyncedUser,
     State(state): State<AppState>,
     Path(session_code): Path<String>,
-) -> impl IntoResponse {
+) -> Result<impl IntoResponse, AppError> {
     let store = &state.store;
 
-    let session = match store.sessions().find_by_join_code(session_code).await {
-        Ok(Some(s)) => s,
-        Ok(None) => {
-            return (
-                StatusCode::NOT_FOUND,
-                Json(json!({"error": "Session not found"})),
-            )
-                .into_response();
-        }
-        Err(_) => {
-            return (StatusCode::INTERNAL_SERVER_ERROR).into_response();
-        }
-    };
+    let session = store
+        .sessions()
+        .find_by_join_code(session_code)
+        .await?
+        .ok_or_else(|| AppError::not_found("Session not found"))?;
 
-    match store.events().find_active_by_session_id(session.id).await {
-        Ok(Some(event)) => (
-            StatusCode::OK,
-            Json(CheckEventResponse {
-                active_event: Some(CheckEventActiveEvent {
-                    id: event.id,
-                    name: event.name,
-                    event_type: event.event_type,
-                    data: event.data,
-                }),
-            }),
-        )
-            .into_response(),
-        Ok(None) => (
-            StatusCode::OK,
-            Json(CheckEventResponse { active_event: None }),
-        )
-            .into_response(),
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR).into_response(),
-    }
+    let active_event =
+        if let Some(event) = store.events().find_active_by_session_id(session.id).await? {
+            Some(CheckEventActiveEvent {
+                id: event.id,
+                name: event.name,
+                event_type: event.event_type,
+                data: event.data,
+            })
+        } else {
+            None
+        };
+
+    Ok((StatusCode::OK, Json(CheckEventResponse { active_event })).into_response())
 }
 
 #[utoipa::path(
@@ -179,43 +165,24 @@ pub async fn create_event(
     State(state): State<AppState>,
     Path(session_code): Path<String>,
     Json(req): Json<CreateEventRequest>,
-) -> impl IntoResponse {
+) -> Result<impl IntoResponse, AppError> {
     let store = &state.store;
 
     let parsed_event_type = match req.event_type.to_ascii_lowercase().as_str() {
         "motion" => EventType::Motion,
         "election" => EventType::Election,
         _ => {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(json!({"error": "Invalid event_type; expected motion or election"})),
-            )
-                .into_response();
+            return Err(AppError::bad_request(
+                "Invalid event_type; expected motion or election",
+            ));
         }
     };
 
-    // Find session by join code
-    let session = match store
+    let session = store
         .sessions()
         .find_by_join_code(session_code.clone())
-        .await
-    {
-        Ok(Some(session)) => session,
-        Ok(None) => {
-            return (
-                StatusCode::NOT_FOUND,
-                Json(json!({"error": "Session not found"})),
-            )
-                .into_response();
-        }
-        Err(_) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"error": "Database error"})),
-            )
-                .into_response();
-        }
-    };
+        .await?
+        .ok_or_else(|| AppError::not_found("Session not found"))?;
 
     let now = Utc::now().with_timezone(&FixedOffset::east_opt(0).unwrap());
     let start_time = req.start_time.unwrap_or(now);
@@ -252,32 +219,21 @@ pub async fn create_event(
         ..Default::default()
     };
 
-    let txn = match state.db.begin().await {
-        Ok(txn) => txn,
-        Err(_) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"error": "Failed to start database transaction"})),
-            )
-                .into_response();
-        }
-    };
+    let txn = state
+        .db
+        .begin()
+        .await
+        .map_err(|_| AppError::internal("Failed to start database transaction"))?;
 
-    let event = match event_model.insert(&txn).await {
-        Ok(event) => event,
-        Err(_) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"error": "Failed to create event"})),
-            )
-                .into_response();
-        }
-    };
+    let event = event_model
+        .insert(&txn)
+        .await
+        .map_err(|_| AppError::internal("Failed to create event"))?;
 
     let proxy_enabled = event.data["proxy"].as_bool().unwrap_or(false);
     if let Err(message) = validate_proxy_assignments(proxy_enabled, &proxy_assignments) {
         let _ = txn.rollback().await;
-        return (StatusCode::BAD_REQUEST, Json(json!({"error": message}))).into_response();
+        return Err(AppError::bad_request(message));
     }
 
     let mut seen_proxy_targets = HashSet::new();
@@ -292,19 +248,11 @@ pub async fn create_event(
             Ok(Some(holder)) => holder,
             Ok(None) => {
                 let _ = txn.rollback().await;
-                return (
-                    StatusCode::BAD_REQUEST,
-                    Json(json!({"error": "Proxy holder must be in the session"})),
-                )
-                    .into_response();
+                return Err(AppError::bad_request("Proxy holder must be in the session"));
             }
             Err(_) => {
                 let _ = txn.rollback().await;
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(json!({"error": "Database error"})),
-                )
-                    .into_response();
+                return Err(AppError::internal("Database error"));
             }
         };
 
@@ -317,30 +265,22 @@ pub async fn create_event(
             Ok(Some(proxied)) => proxied,
             Ok(None) => {
                 let _ = txn.rollback().await;
-                return (
-                    StatusCode::BAD_REQUEST,
-                    Json(json!({"error": "Proxied participant must be in the session"})),
-                )
-                    .into_response();
+                return Err(AppError::bad_request(
+                    "Proxied participant must be in the session",
+                ));
             }
             Err(_) => {
                 let _ = txn.rollback().await;
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(json!({"error": "Database error"})),
-                )
-                    .into_response();
+                return Err(AppError::internal("Database error"));
             }
         };
 
         let proxied_marker = proxied.user_id.to_string();
         if !seen_proxy_targets.insert(proxied_marker.clone()) {
             let _ = txn.rollback().await;
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(json!({"error": "A senator may only be proxied once per event"})),
-            )
-                .into_response();
+            return Err(AppError::bad_request(
+                "A senator may only be proxied once per event",
+            ));
         }
 
         let existing_target = match entity::prelude::UserSession::find()
@@ -352,11 +292,7 @@ pub async fn create_event(
             Ok(existing) => existing,
             Err(_) => {
                 let _ = txn.rollback().await;
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(json!({"error": "Database error"})),
-                )
-                    .into_response();
+                return Err(AppError::internal("Database error"));
             }
         };
 
@@ -364,11 +300,9 @@ pub async fn create_event(
             && existing.user_id != holder.user_id
         {
             let _ = txn.rollback().await;
-            return (
-                StatusCode::CONFLICT,
-                Json(json!({"error": "A senator may only be proxied once per event"})),
-            )
-                .into_response();
+            return Err(AppError::conflict(
+                "A senator may only be proxied once per event",
+            ));
         }
 
         let mut holder_model: user_session::ActiveModel = holder.into();
@@ -376,23 +310,15 @@ pub async fn create_event(
 
         if holder_model.update(&txn).await.is_err() {
             let _ = txn.rollback().await;
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"error": "Failed to create proxy assignment"})),
-            )
-                .into_response();
+            return Err(AppError::internal("Failed to create proxy assignment"));
         }
     }
 
     if txn.commit().await.is_err() {
-        return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({"error": "Failed to commit event transaction"})),
-        )
-            .into_response();
+        return Err(AppError::internal("Failed to commit event transaction"));
     }
 
-    (
+    Ok((
         StatusCode::CREATED,
         Json(CreateEventResponse {
             id: event.id,
@@ -402,7 +328,7 @@ pub async fn create_event(
             start_time: event.start_time,
         }),
     )
-        .into_response()
+        .into_response())
 }
 
 #[utoipa::path(
@@ -422,64 +348,49 @@ pub async fn end_event(
     user: SyncedUser,
     State(state): State<AppState>,
     Path(id): Path<i32>,
-) -> impl IntoResponse {
+) -> Result<impl IntoResponse, AppError> {
     let store = &state.store;
 
-    let event = match store.events().find_by_id(id).await {
-        Ok(Some(event)) => event,
-        Ok(None) => {
-            return (
-                StatusCode::NOT_FOUND,
-                Json(json!({"error": "Event not found"})),
-            )
-                .into_response();
-        }
-        Err(_) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"error": "Database error"})),
-            )
-                .into_response();
-        }
-    };
+    let event = store
+        .events()
+        .find_by_id(id)
+        .await?
+        .ok_or_else(|| AppError::not_found("Event not found"))?;
 
     if event.created_by_user_id != user.0.id {
-        return (
-            StatusCode::FORBIDDEN,
-            Json(json!({"error": "Only the event creator can end this event"})),
-        )
-            .into_response();
+        return Err(AppError::forbidden(
+            "Only the event creator can end this event",
+        ));
     }
 
     if event.status == StatusOption::Inactive {
-        return (
+        return Ok((
             StatusCode::OK,
             Json(EndEventResponse {
                 id: event.id,
                 status: event.status,
             }),
         )
-            .into_response();
+            .into_response());
     }
 
     let mut event_to_update: event::ActiveModel = event.into_active_model();
     event_to_update.status = Set(StatusOption::Inactive);
 
-    match store.events().update(event_to_update).await {
-        Ok(updated) => (
-            StatusCode::OK,
-            Json(EndEventResponse {
-                id: updated.id,
-                status: updated.status,
-            }),
-        )
-            .into_response(),
-        Err(_) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({"error": "Failed to end event"})),
-        )
-            .into_response(),
-    }
+    let updated = store
+        .events()
+        .update(event_to_update)
+        .await
+        .map_err(|_| AppError::internal("Failed to end event"))?;
+
+    Ok((
+        StatusCode::OK,
+        Json(EndEventResponse {
+            id: updated.id,
+            status: updated.status,
+        }),
+    )
+        .into_response())
 }
 
 #[cfg(test)]
