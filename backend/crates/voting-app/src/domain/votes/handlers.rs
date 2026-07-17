@@ -1,6 +1,5 @@
 use crate::AppState;
 use crate::core::auth::middleware::SyncedUser;
-use crate::core::error::AppError;
 use axum::{
     Json,
     extract::{Path, State},
@@ -215,50 +214,91 @@ pub async fn cast_vote(
     State(state): State<AppState>,
     Path(event_id): Path<i32>,
     Json(body): Json<CastVoteRequest>,
-) -> Result<impl IntoResponse, AppError> {
+) -> impl IntoResponse {
     let store = &state.store;
 
-    let event = store
-        .events()
-        .find_by_id(event_id)
-        .await?
-        .ok_or_else(|| AppError::not_found("Event not found"))?;
+    let event = match store.events().find_by_id(event_id).await {
+        Ok(Some(e)) => e,
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({"error": "Event not found"})),
+            )
+                .into_response();
+        }
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Database error"})),
+            )
+                .into_response();
+        }
+    };
 
     let event_data = event.data.clone();
     let vote_type = event_data["vote_type"].as_str().unwrap_or("");
 
     if vote_type != "motion" && vote_type != "election" {
-        return Err(AppError::bad_request("Event is not a motion"));
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "Event is not a motion"})),
+        )
+            .into_response();
     }
 
-    let voter_instances = UserSession::find()
+    let voter_instances = match UserSession::find()
         .filter(user_session::Column::SessionId.eq(event.session_id))
         .filter(user_session::Column::UserId.eq(user.0.id))
         .filter(user_session::Column::JoinLeft.eq(JoinLeft::Joined))
         .all(store.db())
-        .await?;
+        .await
+    {
+        Ok(voters) if !voters.is_empty() => voters,
+        Ok(_) => {
+            return (
+                StatusCode::FORBIDDEN,
+                Json(json!({"error": "User is not eligible to vote in this event"})),
+            )
+                .into_response();
+        }
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Database error"})),
+            )
+                .into_response();
+        }
+    };
 
-    if voter_instances.is_empty() {
-        return Err(AppError::forbidden(
-            "User is not eligible to vote in this event",
-        ));
-    }
-
-    let selected_voter = select_voter_instance(&voter_instances, body.voter_instance_id)
-        .map_err(AppError::bad_request)?;
+    let selected_voter = match select_voter_instance(&voter_instances, body.voter_instance_id) {
+        Ok(instance) => instance,
+        Err(message) => {
+            return (StatusCode::BAD_REQUEST, Json(json!({"error": message}))).into_response();
+        }
+    };
 
     if event.status != StatusOption::Active {
-        return Err(AppError::bad_request("Event is not open"));
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "Event is not open"})),
+        )
+            .into_response();
     }
 
     if selected_voter.proxy.is_some() && !event_data["proxy"].as_bool().unwrap_or(false) {
-        return Err(AppError::bad_request(
-            "Proxy voting is not allowed for this event",
-        ));
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "Proxy voting is not allowed for this event"})),
+        )
+            .into_response();
     }
 
     if body.vote_response.is_empty() {
-        return Err(AppError::bad_request("vote_response cannot be empty"));
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "vote_response cannot be empty"})),
+        )
+            .into_response();
     }
 
     let vote_options: Vec<String> = event_data["vote_options"]
@@ -269,18 +309,33 @@ pub async fn cast_vote(
         .collect();
 
     if !vote_options.contains(&body.vote_response[0]) {
-        return Err(AppError::bad_request("Invalid vote option"));
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "Invalid vote option"})),
+        )
+            .into_response();
     }
 
-    if store
+    match store
         .votes()
         .find_by_event_and_user_session(event.id, selected_voter.id)
-        .await?
-        .is_some()
+        .await
     {
-        return Err(AppError::conflict(
-            "This vote instance has already cast a vote",
-        ));
+        Ok(Some(_)) => {
+            return (
+                StatusCode::CONFLICT,
+                Json(json!({"error": "This vote instance has already cast a vote"})),
+            )
+                .into_response();
+        }
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Database error"})),
+            )
+                .into_response();
+        }
     }
 
     let new_vote = vote::ActiveModel {
@@ -297,41 +352,58 @@ pub async fn cast_vote(
         ..Default::default()
     };
 
-    let created_vote = store
-        .votes()
-        .create(new_vote)
-        .await
-        .map_err(|_| AppError::internal("Failed to cast vote"))?;
-
-    Ok((
-        StatusCode::CREATED,
-        Json(json!({
-            "message": "Vote cast successfully",
-            "voter_instance_id": selected_voter.id,
-            "vote_id": created_vote.id
-        })),
-    )
-        .into_response())
+    match store.votes().create(new_vote).await {
+        Ok(created_vote) => (
+            StatusCode::CREATED,
+            Json(json!({
+                "message": "Vote cast successfully",
+                "voter_instance_id": selected_voter.id,
+                "vote_id": created_vote.id
+            })),
+        )
+            .into_response(),
+        Err(_) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": "Failed to cast vote"})),
+        )
+            .into_response(),
+    }
 }
 
 pub async fn get_motion_results(
     _user: SyncedUser,
     State(state): State<AppState>,
     Path(event_id): Path<i32>,
-) -> Result<impl IntoResponse, AppError> {
+) -> impl IntoResponse {
     let store = state.store;
 
-    let event = store
-        .events()
-        .find_by_id(event_id)
-        .await?
-        .ok_or_else(|| AppError::not_found("Event not found"))?;
+    let event = match store.events().find_by_id(event_id).await {
+        Ok(Some(e)) => e,
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({"error": "Event not found"})),
+            )
+                .into_response();
+        }
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Database error"})),
+            )
+                .into_response();
+        }
+    };
 
     let event_data = event.data.clone();
     let vote_type = event_data["vote_type"].as_str().unwrap_or("");
 
     if vote_type != "motion" && vote_type != "election" {
-        return Err(AppError::bad_request("Event is not a supported vote type"));
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "Event is not a supported vote type"})),
+        )
+            .into_response();
     }
 
     //Place holder for when we figure the visibility out
@@ -339,14 +411,28 @@ pub async fn get_motion_results(
         .as_str()
         .unwrap_or("");
     if visibility == "hidden_until_release" && event.status != StatusOption::Inactive {
-        return Err(AppError::forbidden("Results are not yet available"));
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({"error": "Results are not yet available"})),
+        )
+            .into_response();
     }
 
-    let votes = Vote::find()
+    let votes = match Vote::find()
         .find_also_related(user_session::Entity)
         .filter(vote::Column::EventId.eq(event_id))
         .all(store.db())
-        .await?;
+        .await
+    {
+        Ok(v) => v,
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Database error"})),
+            )
+                .into_response();
+        }
+    };
 
     let threshold = event_data["threshold"].as_f64().unwrap_or(0.5);
     let vote_options: Vec<String> = event_data["vote_options"]
@@ -391,11 +477,11 @@ pub async fn get_motion_results(
 
     if vote_type == "motion" {
         let motion_results = compute_motion_totals(&export_records, threshold);
-        return Ok((StatusCode::OK, Json(json!(motion_results))).into_response());
+        return (StatusCode::OK, Json(json!(motion_results))).into_response();
     }
 
     let election_results = compute_election_totals(&export_records, &vote_options);
-    Ok((StatusCode::OK, Json(json!(election_results))).into_response())
+    (StatusCode::OK, Json(json!(election_results))).into_response()
 }
 
 pub async fn assign_proxy(
@@ -403,121 +489,207 @@ pub async fn assign_proxy(
     State(state): State<AppState>,
     Path(event_id): Path<i32>,
     Json(body): Json<AssignProxyRequest>,
-) -> Result<impl IntoResponse, AppError> {
+) -> impl IntoResponse {
     let store = &state.store;
 
     if body.proxy_holder_user_id == body.proxied_senator_user_id {
-        return Err(AppError::bad_request("A user cannot proxy for themself"));
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "A user cannot proxy for themself"})),
+        )
+            .into_response();
     }
 
-    let event = store
-        .events()
-        .find_by_id(event_id)
-        .await?
-        .ok_or_else(|| AppError::not_found("Event not found"))?;
+    let event = match store.events().find_by_id(event_id).await {
+        Ok(Some(e)) => e,
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({"error": "Event not found"})),
+            )
+                .into_response();
+        }
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Database error"})),
+            )
+                .into_response();
+        }
+    };
 
     if user.0.id != event.created_by_user_id {
-        return Err(AppError::forbidden(
-            "Only the event host may assign proxies",
-        ));
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({"error": "Only the event host may assign proxies"})),
+        )
+            .into_response();
     }
 
     if !event.data["proxy"].as_bool().unwrap_or(false) {
-        return Err(AppError::bad_request(
-            "Proxy voting is not enabled for this event",
-        ));
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "Proxy voting is not enabled for this event"})),
+        )
+            .into_response();
     }
 
-    let proxy_holder = UserSession::find()
+    let proxy_holder = match UserSession::find()
         .filter(user_session::Column::SessionId.eq(event.session_id))
         .filter(user_session::Column::UserId.eq(body.proxy_holder_user_id))
         .filter(user_session::Column::JoinLeft.eq(JoinLeft::Joined))
         .one(store.db())
-        .await?;
+        .await
+    {
+        Ok(user_session) => user_session,
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Database error"})),
+            )
+                .into_response();
+        }
+    };
 
     let Some(proxy_holder) = proxy_holder else {
-        return Err(AppError::bad_request("Proxy holder must be in the session"));
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "Proxy holder must be in the session"})),
+        )
+            .into_response();
     };
 
     if proxy_holder.proxy.is_some() {
-        return Err(AppError::conflict(
-            "One participant may hold at most one proxy",
-        ));
+        return (
+            StatusCode::CONFLICT,
+            Json(json!({"error": "One participant may hold at most one proxy"})),
+        )
+            .into_response();
     }
 
     let proxied_marker = body.proxied_senator_user_id.to_string();
-    let proxied_participant = UserSession::find()
+    let proxied_participant = match UserSession::find()
         .filter(user_session::Column::SessionId.eq(event.session_id))
         .filter(user_session::Column::UserId.eq(body.proxied_senator_user_id))
         .filter(user_session::Column::JoinLeft.eq(JoinLeft::Joined))
         .one(store.db())
-        .await?;
+        .await
+    {
+        Ok(proxy) => proxy,
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Database error"})),
+            )
+                .into_response();
+        }
+    };
 
     if proxied_participant.is_none() {
-        return Err(AppError::bad_request(
-            "Proxied participant must be in the session",
-        ));
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "Proxied participant must be in the session"})),
+        )
+            .into_response();
     }
 
-    let already_proxied = UserSession::find()
+    let already_proxied = match UserSession::find()
         .filter(user_session::Column::SessionId.eq(event.session_id))
         .filter(user_session::Column::JoinLeft.eq(JoinLeft::Joined))
         .filter(user_session::Column::Proxy.eq(proxied_marker.clone()))
         .one(store.db())
-        .await?;
+        .await
+    {
+        Ok(proxy) => proxy,
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Database error"})),
+            )
+                .into_response();
+        }
+    };
 
     if let Some(existing) = already_proxied
         && existing.user_id != body.proxy_holder_user_id
     {
-        return Err(AppError::conflict(
-            "This senator already has a proxy assignment",
-        ));
+        return (
+            StatusCode::CONFLICT,
+            Json(json!({"error": "This senator already has a proxy assignment"})),
+        )
+            .into_response();
     }
 
     let mut holder_model: user_session::ActiveModel = proxy_holder.into();
     holder_model.proxy = Set(Some(proxied_marker));
 
-    let updated = holder_model
-        .update(store.db())
-        .await
-        .map_err(|_| AppError::internal("Failed to create proxy assignment"))?;
-
-    Ok((
-        StatusCode::CREATED,
-        Json(json!(AssignProxyResponse {
-            voter_instance_id: updated.id,
-            proxy_holder_user_id: body.proxy_holder_user_id,
-            proxied_senator_user_id: body.proxied_senator_user_id,
-        })),
-    )
-        .into_response())
+    match holder_model.update(store.db()).await {
+        Ok(updated) => (
+            StatusCode::CREATED,
+            Json(json!(AssignProxyResponse {
+                voter_instance_id: updated.id,
+                proxy_holder_user_id: body.proxy_holder_user_id,
+                proxied_senator_user_id: body.proxied_senator_user_id,
+            })),
+        )
+            .into_response(),
+        Err(_) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": "Failed to create proxy assignment"})),
+        )
+            .into_response(),
+    }
 }
 
 pub async fn list_proxy_assignments(
     user: SyncedUser,
     State(state): State<AppState>,
     Path(event_id): Path<i32>,
-) -> Result<impl IntoResponse, AppError> {
+) -> impl IntoResponse {
     let store = &state.store;
 
-    let event = store
-        .events()
-        .find_by_id(event_id)
-        .await?
-        .ok_or_else(|| AppError::not_found("Event not found"))?;
+    let event = match store.events().find_by_id(event_id).await {
+        Ok(Some(e)) => e,
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({"error": "Event not found"})),
+            )
+                .into_response();
+        }
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Database error"})),
+            )
+                .into_response();
+        }
+    };
 
     if user.0.id != event.created_by_user_id {
-        return Err(AppError::forbidden(
-            "Only the event host may view proxy assignments",
-        ));
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({"error": "Only the event host may view proxy assignments"})),
+        )
+            .into_response();
     }
 
-    let proxy_voters = UserSession::find()
+    let proxy_voters = match UserSession::find()
         .filter(user_session::Column::SessionId.eq(event.session_id))
         .filter(user_session::Column::JoinLeft.eq(JoinLeft::Joined))
         .filter(user_session::Column::Proxy.is_not_null())
         .all(store.db())
-        .await?;
+        .await
+    {
+        Ok(voters) => voters,
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Database error"})),
+            )
+                .into_response();
+        }
+    };
 
     let mut assignments = Vec::new();
     for instance in proxy_voters {
@@ -535,28 +707,65 @@ pub async fn list_proxy_assignments(
         });
     }
 
-    Ok((StatusCode::OK, Json(assignments)).into_response())
+    (StatusCode::OK, Json(assignments)).into_response()
 }
 
 pub async fn get_vote_instances(
     user: SyncedUser,
     State(state): State<AppState>,
     Path(event_id): Path<i32>,
-) -> Result<impl IntoResponse, AppError> {
+) -> impl IntoResponse {
     let store = &state.store;
 
-    let event = store
+    if store
         .events()
         .find_by_id(event_id)
-        .await?
-        .ok_or_else(|| AppError::not_found("Event not found"))?;
+        .await
+        .ok()
+        .flatten()
+        .is_none()
+    {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(json!({"error": "Event not found"})),
+        )
+            .into_response();
+    }
 
-    let voter_instances = UserSession::find()
+    let event = match store.events().find_by_id(event_id).await {
+        Ok(Some(event)) => event,
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({"error": "Event not found"})),
+            )
+                .into_response();
+        }
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Database error"})),
+            )
+                .into_response();
+        }
+    };
+
+    let voter_instances = match UserSession::find()
         .filter(user_session::Column::SessionId.eq(event.session_id))
         .filter(user_session::Column::UserId.eq(user.0.id))
         .filter(user_session::Column::JoinLeft.eq(JoinLeft::Joined))
         .all(store.db())
-        .await?;
+        .await
+    {
+        Ok(voters) => voters,
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Database error"})),
+            )
+                .into_response();
+        }
+    };
 
     let mut response = Vec::new();
     for instance in voter_instances {
@@ -583,33 +792,57 @@ pub async fn get_vote_instances(
         });
     }
 
-    Ok((StatusCode::OK, Json(response)).into_response())
+    (StatusCode::OK, Json(response)).into_response()
 }
 
 pub async fn export_event_results(
     user: SyncedUser,
     State(state): State<AppState>,
     Path(event_id): Path<i32>,
-) -> Result<impl IntoResponse, AppError> {
+) -> impl IntoResponse {
     let store = &state.store;
 
-    let event = store
-        .events()
-        .find_by_id(event_id)
-        .await?
-        .ok_or_else(|| AppError::not_found("Event not found"))?;
+    let event = match store.events().find_by_id(event_id).await {
+        Ok(Some(event)) => event,
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({"error": "Event not found"})),
+            )
+                .into_response();
+        }
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Database error"})),
+            )
+                .into_response();
+        }
+    };
 
     if user.0.id != event.created_by_user_id {
-        return Err(AppError::forbidden(
-            "Only the event host may export results",
-        ));
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({"error": "Only the event host may export results"})),
+        )
+            .into_response();
     }
 
-    let vote_rows = Vote::find()
+    let vote_rows = match Vote::find()
         .find_also_related(user_session::Entity)
         .filter(vote::Column::EventId.eq(event_id))
         .all(store.db())
-        .await?;
+        .await
+    {
+        Ok(rows) => rows,
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Database error"})),
+            )
+                .into_response();
+        }
+    };
 
     let mut user_name_cache: HashMap<i32, Option<String>> = HashMap::new();
     let mut votes = Vec::new();
@@ -683,7 +916,7 @@ pub async fn export_event_results(
     let threshold = event.data["threshold"].as_f64().unwrap_or(0.5);
     let totals = compute_motion_totals(&votes, threshold);
 
-    Ok((
+    (
         StatusCode::OK,
         Json(EventExportResponse {
             event_id: event.id,
@@ -693,7 +926,7 @@ pub async fn export_event_results(
             votes,
         }),
     )
-        .into_response())
+        .into_response()
 }
 
 #[cfg(test)]

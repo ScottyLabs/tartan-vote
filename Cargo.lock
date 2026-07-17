@@ -3031,6 +3031,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cd9b34d4c8e615079c04eb7863a429c2d2a8bf9c934eb9eeb580f51f36367124"
 dependencies = [
  "chrono",
+ "clap",
+ "dotenvy",
  "glob",
  "indoc",
  "regex",
@@ -3065,6 +3067,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b3ceb928aac8be83332d34d1fdbc827d43696135a800723ffeb2e0b33b7b495e"
 dependencies = [
  "async-trait",
+ "clap",
+ "dotenvy",
  "sea-orm",
  "sea-orm-cli",
  "sea-schema",

@@ -14,7 +14,6 @@ use utoipa::ToSchema;
 
 use crate::AppState;
 use crate::core::auth::middleware::SyncedUser;
-use crate::core::error::AppError;
 
 const BYPASS_COOKIE: &str = "bypass_user_id";
 const BYPASS_HEADER: &str = "x-bypass-user-id";
@@ -54,24 +53,34 @@ fn status_payload(user: Option<&SyncedUser>) -> AuthBypassStatusResponse {
 pub async fn bypass_login(
     State(state): State<AppState>,
     Json(req): Json<BypassLoginRequest>,
-) -> Result<Response, AppError> {
+) -> Response {
     let oidc_subject = format!("bypass:{}", req.andrew_id);
 
     let existing = User::find()
         .filter(user::Column::OidcSubject.eq(&oidc_subject))
         .one(&state.db)
-        .await?;
+        .await;
 
     let user = match existing {
-        Some(user) => user,
-        None => {
+        Ok(Some(user)) => user,
+        Ok(None) => {
             let new_user = user::ActiveModel {
                 name: Set(req.name),
                 andrew_id: Set(req.andrew_id),
                 oidc_subject: Set(oidc_subject),
                 ..Default::default()
             };
-            new_user.insert(&state.db).await?
+            match new_user.insert(&state.db).await {
+                Ok(created) => created,
+                Err(err) => {
+                    tracing::error!("failed to create bypass user: {:?}", err);
+                    return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+                }
+            }
+        }
+        Err(err) => {
+            tracing::error!("failed to look up bypass user: {:?}", err);
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
         }
     };
 
@@ -83,12 +92,12 @@ pub async fn bypass_login(
         synced.0.id
     );
 
-    Ok((
+    (
         StatusCode::OK,
         [(header::SET_COOKIE, cookie)],
         Json(payload),
     )
-        .into_response())
+        .into_response()
 }
 
 #[utoipa::path(
