@@ -751,7 +751,7 @@ mod integration_tests {
             .one(db)
             .await
         {
-            // Deleting the creator user cascades: session → events → votes, user_sessions
+            // Deleting the creator user cascades: session -> events -> votes, user_sessions
             let _ = entity::user::Entity::delete_by_id(s.created_by_user_id)
                 .exec(db)
                 .await;
@@ -1152,7 +1152,7 @@ mod integration_tests {
     #[tokio::test]
     #[ignore = "requires DATABASE_URL"]
     async fn test_attendance_csv_mixed_join_left() {
-        // 5 joined, 3 left — CSV should include all 8
+        // 5 joined, 3 left - CSV should include all 8
         let db = test_db().await;
         let code = "ATST04";
         cleanup(&db, code).await;
@@ -1350,7 +1350,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "preview only — writes pdf to /tmp and does not clean up"]
+    #[ignore = "preview only - writes pdf to /tmp and does not clean up"]
     fn test_attendance_pdf_preview() {
         let rows = vec![
             mock_attendance_row(1, "Alice", "alice1", vec![]),
@@ -1383,7 +1383,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "preview only — writes pdf to /tmp and does not clean up"]
+    #[ignore = "preview only - writes pdf to /tmp and does not clean up"]
     fn test_vote_pdf_preview() {
         let counts = vec![
             ("pass".to_string(), 6),

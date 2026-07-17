@@ -132,7 +132,7 @@ backend on `localhost:8080`.
 Governance declares the public frontend URL as `public_url = "https://tartan.vote"`
 in `data/teams/tartan-vote.toml`. The API is served separately at `api.tartan.vote`
 (`kennel.services.tartan-vote.customDomain`). At runtime, `frontend/src/lib/api/base.ts`
-maps the browser hostname to the API origin (`tartan.vote` → `api.tartan.vote`,
+maps the browser hostname to the API origin (`tartan.vote` -> `api.tartan.vote`,
 or the matching `*.scottylabs.net` preview pair). `VITE_API_BASE` is only a
 local-dev override; Kennel's `buildDenoTask` does not bake it into production builds.
 

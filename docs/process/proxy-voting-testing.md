@@ -124,7 +124,7 @@ ______________________________________________________________________
 1. On `ProxySetup` screen:
    - Select "Yes" for senator
    - Enter "Jane Doe"
-   - Click "Continue" → notice shows 2 instances
+   - Click "Continue" -> notice shows 2 instances
 1. (Hypothetically) Call same endpoint again with identical payload
 1. Should still get notice saying 2 instances
 
@@ -159,8 +159,8 @@ ______________________________________________________________________
 
 **Steps:**
 
-1. User goes through flow as senator with proxy "Jane" → gets 2 instances
-1. On wait page, user realizes they entered wrong name → goes "Back"
+1. User goes through flow as senator with proxy "Jane" -> gets 2 instances
+1. On wait page, user realizes they entered wrong name -> goes "Back"
 1. Re-enters proxy setup, changes to senator with proxy "John"
 1. Should see notice: "You now have 2 vote instances..." (same count, updated proxy)
 1. Verify database only has "John", not "Jane"
@@ -197,7 +197,7 @@ ______________________________________________________________________
 
 **Steps:**
 
-1. User initially selects "Yes" for senator with proxy "Jane" → 2 instances
+1. User initially selects "Yes" for senator with proxy "Jane" -> 2 instances
 1. User changes mind on proxy setup, selects "No" for senator + proxy "Jane"
 1. Should see notice: "You now have 1 proxy vote instance."
 1. Verify database: only 1 row with `proxy = 'Jane'`, no base row
@@ -318,9 +318,9 @@ ______________________________________________________________________
 
 **Steps:**
 
-1. Alice: "Yes" senator, no proxy → expects 1 instance
-1. Bob: "No" non-senator, proxy "Alice" → expects 1 instance
-1. Charlie: "Yes" senator, proxy "David" → expects 2 instances
+1. Alice: "Yes" senator, no proxy -> expects 1 instance
+1. Bob: "No" non-senator, proxy "Alice" -> expects 1 instance
+1. Charlie: "Yes" senator, proxy "David" -> expects 2 instances
 1. Admin starts a motion
 1. Each user casts votes on all available options
 1. Verify vote counts in results:
@@ -433,10 +433,10 @@ ______________________________________________________________________
 
 | User Type | Input | Expected Instances | Base | Proxy | Notice |
 | ----------- | ------------ | ------------------ | ---- | ----- | -------------------------------------- |
-| Senator | No proxy | 1 | ✓ | - | "You now have 1 vote instance." |
-| Senator | Proxy "Jane" | 2 | ✓ | ✓ | "You now have 2 vote instances..." |
+| Senator | No proxy | 1 | OK | - | "You now have 1 vote instance." |
+| Senator | Proxy "Jane" | 2 | OK | OK | "You now have 2 vote instances..." |
 | Non-senator | No proxy | 0 | - | - | "You currently have 0 vote instances." |
-| Non-senator | Proxy "Jane" | 1 | - | ✓ | "You now have 1 proxy vote instance." |
+| Non-senator | Proxy "Jane" | 1 | - | OK | "You now have 1 proxy vote instance." |
 
 ______________________________________________________________________
 
@@ -464,7 +464,7 @@ After all tests pass:
 - [ ] Senator proxy test OK
 - [ ] Idempotency test OK
 - [ ] Configuration change test OK
-- [ ] Senator→Non-senator change test OK
+- [ ] Senator->Non-senator change test OK
 - [ ] Host attendance view test OK
 - [ ] Whitespace handling test OK
 - [ ] Empty proxy name test OK

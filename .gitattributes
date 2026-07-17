@@ -1,7 +1,7 @@
 # Normalize line endings
 * text=auto
 
-# Generated files — hide from GitHub diffs/stats
+# Generated files - hide from GitHub diffs/stats
 Cargo.nix linguist-generated=true
 frontend/bun.nix linguist-generated=true
 flake.lock linguist-generated=true

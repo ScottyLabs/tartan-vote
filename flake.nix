@@ -28,8 +28,6 @@
         let
           pkgs = nixpkgs.legacyPackages.${system};
           helpers = scottylabs.mkLib pkgs;
-        in
-        let
           frontend = helpers.buildDenoTask {
             src = ./frontend;
             pname = "frontend";

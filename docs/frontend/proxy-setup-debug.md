@@ -12,7 +12,7 @@ I've enhanced the `ProxySetup.svelte` component with comprehensive logging and d
    - Full request body
    - Response status and headers
    - Response body (success and error cases)
-   - Detailed error messages with colored console output (🔵, 🟢, 🔴)
+   - Detailed error messages with colored console output (blue, green, red)
 
 1. **Debug Info Display** - The ProxySetup screen now shows:
 
@@ -43,10 +43,10 @@ When the ProxySetup screen appears:
 
 When you select a senator option and click "Continue":
 
-1. Look for 🔵 (blue circle) logs showing the request being sent
+1. Look for blue request logs showing the request being sent
 1. Watch for response logs:
-   - If you see 🟢 (green circle): Request succeeded! Check that the notice message appears
-   - If you see 🔴 (red circle): Request failed. Error message will be displayed
+   - If you see (green circle): Request succeeded! Check that the notice message appears
+   - If you see red error logs: Request failed. Error message will be displayed
 
 ### Step 3: Common Issues and Solutions
 
@@ -168,9 +168,9 @@ When everything is working correctly:
 1. **Console shows** (in order):
 
    ```
-   🔵 Sending proxy request: { url: "...", ... }
-   🔵 Response received: { status: 200, statusText: "OK", ... }
-   🟢 Success! Proxy response: { vote_instance_count: 2, is_senator: true, has_proxy: true }
+   Sending proxy request: { url: "...", ... }
+   Response received: { status: 200, statusText: "OK", ... }
+    Success! Proxy response: { vote_instance_count: 2, is_senator: true, has_proxy: true }
    ```
 
 1. **Success message appears**:
@@ -259,11 +259,11 @@ To remove debug info display later, simply delete or comment out the `<div class
 
 When debugging, try to identify:
 
-- ✅ Is the request being sent at all? (Check console logs)
-- ✅ What is the response status code? (200, 401, 404, 500, etc.)
-- ✅ What is the API base URL being used?
-- ✅ Is the user authenticated? (Check cookies)
-- ✅ Is the backend running? (Try accessing `/health` endpoint)
-- ✅ Does the session code exist? (Check database or backend logs)
+- OK: Is the request being sent at all? (Check console logs)
+- OK: What is the response status code? (200, 401, 404, 500, etc.)
+- OK: What is the API base URL being used?
+- OK: Is the user authenticated? (Check cookies)
+- OK: Is the backend running? (Try accessing `/health` endpoint)
+- OK: Does the session code exist? (Check database or backend logs)
 
 Good luck debugging!

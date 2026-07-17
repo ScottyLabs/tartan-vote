@@ -23,7 +23,7 @@ Run `direnv allow` (or `devenv shell`) to enter the development environment. Thi
 
 ### Secrets
 
-Configuration is provided automatically inside `devenv shell` — you do not
+Configuration is provided automatically inside `devenv shell` - you do not
 need to create a `.env`. Secrets are pulled from OpenBao via secretspec, so
 authenticate once:
 

@@ -32,7 +32,7 @@ Hello, reader! For the remainder of this README, and other documentation, we wil
 
 ### Prerequisites
 
-- [devenv](https://devenv.sh/getting-started/) — provides Cargo, Deno, Node, PostgreSQL, and other tooling via Nix
+- [devenv](https://devenv.sh/getting-started/) - provides Cargo, Deno, Node, PostgreSQL, and other tooling via Nix
 - [direnv](https://direnv.net/) (recommended)
 
 ### Quick Setup

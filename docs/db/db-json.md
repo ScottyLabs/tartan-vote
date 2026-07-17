@@ -25,7 +25,7 @@ type VoteData = {
 - `vote_type`: Specifies the type of vote represented by this response. Examples include `"motion"` and `"election"`.
 - `proxy`: Whether this vote was cast as a proxy vote instance.
 - `proxy_for_user_id`: If `proxy` is true, this stores the proxied user's id; otherwise `null`.
-- `vote_response`: Stores the participant’s submitted response as an array.
+- `vote_response`: Stores the participant's submitted response as an array.
   - For a standard motion, this array typically contains a single value.
   - For a ranked-choice election, this array stores the ranked selections in order of preference.
   - A lower array index indicates a higher preference (e.g., index 0 = first choice, index 1 = second choice).

@@ -53,10 +53,10 @@ Two paths exist today:
 Auth-related configuration is provided automatically inside `devenv shell` (see
 [secrets-and-config.md](../../secrets-and-config.md)):
 
-- `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` — **OpenBao secrets** (governance
+- `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` - **OpenBao secrets** (governance
   `oidc_client` feature).
 - `KEYCLOAK_URL`, `KEYCLOAK_REALM`, `OAUTH_RELAY_URL`, `PROJECT_GROUP`,
-  `PROJECT_ADMIN_GROUP` — provisioned by governance for the OIDC flow.
+  `PROJECT_ADMIN_GROUP` - provisioned by governance for the OIDC flow.
 
 None of these are read by the backend yet; they are reserved for the planned
 OIDC implementation. The stubs redirect to `/` (same-origin), so no base-URL
