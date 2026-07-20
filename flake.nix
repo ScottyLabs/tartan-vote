@@ -1,8 +1,15 @@
 {
-  description = "tartan-vote deployment packages";
+  description = "Tartan.vote";
+
+  nixConfig = {
+    extra-substituters = [ "https://scottylabs.cachix.org" ];
+    extra-trusted-public-keys = [
+      "scottylabs.cachix.org-1:hajjEX5SLi/Y7yYloiXTt2IOr3towcTGRhMh1vu6Tjg="
+    ];
+  };
 
   inputs = {
-    nixpkgs.url = "github:cachix/devenv-nixpkgs/rolling";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
     scottylabs = {
       url = "git+https://codeberg.org/ScottyLabs/devenv";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -11,7 +18,6 @@
 
   outputs =
     {
-      self,
       nixpkgs,
       scottylabs,
       ...
@@ -28,16 +34,12 @@
         let
           pkgs = nixpkgs.legacyPackages.${system};
           helpers = scottylabs.mkLib pkgs;
-        in
-        let
+
           frontend = helpers.buildDenoTask {
             src = ./frontend;
             pname = "frontend";
             task = "build";
           };
-        in
-        {
-          inherit frontend;
 
           tartan-vote = helpers.buildRustService {
             src = ./.;
@@ -46,8 +48,9 @@
             nativeBuildInputs = [ pkgs.pkg-config ];
             buildArgs.cargoExtraArgs = "-p backend";
           };
-
-          default = self.packages.${system}.tartan-vote;
+        in
+        {
+          inherit frontend tartan-vote;
         }
       );
     };
