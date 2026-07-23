@@ -1,67 +1,56 @@
 # Auth
 
-Better Auth has been removed. The backend no longer talks to an external auth
-service; user identity is resolved entirely in-process.
+Two paths exist:
 
-Two paths exist today:
-
-- **Dev bypass** (working): a cookie/header-based shortcut for local development
-  and tests that creates/loads a local `user` and exposes it as `SyncedUser`.
-- **OIDC via Ricochet/Keycloak** (planned, stubbed): the `/auth/login` and
-  `/auth/callback` endpoints are placeholders. Real SSO through the Ricochet OAuth
-  relay is not yet implemented.
+- **OIDC via Ricochet/Keycloak** (real SSO): `/auth/login`, `/auth/callback`,
+  `/auth/logout`. OIDC secrets are provided by secretspec.
+- **Dev bypass**: a cookie/header shortcut for local development and tests that
+  creates/loads a local `user` and exposes it as `SyncedUser`. This bypass is scheduled to be removed in the future
 
 ## Backend flow
 
-### `src/core/auth/middleware.rs`
+1. The frontend links to `/auth/login`, which sits behind `OidcLoginLayer`;
+   axum-oidc redirects the browser to Keycloak via the Ricochet relay. The OAuth
+   `state` carries a CSRF token plus the app callback (`{APP_URL}/auth/callback`).
+1. Keycloak authenticates the user; the relay forwards the code to
+   `/auth/callback`, served by `axum_oidc::handle_oidc_redirect`.
+1. The callback exchanges the code for tokens and stores them in a server-side
+   session (Postgres, via `tower-sessions`).
+1. `OidcAuthLayer` establishes the claims on each request; `sync_user_middleware`
+   upserts a local `user` keyed on the OIDC subject and exposes it as `SyncedUser`.
+1. The frontend reads `/auth/status`.
 
-- Defines `SyncedUser(Arc<user::Model>)` and its `FromRequestParts` /
-  `OptionalFromRequestParts` extractors. Handlers require auth by extracting
-  `SyncedUser`, or read optional auth via `Option<SyncedUser>`.
-- No session is fetched here anymore; `SyncedUser` is populated by the bypass
-  middleware (and, eventually, by the OIDC callback).
+Logout (`GET /auth/logout`) flushes the local session and returns to the app
+root. The Keycloak SSO session is left intact, so re-login does not re-prompt for
+credentials.
 
-### `src/domain/auth/bypass.rs`
+### Sessions
 
-- `POST /auth/bypass/login`: creates/loads a user (`oidc_subject = "bypass:<andrew_id>"`)
-  and sets a `bypass_user_id` cookie.
-- `GET /auth/bypass/status`, `POST /auth/bypass/logout`: report / clear the bypass
-  session.
-- `bypass_auth_middleware`: resolves `SyncedUser` from the `bypass_user_id`
-  cookie or the `x-bypass-user-id` header.
+Server-side sessions are backed by the existing Postgres connection
+(`tower-sessions-sqlx-store`), so they survive restarts and stay consistent
+across instances. The session cookie holds only an opaque id; the OIDC token set
+lives in the session store under the `axum-oidc` key. There is no foreign key
+from the session table to `user`; identity is re-derived from the token subject
+per request. Contrast with the domain `session` / `user_session` tables, which
+are voting sessions, unrelated to auth.
 
-### `src/domain/auth/handlers.rs`
+### Files
 
-- `GET /auth/status`: returns auth state derived from optional `SyncedUser`.
-- `GET /auth/login`, `/auth/logout`: redirect to the frontend (stubs).
-- `GET /auth/callback`: stub that redirects to the frontend. **TODO:** exchange
-  the authorization code for tokens via the Ricochet relay / Keycloak, establish
-  a session, then redirect.
+- `src/core/auth/oidc.rs`: `GroupClaims`, the `SessionWrapper` bridge from
+  `tower-sessions` to axum-oidc's session contract, the relay `state` generator,
+  and the discovered `OidcClient` builder.
+- `src/core/auth/middleware.rs`: `SyncedUser` and its extractors, plus
+  `sync_user_middleware`.
+- `src/domain/auth/bypass.rs`: `POST /auth/bypass/login` (creates/loads a user
+  with `oidc_subject = "bypass:<andrew_id>"`), `GET /auth/bypass/status`,
+  `POST /auth/bypass/logout`, and `bypass_auth_middleware`.
+- `src/domain/auth/handlers.rs`: `GET /auth/status`, the `/auth/login` and
+  `/auth/logout` handlers, and the demo page.
+- `src/server.rs`: mounts the session layer, `OidcAuthLayer`,
+  `sync_user_middleware`, the bypass middleware, and CORS.
 
-### `src/server.rs`
+## Config
 
-- Mounts the bypass-auth middleware globally and a CORS layer for SPA origins
-  (`tartan.vote`, `*.scottylabs.org`, `*.scottylabs.net`, and localhost).
-- In production Kennel serves the SPA separately (`kennel.sites.frontend` with
-  `spa = true`); the backend is API-only.
-- Locally, the Vite dev server proxies API routes to the backend.
-- The `/auth/callback` endpoint is reserved for the future OIDC flow; redirect
-  URIs are provisioned by governance/Kennel, not declared in `devenv.nix`.
-
-## Env vars
-
-Auth-related configuration is provided automatically inside `devenv shell` (see
-[secrets-and-config.md](../../secrets-and-config.md)):
-
-- `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` — **OpenBao secrets** (governance
-  `oidc_client` feature).
-- `KEYCLOAK_URL`, `KEYCLOAK_REALM`, `OAUTH_RELAY_URL`, `PROJECT_GROUP`,
-  `PROJECT_ADMIN_GROUP` — provisioned by governance for the OIDC flow.
-
-None of these are read by the backend yet; they are reserved for the planned
-OIDC implementation. The stubs redirect to `/` (same-origin), so no base-URL
-configuration is needed.
-
-The local OAuth relay is enabled with `scottylabs.ricochet.enable` in
-`devenv.nix`; it exports `APP_URL` so the relay can return to the backend
-`/auth/callback` once the OIDC flow is implemented.
+Secrets are loaded through the [secretspec](https://secretspec.dev/) Rust SDK
+(`declare_secrets!` against the repo-root `secretspec.toml`), using the read-only
+`env` provider.

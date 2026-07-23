@@ -127,58 +127,43 @@ pub async fn setup(config: Config) {
         .with_same_site(SameSite::Lax)
         .with_expiry(Expiry::OnInactivity(Duration::hours(1)));
 
-    let auth_routes: Router<AppState> = if app_state.config.oidc.is_some() {
-        let login_layer = ServiceBuilder::new()
-            .layer(HandleErrorLayer::new(|e: MiddlewareError| async move {
-                tracing::error!("OIDC login error: {:?}", e);
-                e.into_response()
-            }))
-            .layer(OidcLoginLayer::<GroupClaims, SessionWrapper>::new());
+    let login_layer = ServiceBuilder::new()
+        .layer(HandleErrorLayer::new(|e: MiddlewareError| async move {
+            tracing::error!("OIDC login error: {:?}", e);
+            e.into_response()
+        }))
+        .layer(OidcLoginLayer::<GroupClaims, SessionWrapper>::new());
 
-        Router::new()
-            .route(
-                "/auth/login",
-                get(crate::domain::auth::handlers::login).layer(login_layer),
-            )
-            .route(
-                "/auth/callback",
-                get(handle_oidc_redirect::<GroupClaims, SessionWrapper>),
-            )
-            .route("/auth/logout", get(crate::domain::auth::handlers::logout))
-    } else {
-        Router::new()
-            .route("/auth/login", get(crate::domain::auth::handlers::login))
-            .route(
-                "/auth/callback",
-                get(crate::domain::auth::handlers::callback),
-            )
-            .route("/auth/logout", get(crate::domain::auth::handlers::logout))
-    };
+    let auth_routes: Router<AppState> = Router::new()
+        .route(
+            "/auth/login",
+            get(crate::domain::auth::handlers::login).layer(login_layer),
+        )
+        .route(
+            "/auth/callback",
+            get(handle_oidc_redirect::<GroupClaims, SessionWrapper>),
+        )
+        .route("/auth/logout", get(crate::domain::auth::handlers::logout));
 
-    let mut api_router = base_router.merge(auth_routes);
+    let client = oidc::build_client(&app_state.config.oidc)
+        .await
+        .expect("failed to build OIDC client (Keycloak discovery)");
+    tracing::info!("OIDC discovery completed");
 
-    if let Some(oidc_settings) = app_state.config.oidc.clone() {
-        let client = oidc::build_client(&oidc_settings)
-            .await
-            .expect("failed to build OIDC client (Keycloak discovery)");
-        tracing::info!("OIDC discovery completed");
+    let oidc_auth_layer = ServiceBuilder::new()
+        .layer(HandleErrorLayer::new(|e: MiddlewareError| async move {
+            tracing::error!("OIDC auth error: {:?}", e);
+            e.into_response()
+        }))
+        .layer(OidcAuthLayer::<GroupClaims, SessionWrapper>::new(client));
 
-        let oidc_auth_layer = ServiceBuilder::new()
-            .layer(HandleErrorLayer::new(|e: MiddlewareError| async move {
-                tracing::error!("OIDC auth error: {:?}", e);
-                e.into_response()
-            }))
-            .layer(OidcAuthLayer::<GroupClaims, SessionWrapper>::new(client));
-
-        api_router = api_router
-            .layer(middleware::from_fn_with_state(
-                app_state.clone(),
-                crate::core::auth::middleware::sync_user_middleware,
-            ))
-            .layer(oidc_auth_layer);
-    }
-
-    let api_router = api_router
+    let api_router = base_router
+        .merge(auth_routes)
+        .layer(middleware::from_fn_with_state(
+            app_state.clone(),
+            crate::core::auth::middleware::sync_user_middleware,
+        ))
+        .layer(oidc_auth_layer)
         .layer(middleware::from_fn_with_state(
             app_state.clone(),
             crate::domain::auth::bypass::bypass_auth_middleware,

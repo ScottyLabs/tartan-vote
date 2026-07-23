@@ -23,7 +23,7 @@ tokio = { version = "1.49.0", features = ["macros", "rt-multi-thread", "net"] }
 tower = "0.5.3"
 tower-http = { version = "0.6.8", features = ["cors", "fs"] }
 tower-sessions = "0.14"
-tower-sessions-sqlx-store = { version = "0.15.0", features = ["postgres"] }
+tower-sessions-sqlx-store = { version = "0.15.0", default-features = false, features = ["postgres"] }
 tracing = "0.1.44"
 tracing-subscriber = "0.3.22"
 uuid = { version = "1.23.3", features = ["v4"] }
@@ -32,6 +32,12 @@ utoipa = { version = "5", features = ["axum_extras", "chrono"] }
 utoipa-axum = "0.2"
 sentry = { version = "0.48.3", default-features = false, features = ["backtrace", "contexts", "panic", "debug-images", "tracing", "reqwest", "rustls"] }
 utoipa-scalar = { version = "0.3.0", features = ["axum"] }
+secretspec = { version = "0.13.0", default-features = false }
+secretspec-derive = "0.13.0"
+secrecy = "0.10.3"
 
 [dev-dependencies]
 sea-orm = { version = "2.0.0-rc.37", features = ["mock"] }
+
+[package.metadata.cargo-machete]
+ignored = ["secrecy"]
