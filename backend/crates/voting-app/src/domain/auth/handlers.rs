@@ -3,6 +3,7 @@ use axum::{
     response::{Html, IntoResponse, Redirect},
 };
 use serde::Serialize;
+use tower_sessions::Session;
 use utoipa::ToSchema;
 
 use crate::core::auth::middleware::SyncedUser;
@@ -19,13 +20,8 @@ pub async fn login() -> impl IntoResponse {
     Redirect::to("/")
 }
 
-// TODO: OIDC authorization-code callback. Exchange the code for tokens via the
-// Ricochet relay / Keycloak, establish a session, then redirect to the frontend.
-pub async fn callback() -> impl IntoResponse {
-    Redirect::to("/")
-}
-
-pub async fn logout() -> impl IntoResponse {
+pub async fn logout(session: Session) -> impl IntoResponse {
+    let _ = session.flush().await;
     Redirect::to("/")
 }
 

@@ -1,9 +1,9 @@
 [package]
-name         = "migration"
+name = "migration"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-publish      = false
+publish = false
 
 [lib]
 name = "migration"

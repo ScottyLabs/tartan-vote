@@ -386,11 +386,7 @@ mod tests {
         AppState {
             store: Store::new(db.clone()),
             db,
-            config: crate::config::Config {
-                database_url: String::new(),
-                bind_addr: String::new(),
-                sentry_dsn: None,
-            },
+            config: crate::config::Config::default(),
         }
     }
 

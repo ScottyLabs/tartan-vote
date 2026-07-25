@@ -1,11 +1,22 @@
-use axum::{middleware, routing::get};
+use axum::{
+    Router, error_handling::HandleErrorLayer, middleware, response::IntoResponse, routing::get,
+};
+use axum_oidc::{OidcAuthLayer, OidcLoginLayer, error::MiddlewareError, handle_oidc_redirect};
+use fred::prelude::{ClientLike, Config as RedisConfig, Pool};
 use migration::{Migrator, MigratorTrait};
 use sea_orm::Database;
+use tower::ServiceBuilder;
+use tower_sessions::{
+    Expiry, SessionManagerLayer,
+    cookie::{SameSite, time::Duration},
+};
+use tower_sessions_redis_store::RedisStore;
 use utoipa::OpenApi;
 use utoipa_axum::{router::OpenApiRouter, routes};
 use utoipa_scalar::{Scalar, Servable};
 use voting_app_store::Store;
 
+use crate::core::auth::oidc::{self, GroupClaims, SessionWrapper};
 use crate::core::openapi::ApiDoc;
 use crate::{AppState, config::Config};
 
@@ -41,7 +52,7 @@ pub async fn setup(config: Config) {
         .routes(routes!(crate::domain::attendance::handlers::attendance))
         .split_for_parts();
 
-    let api_router = router
+    let base_router = router
         .merge(Scalar::with_url("/api/scalar", api.clone()))
         .route(
             "/api/openapi.json",
@@ -50,12 +61,6 @@ pub async fn setup(config: Config) {
                 async move { axum::Json(api) }
             }),
         )
-        .route("/auth/login", get(crate::domain::auth::handlers::login))
-        .route(
-            "/auth/callback",
-            get(crate::domain::auth::handlers::callback),
-        )
-        .route("/auth/logout", get(crate::domain::auth::handlers::logout))
         .route(
             "/events/{id}/vote",
             axum::routing::post(crate::domain::votes::handlers::cast_vote),
@@ -107,12 +112,69 @@ pub async fn setup(config: Config) {
             get(crate::domain::session::export::export_session_events_json),
         )
         .route("/", get(crate::domain::auth::handlers::demo_home))
-        .fallback(get(crate::domain::auth::handlers::demo_not_found))
-        .layer(crate::core::cors::layer())
+        .fallback(get(crate::domain::auth::handlers::demo_not_found));
+
+    let pool = Pool::new(
+        RedisConfig::from_url(&app_state.config.valkey_url).expect("valid VALKEY_URL"),
+        None,
+        None,
+        None,
+        6,
+    )
+    .expect("failed to build valkey pool");
+    pool.connect();
+    pool.wait_for_connect()
+        .await
+        .expect("failed to connect to valkey");
+    let session_store = RedisStore::new(pool);
+    let session_layer = SessionManagerLayer::new(session_store)
+        .with_secure(false)
+        .with_same_site(SameSite::Lax)
+        .with_expiry(Expiry::OnInactivity(Duration::hours(1)));
+
+    let login_layer = ServiceBuilder::new()
+        .layer(HandleErrorLayer::new(|e: MiddlewareError| async move {
+            tracing::error!("OIDC login error: {:?}", e);
+            e.into_response()
+        }))
+        .layer(OidcLoginLayer::<GroupClaims, SessionWrapper>::new());
+
+    let auth_routes: Router<AppState> = Router::new()
+        .route(
+            "/auth/login",
+            get(crate::domain::auth::handlers::login).layer(login_layer),
+        )
+        .route(
+            "/auth/callback",
+            get(handle_oidc_redirect::<GroupClaims, SessionWrapper>),
+        )
+        .route("/auth/logout", get(crate::domain::auth::handlers::logout));
+
+    let client = oidc::build_client(&app_state.config.oidc)
+        .await
+        .expect("failed to build OIDC client (Keycloak discovery)");
+    tracing::info!("OIDC discovery completed");
+
+    let oidc_auth_layer = ServiceBuilder::new()
+        .layer(HandleErrorLayer::new(|e: MiddlewareError| async move {
+            tracing::error!("OIDC auth error: {:?}", e);
+            e.into_response()
+        }))
+        .layer(OidcAuthLayer::<GroupClaims, SessionWrapper>::new(client));
+
+    let api_router = base_router
+        .merge(auth_routes)
+        .layer(middleware::from_fn_with_state(
+            app_state.clone(),
+            crate::core::auth::middleware::sync_user_middleware,
+        ))
+        .layer(oidc_auth_layer)
         .layer(middleware::from_fn_with_state(
             app_state.clone(),
             crate::domain::auth::bypass::bypass_auth_middleware,
         ))
+        .layer(session_layer)
+        .layer(crate::core::cors::layer())
         .with_state(app_state);
 
     let listener = tokio::net::TcpListener::bind(&bind_addr)

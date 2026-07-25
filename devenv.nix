@@ -16,6 +16,7 @@
     rust.enable = true;
     deno.enable = true;
     postgres.enable = true;
+    valkey.enable = true;
 
     ricochet = {
       enable = true;
