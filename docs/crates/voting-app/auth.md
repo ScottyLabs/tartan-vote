@@ -15,7 +15,7 @@ Two paths exist:
 1. Keycloak authenticates the user; the relay forwards the code to
    `/auth/callback`, served by `axum_oidc::handle_oidc_redirect`.
 1. The callback exchanges the code for tokens and stores them in a server-side
-   session (Postgres, via `tower-sessions`).
+   session (Valkey, via `tower-sessions`).
 1. `OidcAuthLayer` establishes the claims on each request; `sync_user_middleware`
    upserts a local `user` keyed on the OIDC subject and exposes it as `SyncedUser`.
 1. The frontend reads `/auth/status`.
@@ -26,13 +26,10 @@ credentials.
 
 ### Sessions
 
-Server-side sessions are backed by the existing Postgres connection
-(`tower-sessions-sqlx-store`), so they survive restarts and stay consistent
-across instances. The session cookie holds only an opaque id; the OIDC token set
-lives in the session store under the `axum-oidc` key. There is no foreign key
-from the session table to `user`; identity is re-derived from the token subject
-per request. Contrast with the domain `session` / `user_session` tables, which
-are voting sessions, unrelated to auth.
+Server-side sessions are backed by Valkey (`tower-sessions-redis-store` over
+`fred`), connected via `VALKEY_URL`. Only the session token set
+lives in Valkey user identity stays in Postgres, re-derived from the token
+subject per request via `sync_user_middleware`.
 
 ### Files
 
