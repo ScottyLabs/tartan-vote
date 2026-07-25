@@ -6,6 +6,7 @@ secretspec_derive::declare_secrets!("../../../secretspec.toml");
 #[derive(Clone, Debug, Default)]
 pub struct Config {
     pub database_url: String,
+    pub valkey_url: String,
     pub bind_addr: String,
     pub sentry_dsn: Option<String>,
     pub oidc: OidcSettings,
@@ -33,6 +34,7 @@ impl Config {
 
         Ok(Self {
             database_url: env::var("DATABASE_URL").context("DATABASE_URL must be set")?,
+            valkey_url: env::var("VALKEY_URL").context("VALKEY_URL must be set")?,
             bind_addr: bind_addr_from_env(),
             sentry_dsn: secrets.sentry_dsn.or_else(|| optional_env("SENTRY_DSN")),
             oidc: OidcSettings {

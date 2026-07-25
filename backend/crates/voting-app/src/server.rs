@@ -2,6 +2,7 @@ use axum::{
     Router, error_handling::HandleErrorLayer, middleware, response::IntoResponse, routing::get,
 };
 use axum_oidc::{OidcAuthLayer, OidcLoginLayer, error::MiddlewareError, handle_oidc_redirect};
+use fred::prelude::{ClientLike, Config as RedisConfig, Pool};
 use migration::{Migrator, MigratorTrait};
 use sea_orm::Database;
 use tower::ServiceBuilder;
@@ -9,7 +10,7 @@ use tower_sessions::{
     Expiry, SessionManagerLayer,
     cookie::{SameSite, time::Duration},
 };
-use tower_sessions_sqlx_store::PostgresStore;
+use tower_sessions_redis_store::RedisStore;
 use utoipa::OpenApi;
 use utoipa_axum::{router::OpenApiRouter, routes};
 use utoipa_scalar::{Scalar, Servable};
@@ -113,15 +114,19 @@ pub async fn setup(config: Config) {
         .route("/", get(crate::domain::auth::handlers::demo_home))
         .fallback(get(crate::domain::auth::handlers::demo_not_found));
 
-    // A server-side session store holds the OIDC token set (and is what `/auth/logout`
-    // flushes). Backed by the existing Postgres connection so sessions survive backend
-    // restarts/deploys and stay consistent across multiple instances. The session table
-    // is created on startup via `migrate()`.
-    let session_store = PostgresStore::new(app_state.db.get_postgres_connection_pool().clone());
-    session_store
-        .migrate()
+    let pool = Pool::new(
+        RedisConfig::from_url(&app_state.config.valkey_url).expect("valid VALKEY_URL"),
+        None,
+        None,
+        None,
+        6,
+    )
+    .expect("failed to build valkey pool");
+    pool.connect();
+    pool.wait_for_connect()
         .await
-        .expect("failed to run session store migrations");
+        .expect("failed to connect to valkey");
+    let session_store = RedisStore::new(pool);
     let session_layer = SessionManagerLayer::new(session_store)
         .with_secure(false)
         .with_same_site(SameSite::Lax)
