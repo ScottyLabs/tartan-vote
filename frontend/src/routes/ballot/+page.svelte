@@ -9,6 +9,7 @@
   const sessionCode = page.url.searchParams.get('sessionCode')?.trim() || 'happy-giraffe';
   const hasProxy = page.url.searchParams.get('proxy') !== 'false';
   const confirmationKind = page.url.searchParams.get('confirmation') === 'secret' ? 'secret' : 'live';
+  const resultsVariant = page.url.searchParams.get('results') === 'rollcall' ? 'rollcall-live' : 'live';
   const instances = hasProxy ? votingInstances : votingInstances.slice(0, 1);
 
   let selections = $state<Record<string, string>>({});
@@ -36,6 +37,15 @@
 
   function closeConfirmation() {
     confirmationOpen = false;
+  }
+
+  function handleConfirmationAction() {
+    if (confirmationKind === 'secret') {
+      closeConfirmation();
+      return;
+    }
+
+    window.location.href = `/results?variant=${resultsVariant}`;
   }
 </script>
 
@@ -100,7 +110,7 @@
           {/if}
         </div>
 
-        <button type="button" onclick={closeConfirmation}>
+        <button type="button" onclick={handleConfirmationAction}>
           {confirmationKind === 'secret' ? 'OK' : 'View Live Results'}
         </button>
       </div>
