@@ -7,6 +7,7 @@ use fred::prelude::{ClientLike, Config as RedisConfig, Pool};
 use migration::{Migrator, MigratorTrait};
 use sea_orm::Database;
 use tower::ServiceBuilder;
+use tower_http::services::{ServeDir, ServeFile};
 use tower_sessions::{
     Expiry, SessionManagerLayer,
     cookie::{SameSite, time::Duration},
@@ -40,6 +41,7 @@ pub async fn setup(config: Config) {
     let app_state = AppState { db, store, config };
 
     let bind_addr = app_state.config.bind_addr.clone();
+    let static_dir = app_state.config.static_dir.clone();
 
     let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
         .nest(
@@ -165,7 +167,7 @@ pub async fn setup(config: Config) {
         }))
         .layer(OidcAuthLayer::<GroupClaims, SessionWrapper>::new(client));
 
-    let app = router
+    let api_router = router
         .nest("/api", api_routes)
         .layer(middleware::from_fn_with_state(
             app_state.clone(),
@@ -178,8 +180,18 @@ pub async fn setup(config: Config) {
         ))
         .layer(session_layer)
         .layer(crate::core::cors::layer())
-        .with_state(app_state)
-        .fallback(|| async { StatusCode::NOT_FOUND });
+        .with_state(app_state);
+
+    let app = match static_dir {
+        Some(dir) => {
+            let index = ServeFile::new(dir.join("index.html"));
+            let serve = ServeDir::new(dir).not_found_service(index);
+            Router::new().merge(api_router).fallback_service(serve)
+        }
+        None => Router::new()
+            .merge(api_router)
+            .fallback(|| async { StatusCode::NOT_FOUND }),
+    };
 
     let listener = tokio::net::TcpListener::bind(&bind_addr)
         .await
