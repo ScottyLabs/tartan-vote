@@ -23,18 +23,15 @@
       appUrl = "http://localhost:8080";
     };
     kennel = {
-      sites.frontend = {
-        spa = true;
-        customDomain = "tartan.vote";
-      };
-      services.tartan-vote.customDomain = "api.tartan.vote";
+      services.tartan-vote.customDomain = "tartan.vote";
     };
   };
 
+  # Built SPA served by the backend (run `deno task build` in frontend/ first).
+  env.STATIC_DIR = "frontend/dist";
+
   git-hooks.hooks = {
-    deno-check.entry = lib.mkForce ''
-      bash -c 'cd frontend && args=(); for f in "$@"; do args+=("''${f#frontend/}"); done; deno check "''${args[@]}"' --
-    '';
+    deno-check.entry = lib.mkForce "bash -c 'cd frontend && deno check .'";
     deno-test.entry = lib.mkForce "deno test --ignore=.devenv,.direnv,old-frontend --permit-no-files";
   };
 

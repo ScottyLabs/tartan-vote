@@ -45,8 +45,20 @@
             src = ./.;
             pname = "tartan-vote";
             buildInputs = [ pkgs.openssl ];
-            nativeBuildInputs = [ pkgs.pkg-config ];
-            buildArgs.cargoExtraArgs = "-p backend";
+            nativeBuildInputs = [
+              pkgs.pkg-config
+              pkgs.makeWrapper
+            ];
+            buildArgs = {
+              cargoExtraArgs = "-p backend";
+              postInstall = ''
+                mkdir -p $out/share/tartan-vote/www
+                cp -r ${frontend}/* $out/share/tartan-vote/www/
+                chmod -R u+w $out/share/tartan-vote/www
+                wrapProgram $out/bin/backend \
+                  --set-default STATIC_DIR $out/share/tartan-vote/www
+              '';
+            };
           };
         in
         {
