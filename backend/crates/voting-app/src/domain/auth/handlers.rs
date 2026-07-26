@@ -17,7 +17,7 @@ pub struct AuthStatusResponse {
 }
 
 pub async fn login() -> impl IntoResponse {
-    Redirect::to("/")
+    Redirect::to("/home")
 }
 
 pub async fn logout(session: Session) -> impl IntoResponse {
