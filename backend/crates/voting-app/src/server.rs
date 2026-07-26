@@ -1,5 +1,6 @@
 use axum::{
-    Router, error_handling::HandleErrorLayer, middleware, response::IntoResponse, routing::get,
+    Router, error_handling::HandleErrorLayer, http::StatusCode, middleware, response::IntoResponse,
+    routing::get,
 };
 use axum_oidc::{OidcAuthLayer, OidcLoginLayer, error::MiddlewareError, handle_oidc_redirect};
 use fred::prelude::{ClientLike, Config as RedisConfig, Pool};
@@ -20,7 +21,7 @@ use crate::core::auth::oidc::{self, GroupClaims, SessionWrapper};
 use crate::core::openapi::ApiDoc;
 use crate::{AppState, config::Config};
 
-#[utoipa::path(get, path = "/api/health", tag = "health", responses((status = OK, body = str)))]
+#[utoipa::path(get, path = "/health", tag = "health", responses((status = OK, body = str)))]
 async fn health() -> &'static str {
     "OK"
 }
@@ -41,21 +42,43 @@ pub async fn setup(config: Config) {
     let bind_addr = app_state.config.bind_addr.clone();
 
     let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
-        .routes(routes!(crate::domain::auth::handlers::auth_status))
-        .routes(routes!(crate::domain::auth::bypass::bypass_login))
-        .routes(routes!(crate::domain::auth::bypass::bypass_status))
-        .routes(routes!(crate::domain::auth::bypass::bypass_logout))
-        .routes(routes!(health))
-        .routes(routes!(crate::domain::event::handlers::create_event))
-        .routes(routes!(crate::domain::event::handlers::check_event))
-        .routes(routes!(crate::domain::event::handlers::end_event))
-        .routes(routes!(crate::domain::attendance::handlers::attendance))
+        .nest(
+            "/api",
+            OpenApiRouter::new()
+                .routes(routes!(crate::domain::auth::handlers::auth_status))
+                .routes(routes!(crate::domain::auth::bypass::bypass_login))
+                .routes(routes!(crate::domain::auth::bypass::bypass_status))
+                .routes(routes!(crate::domain::auth::bypass::bypass_logout))
+                .routes(routes!(health))
+                .routes(routes!(crate::domain::event::handlers::create_event))
+                .routes(routes!(crate::domain::event::handlers::check_event))
+                .routes(routes!(crate::domain::event::handlers::end_event))
+                .routes(routes!(crate::domain::attendance::handlers::attendance)),
+        )
         .split_for_parts();
 
-    let base_router = router
-        .merge(Scalar::with_url("/api/scalar", api.clone()))
+    let login_layer = ServiceBuilder::new()
+        .layer(HandleErrorLayer::new(|e: MiddlewareError| async move {
+            tracing::error!("OIDC login error: {:?}", e);
+            e.into_response()
+        }))
+        .layer(OidcLoginLayer::<GroupClaims, SessionWrapper>::new());
+
+    let auth_routes: Router<AppState> = Router::new()
         .route(
-            "/api/openapi.json",
+            "/auth/login",
+            get(crate::domain::auth::handlers::login).layer(login_layer),
+        )
+        .route(
+            "/auth/callback",
+            get(handle_oidc_redirect::<GroupClaims, SessionWrapper>),
+        )
+        .route("/auth/logout", get(crate::domain::auth::handlers::logout));
+
+    let api_routes: Router<AppState> = Router::new()
+        .merge(Scalar::with_url("/scalar", api.clone()))
+        .route(
+            "/openapi.json",
             get(move || {
                 let api = api.clone();
                 async move { axum::Json(api) }
@@ -82,7 +105,6 @@ pub async fn setup(config: Config) {
             "/events/{id}/export",
             get(crate::domain::votes::handlers::export_event_results),
         )
-        .route("/health", get(|| async { "OK" }))
         .route(
             "/session/create",
             get(crate::domain::session::handlers::create_session),
@@ -111,8 +133,7 @@ pub async fn setup(config: Config) {
             "/session/{session_code}/events/export",
             get(crate::domain::session::export::export_session_events_json),
         )
-        .route("/", get(crate::domain::auth::handlers::demo_home))
-        .fallback(get(crate::domain::auth::handlers::demo_not_found));
+        .merge(auth_routes);
 
     let pool = Pool::new(
         RedisConfig::from_url(&app_state.config.valkey_url).expect("valid VALKEY_URL"),
@@ -132,24 +153,6 @@ pub async fn setup(config: Config) {
         .with_same_site(SameSite::Lax)
         .with_expiry(Expiry::OnInactivity(Duration::hours(1)));
 
-    let login_layer = ServiceBuilder::new()
-        .layer(HandleErrorLayer::new(|e: MiddlewareError| async move {
-            tracing::error!("OIDC login error: {:?}", e);
-            e.into_response()
-        }))
-        .layer(OidcLoginLayer::<GroupClaims, SessionWrapper>::new());
-
-    let auth_routes: Router<AppState> = Router::new()
-        .route(
-            "/auth/login",
-            get(crate::domain::auth::handlers::login).layer(login_layer),
-        )
-        .route(
-            "/auth/callback",
-            get(handle_oidc_redirect::<GroupClaims, SessionWrapper>),
-        )
-        .route("/auth/logout", get(crate::domain::auth::handlers::logout));
-
     let client = oidc::build_client(&app_state.config.oidc)
         .await
         .expect("failed to build OIDC client (Keycloak discovery)");
@@ -162,8 +165,8 @@ pub async fn setup(config: Config) {
         }))
         .layer(OidcAuthLayer::<GroupClaims, SessionWrapper>::new(client));
 
-    let api_router = base_router
-        .merge(auth_routes)
+    let app = router
+        .nest("/api", api_routes)
         .layer(middleware::from_fn_with_state(
             app_state.clone(),
             crate::core::auth::middleware::sync_user_middleware,
@@ -175,14 +178,15 @@ pub async fn setup(config: Config) {
         ))
         .layer(session_layer)
         .layer(crate::core::cors::layer())
-        .with_state(app_state);
+        .with_state(app_state)
+        .fallback(|| async { StatusCode::NOT_FOUND });
 
     let listener = tokio::net::TcpListener::bind(&bind_addr)
         .await
         .expect("failed to bind to server address");
     println!("Listening on {}", bind_addr);
 
-    axum::serve(listener, api_router.into_make_service())
+    axum::serve(listener, app.into_make_service())
         .await
         .expect("failed to start server");
 }
