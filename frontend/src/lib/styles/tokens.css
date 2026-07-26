@@ -1,0 +1,125 @@
+@import url("https://fonts.googleapis.com/css2?family=Sansita&display=swap");
+
+:root {
+  --font-sans:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-brand: Sansita, Georgia, serif;
+
+  --color-white: #ffffff;
+  --color-black: #000000;
+
+  --color-blue-25: #f6fdff;
+  --color-blue-50: #e7f5fa;
+  --color-blue-100: #b4def1;
+  --color-blue-200: #90cfea;
+  --color-blue-300: #5eb9e0;
+  --color-blue-400: #3eabda;
+  --color-blue-500: #0e96d1;
+  --color-blue-600: #0d89be;
+  --color-blue-700: #0a6b94;
+  --color-blue-800: #085373;
+  --color-blue-900: #063f58;
+
+  --color-slate-50: #f0f4f8;
+  --color-slate-100: #d9e1e7;
+  --color-slate-200: #c7d2dc;
+  --color-slate-300: #aebdcc;
+  --color-slate-400: #9eb1c2;
+  --color-slate-500: #869db3;
+  --color-slate-600: #7a8fa3;
+  --color-slate-700: #5f6f7f;
+  --color-slate-800: #4a5662;
+  --color-slate-900: #38424b;
+
+  --color-purple-50: #f0ecfa;
+  --color-purple-100: #d1c4ee;
+  --color-purple-200: #baa7e6;
+  --color-purple-300: #9b7fdb;
+  --color-purple-400: #8766d4;
+  --color-purple-500: #6940c9;
+  --color-purple-600: #603ab7;
+  --color-purple-700: #4b2d8f;
+  --color-purple-800: #3a236f;
+  --color-purple-900: #2c1b54;
+
+  --color-red-50: #fbe9ec;
+  --color-red-100: #f3bbc5;
+  --color-red-200: #ed9aa9;
+  --color-red-300: #e46c82;
+  --color-red-400: #df5069;
+  --color-red-500: #d72444;
+  --color-red-600: #c4213e;
+  --color-red-700: #991a30;
+  --color-red-800: #761425;
+  --color-red-900: #5a0f1d;
+
+  --color-grey-50: #f5f5f5;
+  --color-grey-100: #e6e6e6;
+  --color-grey-200: #d6d6d6;
+  --color-grey-300: #c8c8c8;
+  --color-grey-400: #bababa;
+  --color-grey-500: #a9a9a9;
+  --color-grey-600: #808080;
+  --color-grey-700: #666666;
+  --color-grey-800: #383838;
+  --color-grey-900: #1e1e1e;
+
+  --color-green-50: #e7f6ec;
+  --color-green-100: #b4e2c4;
+  --color-green-200: #90d3a8;
+  --color-green-300: #5ebf80;
+  --color-green-400: #3eb367;
+  --color-green-500: #0ea041;
+  --color-green-600: #0d923b;
+  --color-green-700: #0a722e;
+  --color-green-800: #085824;
+  --color-green-900: #06431b;
+
+  --color-yellow-50: #fef7e6;
+  --color-yellow-100: #fae7b0;
+  --color-yellow-200: #f8db8a;
+  --color-yellow-300: #f5ca54;
+  --color-yellow-400: #f3c033;
+  --color-yellow-500: #f0b000;
+  --color-yellow-600: #daa000;
+  --color-yellow-700: #aa7d00;
+  --color-yellow-800: #846100;
+  --color-yellow-900: #654a00;
+
+  --color-orange-50: #fdeee6;
+  --color-orange-100: #f9cab2;
+  --color-orange-200: #f6b18c;
+  --color-orange-300: #f28d58;
+  --color-orange-400: #ef7737;
+  --color-orange-500: #eb5505;
+  --color-orange-600: #d64d05;
+  --color-orange-700: #a73c04;
+  --color-orange-800: #812f03;
+  --color-orange-900: #632402;
+
+  --gradient-brand: linear-gradient(
+    90deg,
+    var(--color-blue-500) 0%,
+    var(--color-purple-300) 52%,
+    var(--color-red-400) 100%
+  );
+  --gradient-screen-signin: linear-gradient(
+    180deg,
+    var(--color-blue-25) 0%,
+    #eff6fa 17.788%,
+    #edd6da 85.096%
+  );
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: var(--color-blue-25);
+  color: var(--color-grey-900);
+  font-family: var(--font-sans);
+}

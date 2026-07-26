@@ -1,11 +1,12 @@
 <script lang="ts">
-	import favicon from '$lib/assets/favicon.svg';
+  import '$lib/styles/tokens.css';
+  import tartanvoteLogo from '$lib/assets/tartanvote-logo.svg';
 
-	let { children } = $props();
+  let { children } = $props();
 </script>
 
 <svelte:head>
-	<link rel="icon" href={favicon} />
+  <link rel="icon" href={tartanvoteLogo} />
 </svelte:head>
 
 {@render children()}
