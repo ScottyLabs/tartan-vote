@@ -1,24 +1,9 @@
-const PUBLIC_HOST = "tartan.vote";
+/// <reference types="vite/client" />
 
-const envBase = import.meta.env.VITE_API_BASE;
-const configuredBase = envBase ? envBase.replace(/\/$/u, "") : "";
+const envBase: unknown = import.meta.env.VITE_API_BASE;
+const configuredBase = typeof envBase === "string" ? envBase.replace(/\/$/u, "") : "";
 
-const apiBaseFromHostname = (hostname: string): string => {
-  if (hostname === PUBLIC_HOST || hostname === `www.${PUBLIC_HOST}`) {
-    return `https://api.${PUBLIC_HOST}`;
-  }
-
-  const preview = hostname.match(/^tartan-vote-frontend-(?<slug>.+)\.scottylabs\.net$/u);
-  if (preview?.groups?.slug) {
-    return `https://tartan-vote-tartan-vote-${preview.groups.slug}.scottylabs.net`;
-  }
-
-  return "";
-};
-
-const hostname = globalThis.location?.hostname ?? "";
-
-export const apiBase = apiBaseFromHostname(hostname) || configuredBase;
+export const apiBase = configuredBase;
 
 export const apiUrl = (path: string): string => {
   if (/^https?:\/\//u.test(path)) {
@@ -26,5 +11,7 @@ export const apiUrl = (path: string): string => {
   }
 
   const normalized = path.startsWith("/") ? path : `/${path}`;
-  return `${apiBase}${normalized}`;
+  const apiPath =
+    normalized === "/api" || normalized.startsWith("/api/") ? normalized : `/api${normalized}`;
+  return `${apiBase}${apiPath}`;
 };

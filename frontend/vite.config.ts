@@ -14,4 +14,14 @@ export default defineConfig({
       adapter: adapter({ pages: "dist", assets: "dist", fallback: "index.html" }),
     }),
   ],
+  // Bundle SSR deps so Deno's postbuild analyse worker does not need every
+  // transitive package listed as a direct dependency of this project.
+  ssr: {
+    noExternal: true,
+  },
+  server: {
+    proxy: {
+      "/api": "http://localhost:8080",
+    },
+  },
 });
