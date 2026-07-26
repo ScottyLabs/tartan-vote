@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use std::env;
+use std::path::PathBuf;
 
 secretspec_derive::declare_secrets!("../../../secretspec.toml");
 
@@ -9,6 +10,7 @@ pub struct Config {
     pub valkey_url: String,
     pub bind_addr: String,
     pub sentry_dsn: Option<String>,
+    pub static_dir: Option<PathBuf>,
     pub oidc: OidcSettings,
 }
 
@@ -37,6 +39,7 @@ impl Config {
             valkey_url: env::var("VALKEY_URL").context("VALKEY_URL must be set")?,
             bind_addr: bind_addr_from_env(),
             sentry_dsn: secrets.sentry_dsn.or_else(|| optional_env("SENTRY_DSN")),
+            static_dir: optional_env("STATIC_DIR").map(PathBuf::from),
             oidc: OidcSettings {
                 keycloak_url: secrets.keycloak_url.context("KEYCLOAK_URL must be set")?,
                 keycloak_realm: secrets

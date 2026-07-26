@@ -64,7 +64,7 @@ pub async fn build_client(settings: &OidcSettings) -> anyhow::Result<OidcClient<
     ))
     .map_err(|e| anyhow::anyhow!("invalid Keycloak issuer URL: {e}"))?;
 
-    let callback = format!("{}/auth/callback", settings.app_url);
+    let callback = format!("{}/api/auth/callback", settings.app_url);
 
     let client = OidcClient::<GroupClaims>::builder()
         .with_default_http_client()
