@@ -47,7 +47,15 @@ pub enum StatusOption {
     Inactive,
 }
 #[derive(
-    Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, serde::Serialize, serde::Deserialize,
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    EnumIter,
+    DeriveActiveEnum,
+    serde::Serialize,
+    serde::Deserialize,
+    utoipa::ToSchema,
 )]
 #[sea_orm(rs_type = "String", db_type = "Enum", enum_name = "session_status")]
 pub enum SessionStatus {
