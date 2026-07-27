@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import AppFooter from '$lib/components/AppFooter.svelte';
+	import EndSessionDialog from '$lib/components/EndSessionDialog.svelte';
 	import HostConfigurationDialog from '$lib/components/HostConfigurationDialog.svelte';
 	import ProxyRequestDialog from '$lib/components/ProxyRequestDialog.svelte';
 	import actionsUrl from '$lib/assets/host-actions.svg?url';
@@ -78,6 +79,7 @@
 	let activeQuorum = $state(page.url.searchParams.get('quorum')?.trim() || '');
 	let votesSubmitted = $state(runningSubmitted);
 	let eligibleVotes = $state(runningEligible);
+	let endSessionDialogOpen = $state(false);
 
 	const selectedParticipant = $derived(
 		participants.find((participant) => participant.id === activeParticipantId)
@@ -247,7 +249,7 @@
 				<button class="menu-item" type="button">Comprehensive Session Results</button>
 			</nav>
 
-			<button class="end-session" type="button">End session</button>
+				<button class="end-session" type="button" onclick={() => (endSessionDialogOpen = true)}>End session</button>
 		</aside>
 
 		<section class="overview" aria-label="Host overview">
@@ -377,6 +379,13 @@
 		onaccept={() => updateParticipant('accepted')}
 		ondecline={() => updateParticipant('declined')}
 		onkick={() => activeParticipantId !== null && kickParticipant(activeParticipantId)}
+	/>
+{/if}
+
+{#if endSessionDialogOpen}
+	<EndSessionDialog
+		onclose={() => (endSessionDialogOpen = false)}
+		onconfirm={() => (window.location.href = '/home')}
 	/>
 {/if}
 

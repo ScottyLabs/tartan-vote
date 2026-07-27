@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import AppFooter from '$lib/components/AppFooter.svelte';
 	import ConfirmLiveResultsSharingDialog from '$lib/components/ConfirmLiveResultsSharingDialog.svelte';
+	import EndSessionDialog from '$lib/components/EndSessionDialog.svelte';
 	import EndVotingInstanceDialog from '$lib/components/EndVotingInstanceDialog.svelte';
 	import HostFinalResultsDialog from '$lib/components/HostFinalResultsDialog.svelte';
 	import linkUrl from '$lib/assets/host-link.svg?url';
@@ -25,6 +26,7 @@
 	let finalDialogOpen = $state(page.url.searchParams.get('dialog') === 'final');
 	let sharingDialogOpen = $state(page.url.searchParams.get('dialog') === 'share');
 	let instanceEnded = $state(false);
+	let endSessionDialogOpen = $state(false);
 
 	function confirmEnd() {
 		endDialogOpen = false;
@@ -75,7 +77,7 @@
 				<button class="menu-item" type="button">Comprehensive Session Results</button>
 			</nav>
 
-			<button class="end-session" type="button">End session</button>
+				<button class="end-session" type="button" onclick={() => (endSessionDialogOpen = true)}>End session</button>
 		</aside>
 
 		<section class="live-page" aria-labelledby="live-view-heading">
@@ -169,6 +171,13 @@
 		currentlyShared={resultsShared}
 		onclose={() => (sharingDialogOpen = false)}
 		onconfirm={confirmLiveResultsSharing}
+	/>
+{/if}
+
+{#if endSessionDialogOpen}
+	<EndSessionDialog
+		onclose={() => (endSessionDialogOpen = false)}
+		onconfirm={() => (window.location.href = '/home')}
 	/>
 {/if}
 

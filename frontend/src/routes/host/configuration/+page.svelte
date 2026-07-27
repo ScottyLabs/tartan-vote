@@ -3,6 +3,7 @@
 	import { onMount } from 'svelte';
 	import AppFooter from '$lib/components/AppFooter.svelte';
 	import ConfirmDeleteOrganizationDialog from '$lib/components/ConfirmDeleteOrganizationDialog.svelte';
+	import EndSessionDialog from '$lib/components/EndSessionDialog.svelte';
 	import OrganizationNameDialog from '$lib/components/OrganizationNameDialog.svelte';
 	import linkUrl from '$lib/assets/host-link.svg?url';
 	import pencilUrl from '$lib/assets/host-pencil.svg?url';
@@ -29,6 +30,7 @@
 	let organizationPendingDelete = $state<string | null>(page.url.searchParams.get('delete'));
 	let nameDialogMode = $state<'create' | 'edit' | null>(null);
 	let nameDialogError = $state('');
+	let endSessionDialogOpen = $state(false);
 
 	const isDefault = $derived(organization === 'Default');
 
@@ -228,7 +230,7 @@
 				<button class="menu-item" type="button">Comprehensive Session Results</button>
 			</nav>
 
-			<button class="end-session" type="button">End session</button>
+				<button class="end-session" type="button" onclick={() => (endSessionDialogOpen = true)}>End session</button>
 		</aside>
 
 		<section class="configuration-page" aria-labelledby="configuration-title">
@@ -371,6 +373,13 @@
 		error={nameDialogError}
 		onclose={() => (nameDialogMode = null)}
 		onsubmit={submitOrganizationName}
+	/>
+{/if}
+
+{#if endSessionDialogOpen}
+	<EndSessionDialog
+		onclose={() => (endSessionDialogOpen = false)}
+		onconfirm={() => (window.location.href = '/home')}
 	/>
 {/if}
 
