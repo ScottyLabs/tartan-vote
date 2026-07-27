@@ -1,10 +1,10 @@
 <script lang="ts">
 	import heartUrl from '$lib/assets/heart.svg?url';
 
-	let { wide = false } = $props();
+	let { wide = false, flow = false } = $props();
 </script>
 
-<footer class="footer" class:wide={wide}>
+<footer class="footer" class:wide={wide} class:flow={flow}>
 	<p>
 		Designed, developed and maintained with
 		<span class="heart" aria-label="love">
@@ -37,6 +37,11 @@
 		background: var(--color-grey-50);
 		border-top: 1px solid var(--color-grey-400);
 		color: var(--color-slate-800);
+	}
+
+	.footer.flow {
+		position: relative;
+		flex: 0 0 81px;
 	}
 
 	.footer p {
