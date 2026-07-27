@@ -4,7 +4,11 @@
 	let { wide = false, flow = false } = $props();
 </script>
 
-<footer class="footer" class:wide={wide} class:flow={flow}>
+{#if flow}
+	<div class="footer-spacer" aria-hidden="true"></div>
+{/if}
+
+<footer class="footer" class:wide={wide} class:fixed={flow}>
 	<p>
 		Designed, developed and maintained with
 		<span class="heart" aria-label="love">
@@ -39,8 +43,15 @@
 		color: var(--color-slate-800);
 	}
 
-	.footer.flow {
-		position: relative;
+	.footer.fixed {
+		position: fixed;
+		z-index: 10;
+		bottom: 0;
+	}
+
+	.footer-spacer {
+		width: 100%;
+		height: 81px;
 		flex: 0 0 81px;
 	}
 
