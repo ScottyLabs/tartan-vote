@@ -55,7 +55,26 @@ pub async fn setup(config: Config) {
                 .routes(routes!(crate::domain::event::handlers::create_event))
                 .routes(routes!(crate::domain::event::handlers::check_event))
                 .routes(routes!(crate::domain::event::handlers::end_event))
-                .routes(routes!(crate::domain::attendance::handlers::attendance)),
+                .routes(routes!(crate::domain::attendance::handlers::attendance))
+                .routes(routes!(crate::domain::votes::handlers::cast_vote))
+                .routes(routes!(crate::domain::votes::handlers::get_motion_results))
+                .routes(routes!(crate::domain::votes::handlers::get_vote_instances))
+                .routes(routes!(
+                    crate::domain::votes::handlers::list_proxy_assignments
+                ))
+                .routes(routes!(crate::domain::votes::handlers::assign_proxy))
+                .routes(routes!(
+                    crate::domain::votes::handlers::export_event_results
+                ))
+                .routes(routes!(crate::domain::session::handlers::create_session))
+                .routes(routes!(crate::domain::session::handlers::join_session))
+                .routes(routes!(crate::domain::session::handlers::set_session_proxy))
+                .routes(routes!(crate::domain::session::handlers::end_session))
+                .routes(routes!(crate::domain::session::handlers::status_session))
+                .routes(routes!(crate::domain::session::export::export_session_data))
+                .routes(routes!(
+                    crate::domain::session::export::export_session_events_json
+                )),
         )
         .split_for_parts();
 
@@ -85,55 +104,6 @@ pub async fn setup(config: Config) {
                 let api = api.clone();
                 async move { axum::Json(api) }
             }),
-        )
-        .route(
-            "/events/{id}/vote",
-            axum::routing::post(crate::domain::votes::handlers::cast_vote),
-        )
-        .route(
-            "/events/{id}/results",
-            get(crate::domain::votes::handlers::get_motion_results),
-        )
-        .route(
-            "/events/{id}/vote-instances",
-            get(crate::domain::votes::handlers::get_vote_instances),
-        )
-        .route(
-            "/events/{id}/proxies",
-            get(crate::domain::votes::handlers::list_proxy_assignments)
-                .post(crate::domain::votes::handlers::assign_proxy),
-        )
-        .route(
-            "/events/{id}/export",
-            get(crate::domain::votes::handlers::export_event_results),
-        )
-        .route(
-            "/session/create",
-            get(crate::domain::session::handlers::create_session),
-        )
-        .route(
-            "/session/join/{session_code}",
-            get(crate::domain::session::handlers::join_session),
-        )
-        .route(
-            "/session/{session_code}/proxy",
-            axum::routing::post(crate::domain::session::handlers::set_session_proxy),
-        )
-        .route(
-            "/session/{session_code}/end",
-            axum::routing::get(crate::domain::session::handlers::end_session),
-        )
-        .route(
-            "/session/{session_code}/status",
-            get(crate::domain::session::handlers::status_session),
-        )
-        .route(
-            "/session/{session_code}/export/{kind}/{format}",
-            get(crate::domain::session::export::export_session_data),
-        )
-        .route(
-            "/session/{session_code}/events/export",
-            get(crate::domain::session::export::export_session_events_json),
         )
         .merge(auth_routes);
 
