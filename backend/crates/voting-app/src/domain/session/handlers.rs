@@ -9,31 +9,45 @@ use sea_orm::{
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::json;
+use utoipa::ToSchema;
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub struct CreateSessionResponse {
     pub session_code: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub struct EndSessionResponse {
     pub session_code: String,
     pub status: SessionStatus,
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, ToSchema)]
+pub struct StatusSessionResponse {
+    pub session_ended: bool,
+}
+
+#[derive(Deserialize, ToSchema)]
 pub struct SetSessionProxyRequest {
     pub is_senator: bool,
     pub proxy_for: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub struct SetSessionProxyResponse {
     pub vote_instance_count: usize,
     pub is_senator: bool,
     pub has_proxy: bool,
 }
 
+#[utoipa::path(
+    post,
+    path = "/session/create",
+    tag = "sessions",
+    responses(
+        (status = 201, description = "Session created", body = CreateSessionResponse),
+    )
+)]
 pub async fn create_session(user: SyncedUser, State(state): State<AppState>) -> impl IntoResponse {
     let store = &state.store;
 
@@ -60,6 +74,18 @@ pub async fn create_session(user: SyncedUser, State(state): State<AppState>) -> 
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/session/{session_code}/status",
+    tag = "sessions",
+    params(
+        ("session_code" = String, Path, description = "Session join code")
+    ),
+    responses(
+        (status = 200, description = "Whether the session has ended", body = StatusSessionResponse),
+        (status = 404, description = "Session not found"),
+    )
+)]
 pub async fn status_session(
     _user: SyncedUser,
     State(state): State<AppState>,
@@ -82,6 +108,19 @@ pub async fn status_session(
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/session/join/{session_code}",
+    tag = "sessions",
+    params(
+        ("session_code" = String, Path, description = "Session join code")
+    ),
+    responses(
+        (status = 200, description = "Joined the session (or already joined)"),
+        (status = 403, description = "Session is not open"),
+        (status = 404, description = "Session not found"),
+    )
+)]
 pub async fn join_session(
     user: SyncedUser,
     State(state): State<AppState>,
@@ -136,6 +175,20 @@ fn normalize_proxy_for(proxy_for: Option<&str>) -> Option<String> {
         .filter(|value| !value.is_empty())
 }
 
+#[utoipa::path(
+    post,
+    path = "/session/{session_code}/proxy",
+    tag = "sessions",
+    params(
+        ("session_code" = String, Path, description = "Session join code")
+    ),
+    request_body = SetSessionProxyRequest,
+    responses(
+        (status = 200, description = "Proxy / senator vote instances updated", body = SetSessionProxyResponse),
+        (status = 403, description = "Session is not open"),
+        (status = 404, description = "Session not found"),
+    )
+)]
 pub async fn set_session_proxy(
     user: SyncedUser,
     State(state): State<AppState>,
@@ -313,6 +366,19 @@ pub async fn set_session_proxy(
         .into_response()
 }
 
+#[utoipa::path(
+    post,
+    path = "/session/{session_code}/end",
+    tag = "sessions",
+    params(
+        ("session_code" = String, Path, description = "Session join code")
+    ),
+    responses(
+        (status = 200, description = "Session ended", body = EndSessionResponse),
+        (status = 403, description = "Only the session host may end the session"),
+        (status = 404, description = "Session not found"),
+    )
+)]
 pub async fn end_session(
     user: SyncedUser,
     State(state): State<AppState>,

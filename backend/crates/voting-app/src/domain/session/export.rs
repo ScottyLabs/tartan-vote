@@ -15,6 +15,7 @@ use sea_orm::{
     QueryOrder, Statement,
 };
 use std::collections::HashMap;
+use utoipa::ToSchema;
 use voting_app_store::Store;
 
 #[cfg(test)]
@@ -82,7 +83,7 @@ struct VoteCount {
     count: i64,
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, ToSchema)]
 pub struct SessionEventExportItem {
     pub event_id: i32,
     pub event_name: String,
@@ -94,13 +95,13 @@ pub struct SessionEventExportItem {
     pub option_counts: Vec<SessionEventOptionCount>,
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, ToSchema)]
 pub struct SessionEventOptionCount {
     pub option: String,
     pub count: u32,
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, ToSchema)]
 pub struct SessionEventsExportResponse {
     pub session_code: String,
     pub total_events: usize,
@@ -489,6 +490,33 @@ pub async fn ret_vote_csv_with_db(db: &DatabaseConnection, session_code: &str) -
     build_vote_csv(&counts)
 }
 
+#[utoipa::path(
+    get,
+    path = "/session/{session_code}/export/{kind}/{format}",
+    tag = "sessions",
+    params(
+        ("session_code" = String, Path, description = "Session join code"),
+        ("kind" = String, Path, description = "Export kind: attendance or vote"),
+        ("format" = String, Path, description = "Export format: pdf or csv"),
+    ),
+    responses(
+        (
+            status = 200,
+            description = "Exported PDF or CSV attachment",
+            content(
+                (Vec<u8> = "application/pdf"),
+                (Vec<u8> = "text/csv"),
+            ),
+            headers(
+                (
+                    "Content-Disposition" = String,
+                    description = "attachment; filename=\"{session_code}_{kind}.{pdf|csv}\""
+                ),
+            )
+        ),
+        (status = 400, description = "Invalid kind or format"),
+    )
+)]
 pub async fn export_session_data(
     _user: SyncedUser,
     State(state): State<AppState>,
@@ -567,6 +595,19 @@ pub async fn export_session_data(
         .into_response()
 }
 
+#[utoipa::path(
+    get,
+    path = "/session/{session_code}/events/export",
+    tag = "sessions",
+    params(
+        ("session_code" = String, Path, description = "Session join code")
+    ),
+    responses(
+        (status = 200, description = "Session events export", body = SessionEventsExportResponse),
+        (status = 403, description = "Only the session host may export events"),
+        (status = 404, description = "Session not found"),
+    )
+)]
 pub async fn export_session_events_json(
     user: SyncedUser,
     State(state): State<AppState>,
