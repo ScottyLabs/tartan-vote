@@ -9,6 +9,7 @@
     selectedChoiceId?: string;
     disabled?: boolean;
     compact?: boolean;
+    quickVote?: boolean;
     onChange: (instanceId: string, choiceId: string) => void;
   }
 
@@ -18,13 +19,14 @@
     selectedChoiceId,
     disabled = false,
     compact = false,
+    quickVote = false,
     onChange
   }: Props = $props();
 
   const groupName = $derived(`vote-${instance.id}`);
 </script>
 
-<fieldset class:compact {disabled}>
+<fieldset class:compact class:quick-vote={quickVote} {disabled}>
   <legend>Ballot for {instance.votingId}{instance.proxy ? ', proxy vote' : ''}</legend>
 
   <div class="instance-header">
@@ -162,6 +164,12 @@
       min-height: clamp(230px, 13.54vw, 260px);
       padding-top: clamp(24px, 1.56vw, 30px);
       padding-bottom: clamp(24px, 1.56vw, 30px);
+    }
+
+    fieldset.quick-vote {
+      min-height: clamp(190px, 10.938vw, 210px);
+      padding-top: clamp(20px, 1.563vw, 30px);
+      padding-bottom: clamp(20px, 1.563vw, 30px);
     }
 
     .instance-header {

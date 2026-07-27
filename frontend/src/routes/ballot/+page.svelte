@@ -5,12 +5,16 @@
   import VoterHeader from '$lib/components/VoterHeader.svelte';
   import VotingInstanceFieldset from '$lib/components/VotingInstanceFieldset.svelte';
   import { ballotChoices, votingInstances } from '$lib/domain/ballot';
+  import { loadOrganizationSettings } from '$lib/domain/organizationSettings';
+  import { onMount } from 'svelte';
 
   const sessionCode = page.url.searchParams.get('sessionCode')?.trim() || 'happy-giraffe';
   const hasProxy = page.url.searchParams.get('proxy') !== 'false';
   const confirmationKind = page.url.searchParams.get('confirmation') === 'secret' ? 'secret' : 'live';
   const resultsVariant = page.url.searchParams.get('results') === 'rollcall' ? 'rollcall-live' : 'live';
+  const isQuickVote = page.url.searchParams.get('quickvote') === 'true';
   const instances = hasProxy ? votingInstances : votingInstances.slice(0, 1);
+  let choices = $state(ballotChoices);
 
   let selections = $state<Record<string, string>>({});
   let submitted = $state(false);
@@ -18,6 +22,14 @@
 
   const allSelected = $derived(instances.every((instance) => Boolean(selections[instance.id])));
   const voteNoun = $derived(hasProxy ? 'Votes' : 'Vote');
+
+  onMount(() => {
+    if (!isQuickVote) return;
+    choices = loadOrganizationSettings().quickVoteOptions.map((label, index) => ({
+      id: `quick-option-${index + 1}`,
+      label
+    }));
+  });
 
   function signOut() {
     window.location.href = apiUrl('/auth/logout');
@@ -57,11 +69,11 @@
 <main class="ballot-page">
   <VoterHeader {sessionCode} onSignOut={signOut} />
 
-  <section class="ballot-content" aria-labelledby="ballot-title">
-    <header class:with-proxy={hasProxy} class="election-card">
-      <h1 id="ballot-title">Election: Best Rust Stuco Instructor</h1>
+  <section class:quick-vote={isQuickVote} class="ballot-content" aria-labelledby="ballot-title">
+    <header class:with-proxy={hasProxy && !isQuickVote} class="election-card">
+      <h1 id="ballot-title">{isQuickVote ? 'QuickVote' : 'Election: Best Rust Stuco Instructor'}</h1>
       <p>Voting Type: Standard</p>
-      {#if hasProxy}
+      {#if hasProxy && !isQuickVote}
         <p class="instructions">Choose one response for each ballot assigned to you. Your proxy ballot is recorded separately from your own vote.</p>
       {/if}
     </header>
@@ -71,10 +83,11 @@
         {#each instances as instance (instance.id)}
           <VotingInstanceFieldset
             {instance}
-            choices={ballotChoices}
+            {choices}
             selectedChoiceId={selections[instance.id]}
             disabled={submitted}
             compact={hasProxy}
+            quickVote={isQuickVote}
             onChange={updateSelection}
           />
         {/each}
@@ -280,6 +293,10 @@
       max-width: none;
       margin-top: clamp(86px, 7.55vw, 145px);
       padding-bottom: clamp(70px, 5.2vw, 100px);
+    }
+
+    .ballot-content.quick-vote {
+      margin-top: 30px;
     }
 
     .election-card {
