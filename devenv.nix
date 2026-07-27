@@ -32,11 +32,8 @@
 
   git-hooks.hooks = {
     deno-check.entry = lib.mkForce "bash -c 'cd frontend && deno check .'";
-    deno-test.entry = lib.mkForce "deno test --ignore=.devenv,.direnv,old-frontend --permit-no-files";
+    deno-test.entry = lib.mkForce "deno test --ignore=.devenv,.direnv --permit-no-files";
   };
-
-  git-hooks.excludes = [ "old-frontend/.*" ];
-  treefmt.config.settings.excludes = [ "old-frontend/**" ];
 
   scripts = {
     generate-api.exec = "cd frontend && deno task generate-api";
