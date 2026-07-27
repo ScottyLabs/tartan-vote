@@ -14,27 +14,34 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
+use utoipa::ToSchema;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct CastVoteRequest {
     pub vote_response: Vec<String>,
     pub voter_instance_id: Option<i32>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, ToSchema)]
+pub struct CastVoteResponse {
+    pub voter_instance_id: i32,
+    pub vote_id: i32,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct AssignProxyRequest {
     pub proxy_holder_user_id: i32,
     pub proxied_senator_user_id: i32,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct AssignProxyResponse {
     pub voter_instance_id: i32,
     pub proxy_holder_user_id: i32,
     pub proxied_senator_user_id: i32,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct VoteInstance {
     pub voter_instance_id: i32,
     pub is_proxy: bool,
@@ -43,7 +50,7 @@ pub struct VoteInstance {
     pub has_voted: bool,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct ProxyAssignment {
     pub voter_instance_id: i32,
     pub proxy_holder_user_id: i32,
@@ -52,7 +59,7 @@ pub struct ProxyAssignment {
     pub proxied_senator_name: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct VoteExportRecord {
     pub voter_instance_id: i32,
     pub cast_time: String,
@@ -64,7 +71,7 @@ pub struct VoteExportRecord {
     pub vote_response: Vec<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct EventExportResponse {
     pub event_id: i32,
     pub event_name: String,
@@ -73,7 +80,7 @@ pub struct EventExportResponse {
     pub votes: Vec<VoteExportRecord>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct MotionResults {
     pub pass: u32,
     pub reject: u32,
@@ -83,14 +90,14 @@ pub struct MotionResults {
     pub passed: bool,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct ElectionOptionResult {
     pub label: String,
     pub count: u32,
     pub percent: u32,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct ElectionResults {
     pub vote_type: String,
     pub total: u32,
@@ -209,6 +216,21 @@ fn select_voter_instance(
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/events/{id}/vote",
+    tag = "votes",
+    params(
+        ("id" = i32, Path, description = "Event id")
+    ),
+    request_body = CastVoteRequest,
+    responses(
+        (status = 201, description = "Vote cast", body = CastVoteResponse),
+        (status = 400, description = "Invalid vote request"),
+        (status = 404, description = "Event not found"),
+        (status = 409, description = "Vote already cast for this instance"),
+    )
+)]
 pub async fn cast_vote(
     user: SyncedUser,
     State(state): State<AppState>,
@@ -370,6 +392,20 @@ pub async fn cast_vote(
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/events/{id}/results",
+    tag = "votes",
+    params(
+        ("id" = i32, Path, description = "Event id")
+    ),
+    responses(
+        (status = 200, description = "MotionResults for motions, or ElectionResults for elections", body = MotionResults),
+        (status = 400, description = "Unsupported vote type"),
+        (status = 403, description = "Results not yet available"),
+        (status = 404, description = "Event not found"),
+    )
+)]
 pub async fn get_motion_results(
     _user: SyncedUser,
     State(state): State<AppState>,
@@ -484,6 +520,22 @@ pub async fn get_motion_results(
     (StatusCode::OK, Json(json!(election_results))).into_response()
 }
 
+#[utoipa::path(
+    post,
+    path = "/events/{id}/proxies",
+    tag = "votes",
+    params(
+        ("id" = i32, Path, description = "Event id")
+    ),
+    request_body = AssignProxyRequest,
+    responses(
+        (status = 201, description = "Proxy assigned", body = AssignProxyResponse),
+        (status = 400, description = "Invalid proxy assignment"),
+        (status = 403, description = "Only the event host may assign proxies"),
+        (status = 404, description = "Event not found"),
+        (status = 409, description = "Proxy already held or senator already proxied"),
+    )
+)]
 pub async fn assign_proxy(
     user: SyncedUser,
     State(state): State<AppState>,
@@ -641,6 +693,19 @@ pub async fn assign_proxy(
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/events/{id}/proxies",
+    tag = "votes",
+    params(
+        ("id" = i32, Path, description = "Event id")
+    ),
+    responses(
+        (status = 200, description = "Proxy assignments for the event", body = Vec<ProxyAssignment>),
+        (status = 403, description = "Only the event host may view proxy assignments"),
+        (status = 404, description = "Event not found"),
+    )
+)]
 pub async fn list_proxy_assignments(
     user: SyncedUser,
     State(state): State<AppState>,
@@ -710,6 +775,18 @@ pub async fn list_proxy_assignments(
     (StatusCode::OK, Json(assignments)).into_response()
 }
 
+#[utoipa::path(
+    get,
+    path = "/events/{id}/vote-instances",
+    tag = "votes",
+    params(
+        ("id" = i32, Path, description = "Event id")
+    ),
+    responses(
+        (status = 200, description = "Vote instances available to the current user", body = Vec<VoteInstance>),
+        (status = 404, description = "Event not found"),
+    )
+)]
 pub async fn get_vote_instances(
     user: SyncedUser,
     State(state): State<AppState>,
@@ -795,6 +872,19 @@ pub async fn get_vote_instances(
     (StatusCode::OK, Json(response)).into_response()
 }
 
+#[utoipa::path(
+    get,
+    path = "/events/{id}/export",
+    tag = "votes",
+    params(
+        ("id" = i32, Path, description = "Event id")
+    ),
+    responses(
+        (status = 200, description = "Full event export including votes and proxies", body = EventExportResponse),
+        (status = 403, description = "Only the event host may export results"),
+        (status = 404, description = "Event not found"),
+    )
+)]
 pub async fn export_event_results(
     user: SyncedUser,
     State(state): State<AppState>,
