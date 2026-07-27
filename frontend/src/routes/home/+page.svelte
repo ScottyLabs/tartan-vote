@@ -13,8 +13,13 @@
 		window.location.href = '/host';
 	}
 
+	function updateSessionCode(event: Event) {
+		const input = event.currentTarget as HTMLInputElement;
+		sessionCode = input.value.replace(/^\s+/, '').replace(/\s+/g, '-');
+	}
+
 	function joinSession() {
-		const normalizedSessionCode = sessionCode.trim();
+		const normalizedSessionCode = sessionCode.replace(/^-+|-+$/g, '');
 		if (!normalizedSessionCode) return;
 
 		const searchParams = new URLSearchParams({ sessionCode: normalizedSessionCode });
@@ -54,9 +59,12 @@
 				<input
 					id="session-code"
 					type="text"
-					bind:value={sessionCode}
+					value={sessionCode}
+					oninput={updateSessionCode}
 					placeholder="ex: happy-giraffe"
 					autocomplete="off"
+					autocapitalize="none"
+					spellcheck="false"
 				/>
 
 				<button class="session-action primary-action join-action" type="submit" disabled={!sessionCode.trim()}>
