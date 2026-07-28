@@ -48,9 +48,6 @@ pub async fn setup(config: Config) {
             "/api",
             OpenApiRouter::new()
                 .routes(routes!(crate::domain::auth::handlers::auth_status))
-                .routes(routes!(crate::domain::auth::bypass::bypass_login))
-                .routes(routes!(crate::domain::auth::bypass::bypass_status))
-                .routes(routes!(crate::domain::auth::bypass::bypass_logout))
                 .routes(routes!(health))
                 .routes(routes!(crate::domain::event::handlers::create_event))
                 .routes(routes!(crate::domain::event::handlers::check_event))
@@ -145,10 +142,6 @@ pub async fn setup(config: Config) {
             crate::core::auth::middleware::sync_user_middleware,
         ))
         .layer(oidc_auth_layer)
-        .layer(middleware::from_fn_with_state(
-            app_state.clone(),
-            crate::domain::auth::bypass::bypass_auth_middleware,
-        ))
         .layer(session_layer)
         .layer(crate::core::cors::layer())
         .with_state(app_state);
