@@ -120,8 +120,9 @@ pub async fn setup(config: Config) {
         .await
         .expect("failed to connect to valkey");
     let session_store = RedisStore::new(pool);
+    let secure_cookies = app_state.config.oidc.app_url.starts_with("https://");
     let session_layer = SessionManagerLayer::new(session_store)
-        .with_secure(false)
+        .with_secure(secure_cookies)
         .with_same_site(SameSite::Lax)
         .with_expiry(Expiry::OnInactivity(Duration::hours(1)));
 
