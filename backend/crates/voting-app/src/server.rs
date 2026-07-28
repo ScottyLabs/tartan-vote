@@ -67,6 +67,8 @@ pub async fn setup(config: Config) {
                 .routes(routes!(crate::domain::session::handlers::join_session))
                 .routes(routes!(crate::domain::session::handlers::set_session_proxy))
                 .routes(routes!(crate::domain::session::handlers::end_session))
+                .routes(routes!(crate::domain::session::handlers::lock_session))
+                .routes(routes!(crate::domain::session::handlers::open_session))
                 .routes(routes!(crate::domain::session::handlers::status_session))
                 .routes(routes!(crate::domain::session::export::export_session_data))
                 .routes(routes!(

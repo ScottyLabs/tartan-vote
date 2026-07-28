@@ -436,6 +436,86 @@ pub async fn end_session(user: SyncedUser, State(state): State<AppState>) -> imp
     }
 }
 
+async fn transition_hosted_session(
+    user: SyncedUser,
+    state: State<AppState>,
+    expected: SessionStatus,
+    next: SessionStatus,
+) -> axum::response::Response {
+    let store = &state.store;
+
+    let session = match store.sessions().find_active_hosted_by_user(user.0.id).await {
+        Ok(Some(session)) => session,
+        Ok(None) => return (StatusCode::NOT_FOUND).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR).into_response(),
+    };
+
+    if session.status != expected {
+        return (
+            StatusCode::CONFLICT,
+            Json(json!({
+                "error": format!("Session must be {expected:?} to transition to {next:?}")
+            })),
+        )
+            .into_response();
+    }
+
+    let mut session_to_update = session.into_active_model();
+    session_to_update.status = Set(next);
+
+    match store.sessions().update(session_to_update).await {
+        Ok(updated) => (
+            StatusCode::OK,
+            Json(EndSessionResponse {
+                session_code: updated.join_code,
+                status: updated.status,
+            }),
+        )
+            .into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR).into_response(),
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/session/lock",
+    tag = "sessions",
+    responses(
+        (status = 200, description = "Session locked", body = EndSessionResponse),
+        (status = 404, description = "Caller is not hosting an active session"),
+        (status = 409, description = "Session is not open"),
+    )
+)]
+pub async fn lock_session(user: SyncedUser, State(state): State<AppState>) -> impl IntoResponse {
+    transition_hosted_session(
+        user,
+        State(state),
+        SessionStatus::Open,
+        SessionStatus::Locked,
+    )
+    .await
+}
+
+#[utoipa::path(
+    post,
+    path = "/session/open",
+    tag = "sessions",
+    responses(
+        (status = 200, description = "Session opened", body = EndSessionResponse),
+        (status = 404, description = "Caller is not hosting an active session"),
+        (status = 409, description = "Session is not locked"),
+    )
+)]
+pub async fn open_session(user: SyncedUser, State(state): State<AppState>) -> impl IntoResponse {
+    transition_hosted_session(
+        user,
+        State(state),
+        SessionStatus::Locked,
+        SessionStatus::Open,
+    )
+    .await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -744,5 +824,99 @@ mod tests {
             .into_response();
 
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    }
+
+    // fn lock_session
+
+    #[tokio::test]
+    async fn lock_session_locks_open_session_for_host() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results([
+                vec![make_session(1, "ABC123", SessionStatus::Open, 1)],
+                vec![make_session(1, "ABC123", SessionStatus::Locked, 1)],
+            ])
+            .into_connection();
+
+        let response = lock_session(test_user(1), State(make_state(db)))
+            .await
+            .into_response();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let json = axum_to_json(response).await;
+        assert_eq!(json["session_code"], "ABC123");
+        assert_eq!(json["status"], "Locked");
+    }
+
+    #[tokio::test]
+    async fn lock_session_returns_404_when_not_hosting() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results([vec![] as Vec<session::Model>])
+            .into_connection();
+
+        let response = lock_session(test_user(1), State(make_state(db)))
+            .await
+            .into_response();
+
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn lock_session_rejects_when_already_locked() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results([vec![make_session(1, "ABC123", SessionStatus::Locked, 1)]])
+            .into_connection();
+
+        let response = lock_session(test_user(1), State(make_state(db)))
+            .await
+            .into_response();
+
+        assert_eq!(response.status(), StatusCode::CONFLICT);
+    }
+
+    // fn open_session
+
+    #[tokio::test]
+    async fn open_session_opens_locked_session_for_host() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results([
+                vec![make_session(1, "ABC123", SessionStatus::Locked, 1)],
+                vec![make_session(1, "ABC123", SessionStatus::Open, 1)],
+            ])
+            .into_connection();
+
+        let response = open_session(test_user(1), State(make_state(db)))
+            .await
+            .into_response();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let json = axum_to_json(response).await;
+        assert_eq!(json["session_code"], "ABC123");
+        assert_eq!(json["status"], "Open");
+    }
+
+    #[tokio::test]
+    async fn open_session_returns_404_when_not_hosting() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results([vec![] as Vec<session::Model>])
+            .into_connection();
+
+        let response = open_session(test_user(1), State(make_state(db)))
+            .await
+            .into_response();
+
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn open_session_rejects_when_already_open() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results([vec![make_session(1, "ABC123", SessionStatus::Open, 1)]])
+            .into_connection();
+
+        let response = open_session(test_user(1), State(make_state(db)))
+            .await
+            .into_response();
+
+        assert_eq!(response.status(), StatusCode::CONFLICT);
     }
 }
