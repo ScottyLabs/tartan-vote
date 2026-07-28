@@ -46,10 +46,23 @@ pub struct SetSessionProxyResponse {
     tag = "sessions",
     responses(
         (status = 201, description = "Session created", body = CreateSessionResponse),
+        (status = 409, description = "Caller is already hosting an open or locked session"),
     )
 )]
 pub async fn create_session(user: SyncedUser, State(state): State<AppState>) -> impl IntoResponse {
     let store = &state.store;
+
+    match store.sessions().find_active_hosted_by_user(user.0.id).await {
+        Ok(Some(_)) => {
+            return (
+                StatusCode::CONFLICT,
+                Json(json!({"error": "Already hosting an active session"})),
+            )
+                .into_response();
+        }
+        Ok(None) => {}
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR).into_response(),
+    }
 
     let session_code = petname::petname(2, "-").expect("Failed to generate session code");
 
@@ -119,6 +132,7 @@ pub async fn status_session(
         (status = 200, description = "Joined the session (or already joined)"),
         (status = 403, description = "Session is not open"),
         (status = 404, description = "Session not found"),
+        (status = 409, description = "Caller is already participating in another active session"),
     )
 )]
 pub async fn join_session(
@@ -128,43 +142,48 @@ pub async fn join_session(
 ) -> impl IntoResponse {
     let store = &state.store;
 
-    match store.sessions().find_by_join_code(session_code).await {
-        Ok(Some(session)) => {
-            if session.status != SessionStatus::Open {
-                return (
-                    StatusCode::FORBIDDEN,
-                    Json(json!({"error": "Session is not open"})),
-                )
-                    .into_response();
-            }
+    let session = match store.sessions().find_by_join_code(session_code).await {
+        Ok(Some(session)) => session,
+        Ok(None) => return (StatusCode::NOT_FOUND).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR).into_response(),
+    };
 
-            let existing_joined_instance = entity::prelude::UserSession::find()
-                .filter(user_session::Column::SessionId.eq(session.id))
-                .filter(user_session::Column::UserId.eq(user.0.id))
-                .filter(user_session::Column::JoinLeft.eq(JoinLeft::Joined))
-                .filter(user_session::Column::Proxy.is_null())
-                .one(store.db())
-                .await;
+    if session.status != SessionStatus::Open {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({"error": "Session is not open"})),
+        )
+            .into_response();
+    }
 
-            match existing_joined_instance {
-                Ok(Some(_)) => return StatusCode::OK.into_response(),
-                Ok(None) => {}
-                Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
-            }
-
-            let new_user_session = user_session::ActiveModel {
-                user_id: Set(user.0.id),
-                session_id: Set(session.id),
-                join_left: Set(JoinLeft::Joined),
-                ..Default::default()
-            };
-
-            match store.user_sessions().create(new_user_session).await {
-                Ok(_) => (StatusCode::OK).into_response(),
-                Err(_) => (StatusCode::INTERNAL_SERVER_ERROR).into_response(),
-            }
+    match store
+        .user_sessions()
+        .find_active_participation_session(user.0.id)
+        .await
+    {
+        Ok(Some(active)) if active.id == session.id => {
+            return StatusCode::OK.into_response();
         }
-        Ok(None) => (StatusCode::NOT_FOUND).into_response(),
+        Ok(Some(_)) => {
+            return (
+                StatusCode::CONFLICT,
+                Json(json!({"error": "Already participating in an active session"})),
+            )
+                .into_response();
+        }
+        Ok(None) => {}
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR).into_response(),
+    }
+
+    let new_user_session = user_session::ActiveModel {
+        user_id: Set(user.0.id),
+        session_id: Set(session.id),
+        join_left: Set(JoinLeft::Joined),
+        ..Default::default()
+    };
+
+    match store.user_sessions().create(new_user_session).await {
+        Ok(_) => (StatusCode::OK).into_response(),
         Err(_) => (StatusCode::INTERNAL_SERVER_ERROR).into_response(),
     }
 }
@@ -524,6 +543,34 @@ mod tests {
         );
     }
 
+    // fn create_session
+
+    #[tokio::test]
+    async fn create_session_rejects_when_already_hosting_open() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results([vec![make_session(1, "ABC123", SessionStatus::Open, 1)]])
+            .into_connection();
+
+        let response = create_session(test_user(1), State(make_state(db)))
+            .await
+            .into_response();
+
+        assert_eq!(response.status(), StatusCode::CONFLICT);
+    }
+
+    #[tokio::test]
+    async fn create_session_rejects_when_already_hosting_locked() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results([vec![make_session(1, "ABC123", SessionStatus::Locked, 1)]])
+            .into_connection();
+
+        let response = create_session(test_user(1), State(make_state(db)))
+            .await
+            .into_response();
+
+        assert_eq!(response.status(), StatusCode::CONFLICT);
+    }
+
     // fn status_session
 
     #[tokio::test]
@@ -607,6 +654,7 @@ mod tests {
         let db = MockDatabase::new(DatabaseBackend::Postgres)
             .append_query_results([vec![make_session(1, "ABC123", SessionStatus::Open, 99)]])
             .append_query_results([vec![make_user_session(10, 1, 1, None)]])
+            .append_query_results([vec![make_session(1, "ABC123", SessionStatus::Open, 99)]])
             .into_connection();
 
         let response = join_session(
@@ -618,6 +666,25 @@ mod tests {
         .into_response();
 
         assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn join_session_rejects_when_participating_elsewhere() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results([vec![make_session(2, "XYZ789", SessionStatus::Open, 99)]])
+            .append_query_results([vec![make_user_session(10, 1, 1, None)]])
+            .append_query_results([vec![make_session(1, "ABC123", SessionStatus::Locked, 50)]])
+            .into_connection();
+
+        let response = join_session(
+            test_user(1),
+            State(make_state(db)),
+            Path("XYZ789".to_string()),
+        )
+        .await
+        .into_response();
+
+        assert_eq!(response.status(), StatusCode::CONFLICT);
     }
 
     #[tokio::test]
