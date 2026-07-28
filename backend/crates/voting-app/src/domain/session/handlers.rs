@@ -23,8 +23,16 @@ pub struct EndSessionResponse {
 }
 
 #[derive(Serialize, ToSchema)]
+pub struct SessionInvolvement {
+    pub session_code: String,
+    pub status: SessionStatus,
+}
+
+#[derive(Serialize, ToSchema)]
 pub struct StatusSessionResponse {
-    pub session_ended: bool,
+    pub in_session: bool,
+    pub hosting: Option<SessionInvolvement>,
+    pub participating: Option<SessionInvolvement>,
 }
 
 #[derive(Deserialize, ToSchema)]
@@ -38,6 +46,13 @@ pub struct SetSessionProxyResponse {
     pub vote_instance_count: usize,
     pub is_senator: bool,
     pub has_proxy: bool,
+}
+
+fn involvement_from(session: &session::Model) -> SessionInvolvement {
+    SessionInvolvement {
+        session_code: session.join_code.clone(),
+        status: session.status.clone(),
+    }
 }
 
 #[utoipa::path(
@@ -89,36 +104,38 @@ pub async fn create_session(user: SyncedUser, State(state): State<AppState>) -> 
 
 #[utoipa::path(
     get,
-    path = "/session/{session_code}/status",
+    path = "/session/status",
     tag = "sessions",
-    params(
-        ("session_code" = String, Path, description = "Session join code")
-    ),
     responses(
-        (status = 200, description = "Whether the session has ended", body = StatusSessionResponse),
-        (status = 404, description = "Session not found"),
+        (status = 200, description = "Caller's current session involvement", body = StatusSessionResponse),
     )
 )]
-pub async fn status_session(
-    _user: SyncedUser,
-    State(state): State<AppState>,
-    Path(session_code): Path<String>,
-) -> impl IntoResponse {
+pub async fn status_session(user: SyncedUser, State(state): State<AppState>) -> impl IntoResponse {
     let store = &state.store;
 
-    match store.sessions().find_by_join_code(session_code).await {
-        Ok(Some(session)) => (
-            StatusCode::OK,
-            Json(json!({ "session_ended": session.status == SessionStatus::Closed })),
-        )
-            .into_response(),
-        Ok(None) => (
-            StatusCode::NOT_FOUND,
-            Json(json!({"error": "Session not found"})),
-        )
-            .into_response(),
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR).into_response(),
-    }
+    let hosting = match store.sessions().find_active_hosted_by_user(user.0.id).await {
+        Ok(session) => session.map(|s| involvement_from(&s)),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR).into_response(),
+    };
+
+    let participating = match store
+        .user_sessions()
+        .find_active_participation_session(user.0.id)
+        .await
+    {
+        Ok(session) => session.map(|s| involvement_from(&s)),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR).into_response(),
+    };
+
+    (
+        StatusCode::OK,
+        Json(StatusSessionResponse {
+            in_session: hosting.is_some() || participating.is_some(),
+            hosting,
+            participating,
+        }),
+    )
+        .into_response()
 }
 
 #[utoipa::path(
@@ -387,48 +404,21 @@ pub async fn set_session_proxy(
 
 #[utoipa::path(
     post,
-    path = "/session/{session_code}/end",
+    path = "/session/end",
     tag = "sessions",
-    params(
-        ("session_code" = String, Path, description = "Session join code")
-    ),
     responses(
         (status = 200, description = "Session ended", body = EndSessionResponse),
-        (status = 403, description = "Only the session host may end the session"),
-        (status = 404, description = "Session not found"),
+        (status = 404, description = "Caller is not hosting an active session"),
     )
 )]
-pub async fn end_session(
-    user: SyncedUser,
-    State(state): State<AppState>,
-    Path(session_code): Path<String>,
-) -> impl IntoResponse {
+pub async fn end_session(user: SyncedUser, State(state): State<AppState>) -> impl IntoResponse {
     let store = &state.store;
 
-    let session = match store
-        .sessions()
-        .find_by_join_code(session_code.clone())
-        .await
-    {
+    let session = match store.sessions().find_active_hosted_by_user(user.0.id).await {
         Ok(Some(session)) => session,
         Ok(None) => return (StatusCode::NOT_FOUND).into_response(),
         Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR).into_response(),
     };
-
-    if session.created_by_user_id != user.0.id {
-        return (StatusCode::FORBIDDEN).into_response();
-    }
-
-    if session.status == SessionStatus::Closed {
-        return (
-            StatusCode::OK,
-            Json(EndSessionResponse {
-                session_code,
-                status: SessionStatus::Closed,
-            }),
-        )
-            .into_response();
-    }
 
     let mut session_to_update = session.into_active_model();
     session_to_update.status = Set(SessionStatus::Closed);
@@ -574,58 +564,41 @@ mod tests {
     // fn status_session
 
     #[tokio::test]
-    async fn status_session_reports_not_ended_for_open_session() {
+    async fn status_session_reports_hosting_and_participating() {
         let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results([vec![make_session(1, "ABC123", SessionStatus::Open, 1)]])
+            .append_query_results([vec![make_user_session(10, 1, 1, None)]])
             .append_query_results([vec![make_session(1, "ABC123", SessionStatus::Open, 1)]])
             .into_connection();
 
-        let response = status_session(
-            test_user(1),
-            State(make_state(db)),
-            Path("ABC123".to_string()),
-        )
-        .await
-        .into_response();
+        let response = status_session(test_user(1), State(make_state(db)))
+            .await
+            .into_response();
 
         assert_eq!(response.status(), StatusCode::OK);
         let json = axum_to_json(response).await;
-        assert_eq!(json["session_ended"], false);
+        assert_eq!(json["in_session"], true);
+        assert_eq!(json["hosting"]["session_code"], "ABC123");
+        assert_eq!(json["hosting"]["status"], "Open");
+        assert_eq!(json["participating"]["session_code"], "ABC123");
     }
 
     #[tokio::test]
-    async fn status_session_reports_ended_for_closed_session() {
-        let db = MockDatabase::new(DatabaseBackend::Postgres)
-            .append_query_results([vec![make_session(1, "ABC123", SessionStatus::Closed, 1)]])
-            .into_connection();
-
-        let response = status_session(
-            test_user(1),
-            State(make_state(db)),
-            Path("ABC123".to_string()),
-        )
-        .await
-        .into_response();
-
-        assert_eq!(response.status(), StatusCode::OK);
-        let json = axum_to_json(response).await;
-        assert_eq!(json["session_ended"], true);
-    }
-
-    #[tokio::test]
-    async fn status_session_returns_404_when_not_found() {
+    async fn status_session_reports_not_in_session() {
         let db = MockDatabase::new(DatabaseBackend::Postgres)
             .append_query_results([vec![] as Vec<session::Model>])
+            .append_query_results([vec![] as Vec<user_session::Model>])
             .into_connection();
 
-        let response = status_session(
-            test_user(1),
-            State(make_state(db)),
-            Path("NOPE00".to_string()),
-        )
-        .await
-        .into_response();
+        let response = status_session(test_user(1), State(make_state(db)))
+            .await
+            .into_response();
 
-        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+        assert_eq!(response.status(), StatusCode::OK);
+        let json = axum_to_json(response).await;
+        assert_eq!(json["in_session"], false);
+        assert!(json["hosting"].is_null());
+        assert!(json["participating"].is_null());
     }
 
     // fn join_session
@@ -732,13 +705,28 @@ mod tests {
             ])
             .into_connection();
 
-        let response = end_session(
-            test_user(1),
-            State(make_state(db)),
-            Path("ABC123".to_string()),
-        )
-        .await
-        .into_response();
+        let response = end_session(test_user(1), State(make_state(db)))
+            .await
+            .into_response();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let json = axum_to_json(response).await;
+        assert_eq!(json["session_code"], "ABC123");
+        assert_eq!(json["status"], "Closed");
+    }
+
+    #[tokio::test]
+    async fn end_session_closes_locked_session_for_creator() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results([
+                vec![make_session(1, "ABC123", SessionStatus::Locked, 1)],
+                vec![make_session(1, "ABC123", SessionStatus::Closed, 1)],
+            ])
+            .into_connection();
+
+        let response = end_session(test_user(1), State(make_state(db)))
+            .await
+            .into_response();
 
         assert_eq!(response.status(), StatusCode::OK);
         let json = axum_to_json(response).await;
@@ -746,54 +734,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn end_session_rejects_non_creator() {
-        let db = MockDatabase::new(DatabaseBackend::Postgres)
-            .append_query_results([vec![make_session(1, "ABC123", SessionStatus::Open, 99)]])
-            .into_connection();
-
-        let response = end_session(
-            test_user(1),
-            State(make_state(db)),
-            Path("ABC123".to_string()),
-        )
-        .await
-        .into_response();
-
-        assert_eq!(response.status(), StatusCode::FORBIDDEN);
-    }
-
-    #[tokio::test]
-    async fn end_session_is_idempotent_when_already_closed() {
-        let db = MockDatabase::new(DatabaseBackend::Postgres)
-            .append_query_results([vec![make_session(1, "ABC123", SessionStatus::Closed, 1)]])
-            .into_connection();
-
-        let response = end_session(
-            test_user(1),
-            State(make_state(db)),
-            Path("ABC123".to_string()),
-        )
-        .await
-        .into_response();
-
-        assert_eq!(response.status(), StatusCode::OK);
-        let json = axum_to_json(response).await;
-        assert_eq!(json["session_code"], "ABC123");
-    }
-
-    #[tokio::test]
-    async fn end_session_returns_404_when_not_found() {
+    async fn end_session_returns_404_when_not_hosting() {
         let db = MockDatabase::new(DatabaseBackend::Postgres)
             .append_query_results([vec![] as Vec<session::Model>])
             .into_connection();
 
-        let response = end_session(
-            test_user(1),
-            State(make_state(db)),
-            Path("NOPE00".to_string()),
-        )
-        .await
-        .into_response();
+        let response = end_session(test_user(1), State(make_state(db)))
+            .await
+            .into_response();
 
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
     }
