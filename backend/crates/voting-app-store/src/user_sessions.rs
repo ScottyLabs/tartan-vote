@@ -1,4 +1,5 @@
-use ::entity::{prelude::*, user, user_session};
+use ::entity::enums::{JoinLeft, SessionStatus};
+use ::entity::{prelude::*, session, user, user_session};
 use sea_orm::*;
 
 pub struct UserSessionRepository<'a> {
@@ -28,6 +29,29 @@ impl<'a> UserSessionRepository<'a> {
         UserSession::find()
             .filter(user_session::Column::UserId.eq(user_id))
             .all(self.db)
+            .await
+    }
+
+    pub async fn find_active_participation_session(
+        &self,
+        user_id: i32,
+    ) -> Result<Option<session::Model>, DbErr> {
+        let memberships = UserSession::find()
+            .filter(user_session::Column::UserId.eq(user_id))
+            .filter(user_session::Column::JoinLeft.eq(JoinLeft::Joined))
+            .all(self.db)
+            .await?;
+
+        if memberships.is_empty() {
+            return Ok(None);
+        }
+
+        let session_ids: Vec<i32> = memberships.iter().map(|m| m.session_id).collect();
+
+        Session::find()
+            .filter(session::Column::Id.is_in(session_ids))
+            .filter(session::Column::Status.is_in([SessionStatus::Open, SessionStatus::Locked]))
+            .one(self.db)
             .await
     }
 

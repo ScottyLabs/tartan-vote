@@ -1,3 +1,4 @@
+use ::entity::enums::SessionStatus;
 use ::entity::{prelude::*, session};
 use sea_orm::*;
 
@@ -16,6 +17,17 @@ impl<'a> SessionRepository<'a> {
     ) -> Result<Option<session::Model>, DbErr> {
         Session::find()
             .filter(session::Column::JoinCode.eq(join_code))
+            .one(self.db)
+            .await
+    }
+
+    pub async fn find_active_hosted_by_user(
+        &self,
+        user_id: i32,
+    ) -> Result<Option<session::Model>, DbErr> {
+        Session::find()
+            .filter(session::Column::CreatedByUserId.eq(user_id))
+            .filter(session::Column::Status.is_in([SessionStatus::Open, SessionStatus::Locked]))
             .one(self.db)
             .await
     }

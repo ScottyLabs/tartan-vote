@@ -48,9 +48,6 @@ pub async fn setup(config: Config) {
             "/api",
             OpenApiRouter::new()
                 .routes(routes!(crate::domain::auth::handlers::auth_status))
-                .routes(routes!(crate::domain::auth::bypass::bypass_login))
-                .routes(routes!(crate::domain::auth::bypass::bypass_status))
-                .routes(routes!(crate::domain::auth::bypass::bypass_logout))
                 .routes(routes!(health))
                 .routes(routes!(crate::domain::event::handlers::create_event))
                 .routes(routes!(crate::domain::event::handlers::check_event))
@@ -70,6 +67,8 @@ pub async fn setup(config: Config) {
                 .routes(routes!(crate::domain::session::handlers::join_session))
                 .routes(routes!(crate::domain::session::handlers::set_session_proxy))
                 .routes(routes!(crate::domain::session::handlers::end_session))
+                .routes(routes!(crate::domain::session::handlers::lock_session))
+                .routes(routes!(crate::domain::session::handlers::open_session))
                 .routes(routes!(crate::domain::session::handlers::status_session))
                 .routes(routes!(crate::domain::session::export::export_session_data))
                 .routes(routes!(
@@ -120,8 +119,9 @@ pub async fn setup(config: Config) {
         .await
         .expect("failed to connect to valkey");
     let session_store = RedisStore::new(pool);
+    let secure_cookies = app_state.config.oidc.app_url.starts_with("https://");
     let session_layer = SessionManagerLayer::new(session_store)
-        .with_secure(false)
+        .with_secure(secure_cookies)
         .with_same_site(SameSite::Lax)
         .with_expiry(Expiry::OnInactivity(Duration::hours(1)));
 
@@ -144,10 +144,6 @@ pub async fn setup(config: Config) {
             crate::core::auth::middleware::sync_user_middleware,
         ))
         .layer(oidc_auth_layer)
-        .layer(middleware::from_fn_with_state(
-            app_state.clone(),
-            crate::domain::auth::bypass::bypass_auth_middleware,
-        ))
         .layer(session_layer)
         .layer(crate::core::cors::layer())
         .with_state(app_state);

@@ -1,11 +1,7 @@
 # Auth
 
-Two paths exist:
-
-- **OIDC via Ricochet/Keycloak** (real SSO): `/auth/login`, `/auth/callback`,
-  `/auth/logout`. OIDC secrets are provided by secretspec.
-- **Dev bypass**: a cookie/header shortcut for local development and tests that
-  creates/loads a local `user` and exposes it as `SyncedUser`. This bypass is scheduled to be removed in the future
+Authentication is **OIDC via Ricochet/Keycloak**: `/auth/login`, `/auth/callback`,
+`/auth/logout`. OIDC secrets are provided by secretspec.
 
 ## Backend flow
 
@@ -38,13 +34,10 @@ subject per request via `sync_user_middleware`.
   and the discovered `OidcClient` builder.
 - `src/core/auth/middleware.rs`: `SyncedUser` and its extractors, plus
   `sync_user_middleware`.
-- `src/domain/auth/bypass.rs`: `POST /auth/bypass/login` (creates/loads a user
-  with `oidc_subject = "bypass:<andrew_id>"`), `GET /auth/bypass/status`,
-  `POST /auth/bypass/logout`, and `bypass_auth_middleware`.
 - `src/domain/auth/handlers.rs`: `GET /auth/status`, the `/auth/login` and
   `/auth/logout` handlers, and the demo page.
 - `src/server.rs`: mounts the session layer, `OidcAuthLayer`,
-  `sync_user_middleware`, the bypass middleware, and CORS.
+  `sync_user_middleware`, and CORS.
 
 ## Config
 
