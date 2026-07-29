@@ -87,7 +87,6 @@ struct VoteCount {
 pub struct SessionEventExportItem {
     pub event_id: i32,
     pub event_name: String,
-    pub event_type: String,
     pub status: String,
     pub start_time: String,
     pub end_time: Option<String>,
@@ -725,7 +724,6 @@ pub async fn export_session_events_json(
         event_exports.push(SessionEventExportItem {
             event_id: session_event.id,
             event_name: session_event.name,
-            event_type: format!("{:?}", session_event.event_type),
             status: format!("{:?}", session_event.status),
             start_time: session_event.start_time.to_rfc3339(),
             end_time: session_event.end_time.map(|value| value.to_rfc3339()),
@@ -773,7 +771,7 @@ pub async fn ret_vote_csv(session_code: &str) -> Vec<u8> {
 mod integration_tests {
     use super::*;
     use chrono::Utc;
-    use entity::enums::{EventType, JoinLeft, SessionStatus, StatusOption};
+    use entity::enums::{JoinLeft, SessionStatus, StatusOption};
     use entity::{event, session, user, user_session, vote};
     use sea_orm::{ActiveModelTrait, ActiveValue::Set, Database, EntityTrait};
     use serde_json::json;
@@ -925,14 +923,12 @@ mod integration_tests {
 
     async fn insert_event(db: &DatabaseConnection, sess_id: i32, creator_id: i32) -> event::Model {
         event::ActiveModel {
-            event_type: Set(EventType::Motion),
             name: Set("Test Motion".to_string()),
             status: Set(StatusOption::Active),
             start_time: Set(Utc::now().fixed_offset()),
             end_time: Set(None),
             data: Set(json!({
                 "vote_options": ["pass", "reject", "abstain"],
-                "threshold": 0.5,
                 "proxy": false,
                 "visibility": { "participants": "live" }
             })),
@@ -969,7 +965,6 @@ mod integration_tests {
             user_session_id: Set(user_session_row.id),
             cast_time: Set(Utc::now().fixed_offset()),
             data: Set(json!({
-                "vote_type": "motion",
                 "proxy": false,
                 "vote_response": [response]
             })),

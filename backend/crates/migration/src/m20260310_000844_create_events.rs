@@ -12,15 +12,6 @@ impl MigrationTrait for Migration {
         manager
             .create_type(
                 Type::create()
-                    .as_enum(EventType::Enum)
-                    .values([EventType::Motion, EventType::Election])
-                    .to_owned(),
-            )
-            .await?;
-
-        manager
-            .create_type(
-                Type::create()
                     .as_enum(StatusOption::Enum)
                     .values([StatusOption::Active, StatusOption::Inactive])
                     .to_owned(),
@@ -38,11 +29,6 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .auto_increment()
                             .primary_key(),
-                    )
-                    .col(
-                        ColumnDef::new(Event::EventType)
-                            .custom(EventType::Enum)
-                            .not_null(),
                     )
                     .col(ColumnDef::new(Event::Name).string().not_null())
                     .col(
@@ -82,9 +68,6 @@ impl MigrationTrait for Migration {
             .drop_table(Table::drop().table(Event::Table).to_owned())
             .await?;
         manager
-            .drop_type(Type::drop().name(EventType::Enum).to_owned())
-            .await?;
-        manager
             .drop_type(Type::drop().name(StatusOption::Enum).to_owned())
             .await?;
 
@@ -97,7 +80,6 @@ impl MigrationTrait for Migration {
 pub enum Event {
     Table,
     Id,
-    EventType,
     Name,
     Status,
     StartTime,
@@ -105,14 +87,6 @@ pub enum Event {
     Data,
     CreatedByUserId,
     SessionId,
-}
-
-#[derive(DeriveIden)]
-pub enum EventType {
-    #[sea_orm(iden = "event_type")]
-    Enum,
-    Motion,
-    Election,
 }
 
 #[derive(DeriveIden)]

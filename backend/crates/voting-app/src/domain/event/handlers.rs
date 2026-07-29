@@ -2,7 +2,7 @@ use crate::AppState;
 use crate::core::auth::middleware::SyncedUser;
 use axum::{Json, extract::Path, extract::State, http::StatusCode, response::IntoResponse};
 use chrono::{FixedOffset, Utc};
-use entity::enums::{EventType, StatusOption};
+use entity::enums::StatusOption;
 use entity::{event, user_session};
 use sea_orm::ActiveValue::Set;
 use sea_orm::{
@@ -16,8 +16,6 @@ use utoipa::ToSchema;
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateEventRequest {
     pub name: String,
-    #[serde(alias = "vote_type")]
-    pub event_type: String,
     #[schema(value_type = Option<String>, format = DateTime)]
     pub start_time: Option<chrono::DateTime<chrono::FixedOffset>>,
     #[schema(value_type = Option<String>, format = DateTime)]
@@ -31,7 +29,6 @@ pub struct CreateEventRequest {
 pub struct CreateEventResponse {
     pub id: i32,
     pub name: String,
-    pub event_type: EventType,
     pub status: StatusOption,
     #[schema(value_type = String, format = DateTime)]
     pub start_time: chrono::DateTime<chrono::FixedOffset>,
@@ -95,7 +92,6 @@ pub struct EndEventResponse {
 pub struct CheckEventActiveEvent {
     pub id: i32,
     pub name: String,
-    pub event_type: EventType,
     #[schema(value_type = Object)]
     pub data: serde_json::Value,
 }
@@ -145,7 +141,6 @@ pub async fn check_event(
                 active_event: Some(CheckEventActiveEvent {
                     id: event.id,
                     name: event.name,
-                    event_type: event.event_type,
                     data: event.data,
                 }),
             }),
@@ -170,7 +165,7 @@ pub async fn check_event(
     request_body = CreateEventRequest,
     responses(
         (status = 201, description = "Event created", body = CreateEventResponse),
-        (status = 400, description = "Invalid event_type or proxy configuration"),
+        (status = 400, description = "Invalid proxy configuration"),
         (status = 404, description = "Session not found"),
     )
 )]
@@ -181,18 +176,6 @@ pub async fn create_event(
     Json(req): Json<CreateEventRequest>,
 ) -> impl IntoResponse {
     let store = &state.store;
-
-    let parsed_event_type = match req.event_type.to_ascii_lowercase().as_str() {
-        "motion" => EventType::Motion,
-        "election" => EventType::Election,
-        _ => {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(json!({"error": "Invalid event_type; expected motion or election"})),
-            )
-                .into_response();
-        }
-    };
 
     // Find session by join code
     let session = match store
@@ -221,12 +204,6 @@ pub async fn create_event(
     let start_time = req.start_time.unwrap_or(now);
 
     let mut event_data = req.data.unwrap_or(serde_json::json!({}));
-    if event_data.get("vote_type").is_none() {
-        event_data["vote_type"] = match parsed_event_type {
-            EventType::Motion => json!("motion"),
-            EventType::Election => json!("election"),
-        };
-    }
 
     if let Some(visibility) = event_data
         .get("visibility")
@@ -242,7 +219,6 @@ pub async fn create_event(
 
     let event_model = event::ActiveModel {
         name: Set(req.name.clone()),
-        event_type: Set(parsed_event_type),
         status: Set(StatusOption::Active),
         start_time: Set(start_time),
         end_time: Set(req.end_time),
@@ -397,7 +373,6 @@ pub async fn create_event(
         Json(CreateEventResponse {
             id: event.id,
             name: event.name,
-            event_type: event.event_type,
             status: event.status,
             start_time: event.start_time,
         }),
