@@ -151,7 +151,7 @@ fn select_voter_instance(
 
 #[utoipa::path(
     post,
-    path = "/events/{id}/vote",
+    path = "/motions/{id}/vote",
     tag = "votes",
     params(
         ("id" = i32, Path, description = "Motion id")
@@ -317,7 +317,7 @@ pub async fn cast_vote(
 
 #[utoipa::path(
     get,
-    path = "/events/{id}/results",
+    path = "/motions/{id}/results",
     tag = "votes",
     params(
         ("id" = i32, Path, description = "Motion id")
@@ -429,7 +429,7 @@ pub async fn get_motion_results(
 
 #[utoipa::path(
     post,
-    path = "/events/{id}/proxies",
+    path = "/motions/{id}/proxies",
     tag = "votes",
     params(
         ("id" = i32, Path, description = "Motion id")
@@ -602,7 +602,7 @@ pub async fn assign_proxy(
 
 #[utoipa::path(
     get,
-    path = "/events/{id}/proxies",
+    path = "/motions/{id}/proxies",
     tag = "votes",
     params(
         ("id" = i32, Path, description = "Motion id")
@@ -684,7 +684,7 @@ pub async fn list_proxy_assignments(
 
 #[utoipa::path(
     get,
-    path = "/events/{id}/vote-instances",
+    path = "/motions/{id}/vote-instances",
     tag = "votes",
     params(
         ("id" = i32, Path, description = "Motion id")
@@ -781,7 +781,7 @@ pub async fn get_vote_instances(
 
 #[utoipa::path(
     get,
-    path = "/events/{id}/export",
+    path = "/motions/{id}/export",
     tag = "votes",
     params(
         ("id" = i32, Path, description = "Motion id")

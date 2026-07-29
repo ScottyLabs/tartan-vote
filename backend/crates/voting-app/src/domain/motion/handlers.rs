@@ -103,7 +103,7 @@ pub struct CheckMotionResponse {
 
 #[utoipa::path(
     get,
-    path = "/events/{session_code}/check",
+    path = "/motions/{session_code}/check",
     tag = "motions",
     params(
         ("session_code" = String, Path, description = "Session join code")
@@ -159,7 +159,7 @@ pub async fn check_motion(
 
 #[utoipa::path(
     post,
-    path = "/events/create/{session_code}",
+    path = "/motions/create/{session_code}",
     tag = "motions",
     params(
         ("session_code" = String, Path, description = "Session join code")
@@ -383,7 +383,7 @@ pub async fn create_motion(
 
 #[utoipa::path(
     post,
-    path = "/events/{id}/end",
+    path = "/motions/{id}/end",
     tag = "motions",
     params(
         ("id" = i32, Path, description = "Motion ID")

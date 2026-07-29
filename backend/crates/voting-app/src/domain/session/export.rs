@@ -596,7 +596,7 @@ pub async fn export_session_data(
 
 #[utoipa::path(
     get,
-    path = "/session/{session_code}/events/export",
+    path = "/session/{session_code}/motions/export",
     tag = "sessions",
     params(
         ("session_code" = String, Path, description = "Session join code")
