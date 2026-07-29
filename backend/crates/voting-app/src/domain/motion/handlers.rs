@@ -3,7 +3,7 @@ use crate::core::auth::middleware::SyncedUser;
 use axum::{Json, extract::Path, extract::State, http::StatusCode, response::IntoResponse};
 use chrono::{FixedOffset, Utc};
 use entity::enums::StatusOption;
-use entity::{event, user_session};
+use entity::{motion, user_session};
 use sea_orm::ActiveValue::Set;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, TransactionTrait,
@@ -14,7 +14,7 @@ use std::collections::HashSet;
 use utoipa::ToSchema;
 
 #[derive(Debug, Deserialize, ToSchema)]
-pub struct CreateEventRequest {
+pub struct CreateMotionRequest {
     pub name: String,
     #[schema(value_type = Option<String>, format = DateTime)]
     pub start_time: Option<chrono::DateTime<chrono::FixedOffset>>,
@@ -26,7 +26,7 @@ pub struct CreateEventRequest {
 }
 
 #[derive(Debug, Serialize, ToSchema)]
-pub struct CreateEventResponse {
+pub struct CreateMotionResponse {
     pub id: i32,
     pub name: String,
     pub status: StatusOption,
@@ -75,7 +75,7 @@ fn validate_proxy_assignments(
         }
 
         if !seen_proxied_senators.insert(assignment.proxied_senator_user_id) {
-            return Err("A senator may only be proxied once per event");
+            return Err("A senator may only be proxied once per motion");
         }
     }
 
@@ -83,13 +83,13 @@ fn validate_proxy_assignments(
 }
 
 #[derive(Debug, Serialize, ToSchema)]
-pub struct EndEventResponse {
+pub struct EndMotionResponse {
     pub id: i32,
     pub status: StatusOption,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
-pub struct CheckEventActiveEvent {
+pub struct CheckMotionActiveMotion {
     pub id: i32,
     pub name: String,
     #[schema(value_type = Object)]
@@ -97,23 +97,23 @@ pub struct CheckEventActiveEvent {
 }
 
 #[derive(Debug, Serialize, ToSchema)]
-pub struct CheckEventResponse {
-    pub active_event: Option<CheckEventActiveEvent>,
+pub struct CheckMotionResponse {
+    pub active_motion: Option<CheckMotionActiveMotion>,
 }
 
 #[utoipa::path(
     get,
     path = "/events/{session_code}/check",
-    tag = "events",
+    tag = "motions",
     params(
         ("session_code" = String, Path, description = "Session join code")
     ),
     responses(
-        (status = 200, description = "Active event for the session, or null", body = CheckEventResponse),
+        (status = 200, description = "Active motion for the session, or null", body = CheckMotionResponse),
         (status = 404, description = "Session not found"),
     )
 )]
-pub async fn check_event(
+pub async fn check_motion(
     _user: SyncedUser,
     State(state): State<AppState>,
     Path(session_code): Path<String>,
@@ -134,21 +134,23 @@ pub async fn check_event(
         }
     };
 
-    match store.events().find_active_by_session_id(session.id).await {
-        Ok(Some(event)) => (
+    match store.motions().find_active_by_session_id(session.id).await {
+        Ok(Some(motion)) => (
             StatusCode::OK,
-            Json(CheckEventResponse {
-                active_event: Some(CheckEventActiveEvent {
-                    id: event.id,
-                    name: event.name,
-                    data: event.data,
+            Json(CheckMotionResponse {
+                active_motion: Some(CheckMotionActiveMotion {
+                    id: motion.id,
+                    name: motion.name,
+                    data: motion.data,
                 }),
             }),
         )
             .into_response(),
         Ok(None) => (
             StatusCode::OK,
-            Json(CheckEventResponse { active_event: None }),
+            Json(CheckMotionResponse {
+                active_motion: None,
+            }),
         )
             .into_response(),
         Err(_) => (StatusCode::INTERNAL_SERVER_ERROR).into_response(),
@@ -158,26 +160,25 @@ pub async fn check_event(
 #[utoipa::path(
     post,
     path = "/events/create/{session_code}",
-    tag = "events",
+    tag = "motions",
     params(
         ("session_code" = String, Path, description = "Session join code")
     ),
-    request_body = CreateEventRequest,
+    request_body = CreateMotionRequest,
     responses(
-        (status = 201, description = "Event created", body = CreateEventResponse),
+        (status = 201, description = "Motion created", body = CreateMotionResponse),
         (status = 400, description = "Invalid proxy configuration"),
         (status = 404, description = "Session not found"),
     )
 )]
-pub async fn create_event(
+pub async fn create_motion(
     user: SyncedUser,
     State(state): State<AppState>,
     Path(session_code): Path<String>,
-    Json(req): Json<CreateEventRequest>,
+    Json(req): Json<CreateMotionRequest>,
 ) -> impl IntoResponse {
     let store = &state.store;
 
-    // Find session by join code
     let session = match store
         .sessions()
         .find_by_join_code(session_code.clone())
@@ -203,26 +204,26 @@ pub async fn create_event(
     let now = Utc::now().with_timezone(&FixedOffset::east_opt(0).unwrap());
     let start_time = req.start_time.unwrap_or(now);
 
-    let mut event_data = req.data.unwrap_or(serde_json::json!({}));
+    let mut motion_data = req.data.unwrap_or(serde_json::json!({}));
 
-    if let Some(visibility) = event_data
+    if let Some(visibility) = motion_data
         .get("visibility")
         .and_then(|value| value.as_str())
         .map(ToOwned::to_owned)
     {
-        event_data["visibility"] = json!({"participants": visibility});
+        motion_data["visibility"] = json!({"participants": visibility});
     }
 
-    event_data["session_code"] = json!(session_code);
+    motion_data["session_code"] = json!(session_code);
 
-    let proxy_assignments = parse_proxy_assignments(event_data.get("proxy_assignments"));
+    let proxy_assignments = parse_proxy_assignments(motion_data.get("proxy_assignments"));
 
-    let event_model = event::ActiveModel {
+    let motion_model = motion::ActiveModel {
         name: Set(req.name.clone()),
         status: Set(StatusOption::Active),
         start_time: Set(start_time),
         end_time: Set(req.end_time),
-        data: Set(event_data),
+        data: Set(motion_data),
         created_by_user_id: Set(user.0.id),
         session_id: Set(session.id),
         ..Default::default()
@@ -239,18 +240,18 @@ pub async fn create_event(
         }
     };
 
-    let event = match event_model.insert(&txn).await {
-        Ok(event) => event,
+    let motion = match motion_model.insert(&txn).await {
+        Ok(motion) => motion,
         Err(_) => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"error": "Failed to create event"})),
+                Json(json!({"error": "Failed to create motion"})),
             )
                 .into_response();
         }
     };
 
-    let proxy_enabled = event.data["proxy"].as_bool().unwrap_or(false);
+    let proxy_enabled = motion.data["proxy"].as_bool().unwrap_or(false);
     if let Err(message) = validate_proxy_assignments(proxy_enabled, &proxy_assignments) {
         let _ = txn.rollback().await;
         return (StatusCode::BAD_REQUEST, Json(json!({"error": message}))).into_response();
@@ -314,7 +315,7 @@ pub async fn create_event(
             let _ = txn.rollback().await;
             return (
                 StatusCode::BAD_REQUEST,
-                Json(json!({"error": "A senator may only be proxied once per event"})),
+                Json(json!({"error": "A senator may only be proxied once per motion"})),
             )
                 .into_response();
         }
@@ -342,7 +343,7 @@ pub async fn create_event(
             let _ = txn.rollback().await;
             return (
                 StatusCode::CONFLICT,
-                Json(json!({"error": "A senator may only be proxied once per event"})),
+                Json(json!({"error": "A senator may only be proxied once per motion"})),
             )
                 .into_response();
         }
@@ -363,18 +364,18 @@ pub async fn create_event(
     if txn.commit().await.is_err() {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({"error": "Failed to commit event transaction"})),
+            Json(json!({"error": "Failed to commit motion transaction"})),
         )
             .into_response();
     }
 
     (
         StatusCode::CREATED,
-        Json(CreateEventResponse {
-            id: event.id,
-            name: event.name,
-            status: event.status,
-            start_time: event.start_time,
+        Json(CreateMotionResponse {
+            id: motion.id,
+            name: motion.name,
+            status: motion.status,
+            start_time: motion.start_time,
         }),
     )
         .into_response()
@@ -383,29 +384,29 @@ pub async fn create_event(
 #[utoipa::path(
     post,
     path = "/events/{id}/end",
-    tag = "events",
+    tag = "motions",
     params(
-        ("id" = i32, Path, description = "Event ID")
+        ("id" = i32, Path, description = "Motion ID")
     ),
     responses(
-        (status = 200, description = "Event ended (or already inactive)", body = EndEventResponse),
-        (status = 403, description = "Only the event creator can end this event"),
-        (status = 404, description = "Event not found"),
+        (status = 200, description = "Motion ended (or already inactive)", body = EndMotionResponse),
+        (status = 403, description = "Only the motion creator can end this motion"),
+        (status = 404, description = "Motion not found"),
     )
 )]
-pub async fn end_event(
+pub async fn end_motion(
     user: SyncedUser,
     State(state): State<AppState>,
     Path(id): Path<i32>,
 ) -> impl IntoResponse {
     let store = &state.store;
 
-    let event = match store.events().find_by_id(id).await {
-        Ok(Some(event)) => event,
+    let motion = match store.motions().find_by_id(id).await {
+        Ok(Some(motion)) => motion,
         Ok(None) => {
             return (
                 StatusCode::NOT_FOUND,
-                Json(json!({"error": "Event not found"})),
+                Json(json!({"error": "Motion not found"})),
             )
                 .into_response();
         }
@@ -418,32 +419,32 @@ pub async fn end_event(
         }
     };
 
-    if event.created_by_user_id != user.0.id {
+    if motion.created_by_user_id != user.0.id {
         return (
             StatusCode::FORBIDDEN,
-            Json(json!({"error": "Only the event creator can end this event"})),
+            Json(json!({"error": "Only the motion creator can end this motion"})),
         )
             .into_response();
     }
 
-    if event.status == StatusOption::Inactive {
+    if motion.status == StatusOption::Inactive {
         return (
             StatusCode::OK,
-            Json(EndEventResponse {
-                id: event.id,
-                status: event.status,
+            Json(EndMotionResponse {
+                id: motion.id,
+                status: motion.status,
             }),
         )
             .into_response();
     }
 
-    let mut event_to_update: event::ActiveModel = event.into_active_model();
-    event_to_update.status = Set(StatusOption::Inactive);
+    let mut motion_to_update: motion::ActiveModel = motion.into_active_model();
+    motion_to_update.status = Set(StatusOption::Inactive);
 
-    match store.events().update(event_to_update).await {
+    match store.motions().update(motion_to_update).await {
         Ok(updated) => (
             StatusCode::OK,
-            Json(EndEventResponse {
+            Json(EndMotionResponse {
                 id: updated.id,
                 status: updated.status,
             }),
@@ -451,7 +452,7 @@ pub async fn end_event(
             .into_response(),
         Err(_) => (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({"error": "Failed to end event"})),
+            Json(json!({"error": "Failed to end motion"})),
         )
             .into_response(),
     }
@@ -530,7 +531,7 @@ mod tests {
         let result = validate_proxy_assignments(true, &assignments);
         assert_eq!(
             result.expect_err("should fail"),
-            "A senator may only be proxied once per event"
+            "A senator may only be proxied once per motion"
         );
     }
 }

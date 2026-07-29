@@ -72,24 +72,24 @@ pub struct VoteExportRecord {
 }
 
 #[derive(Debug, Serialize, ToSchema)]
-pub struct EventExportResponse {
-    pub event_id: i32,
-    pub event_name: String,
+pub struct MotionExportResponse {
+    pub motion_id: i32,
+    pub motion_name: String,
     pub proxy_assignments: Vec<ProxyAssignment>,
-    pub totals: VoteResults,
+    pub totals: MotionResults,
     pub votes: Vec<VoteExportRecord>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
-pub struct VoteOptionResult {
+pub struct MotionOptionResult {
     pub label: String,
     pub count: u32,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
-pub struct VoteResults {
+pub struct MotionResults {
     pub total: u32,
-    pub options: Vec<VoteOptionResult>,
+    pub options: Vec<MotionOptionResult>,
 }
 
 fn parse_proxy_for_user_id(proxy: &Option<String>) -> Option<i32> {
@@ -103,7 +103,10 @@ async fn user_name_by_id(store: &voting_app_store::Store, user_id: i32) -> Optio
     }
 }
 
-fn compute_vote_totals(vote_records: &[VoteExportRecord], vote_options: &[String]) -> VoteResults {
+fn compute_motion_totals(
+    vote_records: &[VoteExportRecord],
+    vote_options: &[String],
+) -> MotionResults {
     let mut counts: HashMap<String, u32> = vote_options
         .iter()
         .map(|option| (option.clone(), 0u32))
@@ -120,13 +123,13 @@ fn compute_vote_totals(vote_records: &[VoteExportRecord], vote_options: &[String
 
     let options = vote_options
         .iter()
-        .map(|label| VoteOptionResult {
+        .map(|label| MotionOptionResult {
             label: label.clone(),
             count: *counts.get(label).unwrap_or(&0),
         })
         .collect();
 
-    VoteResults { total, options }
+    MotionResults { total, options }
 }
 
 fn select_voter_instance(
@@ -151,30 +154,30 @@ fn select_voter_instance(
     path = "/events/{id}/vote",
     tag = "votes",
     params(
-        ("id" = i32, Path, description = "Event id")
+        ("id" = i32, Path, description = "Motion id")
     ),
     request_body = CastVoteRequest,
     responses(
         (status = 201, description = "Vote cast", body = CastVoteResponse),
         (status = 400, description = "Invalid vote request"),
-        (status = 404, description = "Event not found"),
+        (status = 404, description = "Motion not found"),
         (status = 409, description = "Vote already cast for this instance"),
     )
 )]
 pub async fn cast_vote(
     user: SyncedUser,
     State(state): State<AppState>,
-    Path(event_id): Path<i32>,
+    Path(motion_id): Path<i32>,
     Json(body): Json<CastVoteRequest>,
 ) -> impl IntoResponse {
     let store = &state.store;
 
-    let event = match store.events().find_by_id(event_id).await {
+    let event = match store.motions().find_by_id(motion_id).await {
         Ok(Some(e)) => e,
         Ok(None) => {
             return (
                 StatusCode::NOT_FOUND,
-                Json(json!({"error": "Event not found"})),
+                Json(json!({"error": "Motion not found"})),
             )
                 .into_response();
         }
@@ -200,7 +203,7 @@ pub async fn cast_vote(
         Ok(_) => {
             return (
                 StatusCode::FORBIDDEN,
-                Json(json!({"error": "User is not eligible to vote in this event"})),
+                Json(json!({"error": "User is not eligible to vote in this motion"})),
             )
                 .into_response();
         }
@@ -223,7 +226,7 @@ pub async fn cast_vote(
     if event.status != StatusOption::Active {
         return (
             StatusCode::BAD_REQUEST,
-            Json(json!({"error": "Event is not open"})),
+            Json(json!({"error": "Motion is not open"})),
         )
             .into_response();
     }
@@ -231,7 +234,7 @@ pub async fn cast_vote(
     if selected_voter.proxy.is_some() && !event_data["proxy"].as_bool().unwrap_or(false) {
         return (
             StatusCode::BAD_REQUEST,
-            Json(json!({"error": "Proxy voting is not allowed for this event"})),
+            Json(json!({"error": "Proxy voting is not allowed for this motion"})),
         )
             .into_response();
     }
@@ -261,7 +264,7 @@ pub async fn cast_vote(
 
     match store
         .votes()
-        .find_by_event_and_user_session(event.id, selected_voter.id)
+        .find_by_motion_and_user_session(event.id, selected_voter.id)
         .await
     {
         Ok(Some(_)) => {
@@ -282,7 +285,7 @@ pub async fn cast_vote(
     }
 
     let new_vote = vote::ActiveModel {
-        event_id: Set(event.id),
+        motion_id: Set(event.id),
         user_session_id: Set(selected_voter.id),
         cast_time: Set(Utc::now().into()),
         data: Set(json!({
@@ -317,27 +320,27 @@ pub async fn cast_vote(
     path = "/events/{id}/results",
     tag = "votes",
     params(
-        ("id" = i32, Path, description = "Event id")
+        ("id" = i32, Path, description = "Motion id")
     ),
     responses(
-        (status = 200, description = "Option counts for the event", body = VoteResults),
+        (status = 200, description = "Option counts for the motion", body = MotionResults),
         (status = 403, description = "Results not yet available"),
-        (status = 404, description = "Event not found"),
+        (status = 404, description = "Motion not found"),
     )
 )]
 pub async fn get_motion_results(
     _user: SyncedUser,
     State(state): State<AppState>,
-    Path(event_id): Path<i32>,
+    Path(motion_id): Path<i32>,
 ) -> impl IntoResponse {
     let store = state.store;
 
-    let event = match store.events().find_by_id(event_id).await {
+    let event = match store.motions().find_by_id(motion_id).await {
         Ok(Some(e)) => e,
         Ok(None) => {
             return (
                 StatusCode::NOT_FOUND,
-                Json(json!({"error": "Event not found"})),
+                Json(json!({"error": "Motion not found"})),
             )
                 .into_response();
         }
@@ -366,7 +369,7 @@ pub async fn get_motion_results(
 
     let votes = match Vote::find()
         .find_also_related(user_session::Entity)
-        .filter(vote::Column::EventId.eq(event_id))
+        .filter(vote::Column::MotionId.eq(motion_id))
         .all(store.db())
         .await
     {
@@ -420,8 +423,8 @@ pub async fn get_motion_results(
         });
     }
 
-    let vote_results = compute_vote_totals(&export_records, &vote_options);
-    (StatusCode::OK, Json(json!(vote_results))).into_response()
+    let motion_results = compute_motion_totals(&export_records, &vote_options);
+    (StatusCode::OK, Json(json!(motion_results))).into_response()
 }
 
 #[utoipa::path(
@@ -429,21 +432,21 @@ pub async fn get_motion_results(
     path = "/events/{id}/proxies",
     tag = "votes",
     params(
-        ("id" = i32, Path, description = "Event id")
+        ("id" = i32, Path, description = "Motion id")
     ),
     request_body = AssignProxyRequest,
     responses(
         (status = 201, description = "Proxy assigned", body = AssignProxyResponse),
         (status = 400, description = "Invalid proxy assignment"),
-        (status = 403, description = "Only the event host may assign proxies"),
-        (status = 404, description = "Event not found"),
+        (status = 403, description = "Only the motion host may assign proxies"),
+        (status = 404, description = "Motion not found"),
         (status = 409, description = "Proxy already held or senator already proxied"),
     )
 )]
 pub async fn assign_proxy(
     user: SyncedUser,
     State(state): State<AppState>,
-    Path(event_id): Path<i32>,
+    Path(motion_id): Path<i32>,
     Json(body): Json<AssignProxyRequest>,
 ) -> impl IntoResponse {
     let store = &state.store;
@@ -456,12 +459,12 @@ pub async fn assign_proxy(
             .into_response();
     }
 
-    let event = match store.events().find_by_id(event_id).await {
+    let event = match store.motions().find_by_id(motion_id).await {
         Ok(Some(e)) => e,
         Ok(None) => {
             return (
                 StatusCode::NOT_FOUND,
-                Json(json!({"error": "Event not found"})),
+                Json(json!({"error": "Motion not found"})),
             )
                 .into_response();
         }
@@ -477,7 +480,7 @@ pub async fn assign_proxy(
     if user.0.id != event.created_by_user_id {
         return (
             StatusCode::FORBIDDEN,
-            Json(json!({"error": "Only the event host may assign proxies"})),
+            Json(json!({"error": "Only the motion host may assign proxies"})),
         )
             .into_response();
     }
@@ -485,7 +488,7 @@ pub async fn assign_proxy(
     if !event.data["proxy"].as_bool().unwrap_or(false) {
         return (
             StatusCode::BAD_REQUEST,
-            Json(json!({"error": "Proxy voting is not enabled for this event"})),
+            Json(json!({"error": "Proxy voting is not enabled for this motion"})),
         )
             .into_response();
     }
@@ -602,27 +605,27 @@ pub async fn assign_proxy(
     path = "/events/{id}/proxies",
     tag = "votes",
     params(
-        ("id" = i32, Path, description = "Event id")
+        ("id" = i32, Path, description = "Motion id")
     ),
     responses(
-        (status = 200, description = "Proxy assignments for the event", body = Vec<ProxyAssignment>),
-        (status = 403, description = "Only the event host may view proxy assignments"),
-        (status = 404, description = "Event not found"),
+        (status = 200, description = "Proxy assignments for the motion", body = Vec<ProxyAssignment>),
+        (status = 403, description = "Only the motion host may view proxy assignments"),
+        (status = 404, description = "Motion not found"),
     )
 )]
 pub async fn list_proxy_assignments(
     user: SyncedUser,
     State(state): State<AppState>,
-    Path(event_id): Path<i32>,
+    Path(motion_id): Path<i32>,
 ) -> impl IntoResponse {
     let store = &state.store;
 
-    let event = match store.events().find_by_id(event_id).await {
+    let event = match store.motions().find_by_id(motion_id).await {
         Ok(Some(e)) => e,
         Ok(None) => {
             return (
                 StatusCode::NOT_FOUND,
-                Json(json!({"error": "Event not found"})),
+                Json(json!({"error": "Motion not found"})),
             )
                 .into_response();
         }
@@ -638,7 +641,7 @@ pub async fn list_proxy_assignments(
     if user.0.id != event.created_by_user_id {
         return (
             StatusCode::FORBIDDEN,
-            Json(json!({"error": "Only the event host may view proxy assignments"})),
+            Json(json!({"error": "Only the motion host may view proxy assignments"})),
         )
             .into_response();
     }
@@ -684,23 +687,23 @@ pub async fn list_proxy_assignments(
     path = "/events/{id}/vote-instances",
     tag = "votes",
     params(
-        ("id" = i32, Path, description = "Event id")
+        ("id" = i32, Path, description = "Motion id")
     ),
     responses(
         (status = 200, description = "Vote instances available to the current user", body = Vec<VoteInstance>),
-        (status = 404, description = "Event not found"),
+        (status = 404, description = "Motion not found"),
     )
 )]
 pub async fn get_vote_instances(
     user: SyncedUser,
     State(state): State<AppState>,
-    Path(event_id): Path<i32>,
+    Path(motion_id): Path<i32>,
 ) -> impl IntoResponse {
     let store = &state.store;
 
     if store
-        .events()
-        .find_by_id(event_id)
+        .motions()
+        .find_by_id(motion_id)
         .await
         .ok()
         .flatten()
@@ -708,17 +711,17 @@ pub async fn get_vote_instances(
     {
         return (
             StatusCode::NOT_FOUND,
-            Json(json!({"error": "Event not found"})),
+            Json(json!({"error": "Motion not found"})),
         )
             .into_response();
     }
 
-    let event = match store.events().find_by_id(event_id).await {
+    let event = match store.motions().find_by_id(motion_id).await {
         Ok(Some(event)) => event,
         Ok(None) => {
             return (
                 StatusCode::NOT_FOUND,
-                Json(json!({"error": "Event not found"})),
+                Json(json!({"error": "Motion not found"})),
             )
                 .into_response();
         }
@@ -753,7 +756,7 @@ pub async fn get_vote_instances(
         let proxy_for_user_id = parse_proxy_for_user_id(&instance.proxy);
         let has_voted = store
             .votes()
-            .find_by_event_and_user_session(event.id, instance.id)
+            .find_by_motion_and_user_session(event.id, instance.id)
             .await
             .ok()
             .flatten()
@@ -781,27 +784,27 @@ pub async fn get_vote_instances(
     path = "/events/{id}/export",
     tag = "votes",
     params(
-        ("id" = i32, Path, description = "Event id")
+        ("id" = i32, Path, description = "Motion id")
     ),
     responses(
-        (status = 200, description = "Full event export including votes and proxies", body = EventExportResponse),
-        (status = 403, description = "Only the event host may export results"),
-        (status = 404, description = "Event not found"),
+        (status = 200, description = "Full motion export including votes and proxies", body = MotionExportResponse),
+        (status = 403, description = "Only the motion host may export results"),
+        (status = 404, description = "Motion not found"),
     )
 )]
-pub async fn export_event_results(
+pub async fn export_motion_results(
     user: SyncedUser,
     State(state): State<AppState>,
-    Path(event_id): Path<i32>,
+    Path(motion_id): Path<i32>,
 ) -> impl IntoResponse {
     let store = &state.store;
 
-    let event = match store.events().find_by_id(event_id).await {
+    let event = match store.motions().find_by_id(motion_id).await {
         Ok(Some(event)) => event,
         Ok(None) => {
             return (
                 StatusCode::NOT_FOUND,
-                Json(json!({"error": "Event not found"})),
+                Json(json!({"error": "Motion not found"})),
             )
                 .into_response();
         }
@@ -817,14 +820,14 @@ pub async fn export_event_results(
     if user.0.id != event.created_by_user_id {
         return (
             StatusCode::FORBIDDEN,
-            Json(json!({"error": "Only the event host may export results"})),
+            Json(json!({"error": "Only the motion host may export results"})),
         )
             .into_response();
     }
 
     let vote_rows = match Vote::find()
         .find_also_related(user_session::Entity)
-        .filter(vote::Column::EventId.eq(event_id))
+        .filter(vote::Column::MotionId.eq(motion_id))
         .all(store.db())
         .await
     {
@@ -916,13 +919,13 @@ pub async fn export_event_results(
                 .collect::<Vec<_>>()
         })
         .unwrap_or_default();
-    let totals = compute_vote_totals(&votes, &vote_options);
+    let totals = compute_motion_totals(&votes, &vote_options);
 
     (
         StatusCode::OK,
-        Json(EventExportResponse {
-            event_id: event.id,
-            event_name: event.name,
+        Json(MotionExportResponse {
+            motion_id: event.id,
+            motion_name: event.name,
             proxy_assignments,
             totals,
             votes,
@@ -963,7 +966,7 @@ mod tests {
     }
 
     #[test]
-    fn compute_vote_totals_counts_options() {
+    fn compute_motion_totals_counts_options() {
         let vote_records = vec![
             build_vote_record("Pass"),
             build_vote_record("Pass"),
@@ -976,7 +979,7 @@ mod tests {
             "Abstain".to_string(),
         ];
 
-        let totals = compute_vote_totals(&vote_records, &options);
+        let totals = compute_motion_totals(&vote_records, &options);
 
         assert_eq!(totals.total, 4);
         assert_eq!(totals.options[0].label, "Pass");
@@ -986,17 +989,18 @@ mod tests {
     }
 
     #[test]
-    fn compute_vote_totals_handles_empty_votes() {
+    fn compute_motion_totals_handles_empty_votes() {
         let vote_records: Vec<VoteExportRecord> = vec![];
         let options = vec!["Pass".to_string(), "Reject".to_string()];
-        let totals = compute_vote_totals(&vote_records, &options);
+        let totals = compute_motion_totals(&vote_records, &options);
 
         assert_eq!(totals.total, 0);
+        assert_eq!(totals.options[0].count, 0);
         assert_eq!(totals.options[1].count, 0);
     }
 
     #[test]
-    fn compute_vote_totals_ignores_unknown_options() {
+    fn compute_motion_totals_ignores_unknown_options() {
         let vote_records = vec![
             build_vote_record("Yes"),
             build_vote_record("No"),
@@ -1004,7 +1008,7 @@ mod tests {
         ];
         let options = vec!["Yes".to_string(), "No".to_string()];
 
-        let totals = compute_vote_totals(&vote_records, &options);
+        let totals = compute_motion_totals(&vote_records, &options);
 
         assert_eq!(totals.total, 2);
         assert_eq!(totals.options[0].count, 1);

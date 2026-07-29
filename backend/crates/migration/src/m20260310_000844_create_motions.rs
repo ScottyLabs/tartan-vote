@@ -21,40 +21,40 @@ impl MigrationTrait for Migration {
         manager
             .create_table(
                 Table::create()
-                    .table(Event::Table)
+                    .table(Motion::Table)
                     .if_not_exists()
                     .col(
-                        ColumnDef::new(Event::Id)
+                        ColumnDef::new(Motion::Id)
                             .integer()
                             .not_null()
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(Event::Name).string().not_null())
+                    .col(ColumnDef::new(Motion::Name).string().not_null())
                     .col(
-                        ColumnDef::new(Event::Status)
+                        ColumnDef::new(Motion::Status)
                             .custom(StatusOption::Enum)
                             .not_null(),
                     )
                     .col(
-                        ColumnDef::new(Event::StartTime)
+                        ColumnDef::new(Motion::StartTime)
                             .timestamp_with_time_zone()
                             .not_null(),
                     )
-                    .col(ColumnDef::new(Event::EndTime).timestamp_with_time_zone())
-                    .col(ColumnDef::new(Event::Data).json_binary().not_null())
-                    .col(ColumnDef::new(Event::CreatedByUserId).integer().not_null())
-                    .col(ColumnDef::new(Event::SessionId).integer().not_null())
+                    .col(ColumnDef::new(Motion::EndTime).timestamp_with_time_zone())
+                    .col(ColumnDef::new(Motion::Data).json_binary().not_null())
+                    .col(ColumnDef::new(Motion::CreatedByUserId).integer().not_null())
+                    .col(ColumnDef::new(Motion::SessionId).integer().not_null())
                     .foreign_key(
                         ForeignKey::create()
-                            .from(Event::Table, Event::CreatedByUserId)
+                            .from(Motion::Table, Motion::CreatedByUserId)
                             .to(User::Table, User::Id)
                             // this may not be the correct methodology
                             .on_delete(ForeignKeyAction::Cascade),
                     )
                     .foreign_key(
                         ForeignKey::create()
-                            .from(Event::Table, Event::SessionId)
+                            .from(Motion::Table, Motion::SessionId)
                             .to(Session::Table, Session::Id)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
@@ -65,7 +65,7 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_table(Table::drop().table(Event::Table).to_owned())
+            .drop_table(Table::drop().table(Motion::Table).to_owned())
             .await?;
         manager
             .drop_type(Type::drop().name(StatusOption::Enum).to_owned())
@@ -76,8 +76,7 @@ impl MigrationTrait for Migration {
 }
 
 #[derive(DeriveIden)]
-#[allow(clippy::enum_variant_names)]
-pub enum Event {
+pub enum Motion {
     Table,
     Id,
     Name,

@@ -15,8 +15,8 @@ pub struct Model {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(has_many = "super::event::Entity")]
-    Event,
+    #[sea_orm(has_many = "super::motion::Entity")]
+    Motion,
     #[sea_orm(has_many = "super::organization_member::Entity")]
     OrganizationMember,
     #[sea_orm(has_many = "super::session::Entity")]
@@ -25,9 +25,9 @@ pub enum Relation {
     UserSession,
 }
 
-impl Related<super::event::Entity> for Entity {
+impl Related<super::motion::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::Event.def()
+        Relation::Motion.def()
     }
 }
 
