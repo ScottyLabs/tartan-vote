@@ -76,32 +76,20 @@ pub struct EventExportResponse {
     pub event_id: i32,
     pub event_name: String,
     pub proxy_assignments: Vec<ProxyAssignment>,
-    pub totals: MotionResults,
+    pub totals: VoteResults,
     pub votes: Vec<VoteExportRecord>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
-pub struct MotionResults {
-    pub pass: u32,
-    pub reject: u32,
-    pub abstain: u32,
-    pub total: u32,
-    pub threshold: f64,
-    pub passed: bool,
-}
-
-#[derive(Debug, Serialize, ToSchema)]
-pub struct ElectionOptionResult {
+pub struct VoteOptionResult {
     pub label: String,
     pub count: u32,
-    pub percent: u32,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
-pub struct ElectionResults {
-    pub vote_type: String,
+pub struct VoteResults {
     pub total: u32,
-    pub options: Vec<ElectionOptionResult>,
+    pub options: Vec<VoteOptionResult>,
 }
 
 fn parse_proxy_for_user_id(proxy: &Option<String>) -> Option<i32> {
@@ -115,51 +103,7 @@ async fn user_name_by_id(store: &voting_app_store::Store, user_id: i32) -> Optio
     }
 }
 
-fn compute_motion_totals(vote_records: &[VoteExportRecord], threshold: f64) -> MotionResults {
-    let mut pass = 0u32;
-    let mut reject = 0u32;
-    let mut abstain = 0u32;
-
-    let classify_motion_vote = |value: &str| match value.trim().to_ascii_lowercase().as_str() {
-        "pass" | "yes" | "yay" | "approve" | "approved" | "for" => Some("pass"),
-        "reject" | "no" | "nay" | "deny" | "denied" | "against" => Some("reject"),
-        "abstain" | "abstained" | "abstention" => Some("abstain"),
-        _ => None,
-    };
-
-    for record in vote_records {
-        let response = record
-            .vote_response
-            .first()
-            .map(|value| value.to_string())
-            .unwrap_or_default();
-
-        match classify_motion_vote(&response) {
-            Some("pass") => pass += 1,
-            Some("reject") => reject += 1,
-            Some("abstain") => abstain += 1,
-            _ => {}
-        }
-    }
-
-    let total = pass + reject + abstain;
-    let denominator = pass + reject;
-    let passed = denominator > 0 && (pass as f64 / denominator as f64) > threshold;
-
-    MotionResults {
-        pass,
-        reject,
-        abstain,
-        total,
-        threshold,
-        passed,
-    }
-}
-
-fn compute_election_totals(
-    vote_records: &[VoteExportRecord],
-    vote_options: &[String],
-) -> ElectionResults {
+fn compute_vote_totals(vote_records: &[VoteExportRecord], vote_options: &[String]) -> VoteResults {
     let mut counts: HashMap<String, u32> = vote_options
         .iter()
         .map(|option| (option.clone(), 0u32))
@@ -176,27 +120,13 @@ fn compute_election_totals(
 
     let options = vote_options
         .iter()
-        .map(|label| {
-            let count = *counts.get(label).unwrap_or(&0);
-            let percent = if total > 0 {
-                ((count as f64 / total as f64) * 100.0).round() as u32
-            } else {
-                0
-            };
-
-            ElectionOptionResult {
-                label: label.clone(),
-                count,
-                percent,
-            }
+        .map(|label| VoteOptionResult {
+            label: label.clone(),
+            count: *counts.get(label).unwrap_or(&0),
         })
         .collect();
 
-    ElectionResults {
-        vote_type: "election".to_string(),
-        total,
-        options,
-    }
+    VoteResults { total, options }
 }
 
 fn select_voter_instance(
@@ -258,15 +188,6 @@ pub async fn cast_vote(
     };
 
     let event_data = event.data.clone();
-    let vote_type = event_data["vote_type"].as_str().unwrap_or("");
-
-    if vote_type != "motion" && vote_type != "election" {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({"error": "Event is not a motion"})),
-        )
-            .into_response();
-    }
 
     let voter_instances = match UserSession::find()
         .filter(user_session::Column::SessionId.eq(event.session_id))
@@ -365,7 +286,6 @@ pub async fn cast_vote(
         user_session_id: Set(selected_voter.id),
         cast_time: Set(Utc::now().into()),
         data: Set(json!({
-            "vote_type": vote_type,
             "proxy": selected_voter.proxy.is_some(),
             "proxy_for_user_id": parse_proxy_for_user_id(&selected_voter.proxy),
             "proxy_for": selected_voter.proxy,
@@ -400,8 +320,7 @@ pub async fn cast_vote(
         ("id" = i32, Path, description = "Event id")
     ),
     responses(
-        (status = 200, description = "MotionResults for motions, or ElectionResults for elections", body = MotionResults),
-        (status = 400, description = "Unsupported vote type"),
+        (status = 200, description = "Option counts for the event", body = VoteResults),
         (status = 403, description = "Results not yet available"),
         (status = 404, description = "Event not found"),
     )
@@ -432,15 +351,6 @@ pub async fn get_motion_results(
     };
 
     let event_data = event.data.clone();
-    let vote_type = event_data["vote_type"].as_str().unwrap_or("");
-
-    if vote_type != "motion" && vote_type != "election" {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({"error": "Event is not a supported vote type"})),
-        )
-            .into_response();
-    }
 
     //Place holder for when we figure the visibility out
     let visibility = event_data["visibility"]["participants"]
@@ -470,7 +380,6 @@ pub async fn get_motion_results(
         }
     };
 
-    let threshold = event_data["threshold"].as_f64().unwrap_or(0.5);
     let vote_options: Vec<String> = event_data["vote_options"]
         .as_array()
         .map(|values| {
@@ -511,13 +420,8 @@ pub async fn get_motion_results(
         });
     }
 
-    if vote_type == "motion" {
-        let motion_results = compute_motion_totals(&export_records, threshold);
-        return (StatusCode::OK, Json(json!(motion_results))).into_response();
-    }
-
-    let election_results = compute_election_totals(&export_records, &vote_options);
-    (StatusCode::OK, Json(json!(election_results))).into_response()
+    let vote_results = compute_vote_totals(&export_records, &vote_options);
+    (StatusCode::OK, Json(json!(vote_results))).into_response()
 }
 
 #[utoipa::path(
@@ -1003,8 +907,16 @@ pub async fn export_event_results(
         })
         .collect::<Vec<_>>();
 
-    let threshold = event.data["threshold"].as_f64().unwrap_or(0.5);
-    let totals = compute_motion_totals(&votes, threshold);
+    let vote_options: Vec<String> = event.data["vote_options"]
+        .as_array()
+        .map(|values| {
+            values
+                .iter()
+                .filter_map(|value| value.as_str().map(ToOwned::to_owned))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    let totals = compute_vote_totals(&votes, &vote_options);
 
     (
         StatusCode::OK,
@@ -1051,48 +963,52 @@ mod tests {
     }
 
     #[test]
-    fn compute_motion_totals_counts_votes_and_threshold() {
+    fn compute_vote_totals_counts_options() {
         let vote_records = vec![
             build_vote_record("Pass"),
-            build_vote_record("pass"),
+            build_vote_record("Pass"),
             build_vote_record("Reject"),
             build_vote_record("Abstain"),
         ];
+        let options = vec![
+            "Pass".to_string(),
+            "Reject".to_string(),
+            "Abstain".to_string(),
+        ];
 
-        let totals = compute_motion_totals(&vote_records, 0.5);
+        let totals = compute_vote_totals(&vote_records, &options);
 
-        assert_eq!(totals.pass, 2);
-        assert_eq!(totals.reject, 1);
-        assert_eq!(totals.abstain, 1);
         assert_eq!(totals.total, 4);
-        assert!(totals.passed);
+        assert_eq!(totals.options[0].label, "Pass");
+        assert_eq!(totals.options[0].count, 2);
+        assert_eq!(totals.options[1].count, 1);
+        assert_eq!(totals.options[2].count, 1);
     }
 
     #[test]
-    fn compute_motion_totals_does_not_pass_without_pass_reject_denominator() {
-        let vote_records = vec![build_vote_record("Abstain")];
-        let totals = compute_motion_totals(&vote_records, 0.5);
+    fn compute_vote_totals_handles_empty_votes() {
+        let vote_records: Vec<VoteExportRecord> = vec![];
+        let options = vec!["Pass".to_string(), "Reject".to_string()];
+        let totals = compute_vote_totals(&vote_records, &options);
 
-        assert_eq!(totals.pass, 0);
-        assert_eq!(totals.reject, 0);
-        assert_eq!(totals.abstain, 1);
-        assert!(!totals.passed);
+        assert_eq!(totals.total, 0);
+        assert_eq!(totals.options[1].count, 0);
     }
 
     #[test]
-    fn compute_motion_totals_counts_yes_no_labels() {
+    fn compute_vote_totals_ignores_unknown_options() {
         let vote_records = vec![
             build_vote_record("Yes"),
             build_vote_record("No"),
             build_vote_record("Abstain"),
         ];
+        let options = vec!["Yes".to_string(), "No".to_string()];
 
-        let totals = compute_motion_totals(&vote_records, 0.5);
+        let totals = compute_vote_totals(&vote_records, &options);
 
-        assert_eq!(totals.pass, 1);
-        assert_eq!(totals.reject, 1);
-        assert_eq!(totals.abstain, 1);
-        assert_eq!(totals.total, 3);
+        assert_eq!(totals.total, 2);
+        assert_eq!(totals.options[0].count, 1);
+        assert_eq!(totals.options[1].count, 1);
     }
 
     #[test]
