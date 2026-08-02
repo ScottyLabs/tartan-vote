@@ -7,7 +7,6 @@
   import ConfirmDeleteOrganizationDialog from "$lib/components/ConfirmDeleteOrganizationDialog.svelte";
   import EndSessionDialog from "$lib/components/EndSessionDialog.svelte";
   import OrganizationNameDialog from "$lib/components/OrganizationNameDialog.svelte";
-  import logoUrl from "$lib/assets/tartanvote-logo.svg?url";
   import {
     clearOrganizationSettings,
     defaultOrganizationSettings,
@@ -244,34 +243,6 @@
 <svelte:head>
   <title>TartanVote | Session Configuration</title>
 </svelte:head>
-
-<main
-  class="flex min-h-svh w-full min-w-[1024px] flex-col bg-(image:--gradient-screen-signin) text-grey-900"
->
-  <header
-    class="flex h-[clamp(60px,5.833vw,112px)] shrink-0 basis-[clamp(60px,5.833vw,112px)] items-center justify-between bg-red-600 pr-[clamp(34px,3.542vw,68px)] pl-[clamp(18px,1.771vw,34px)] shadow-[0_4px_4px_rgb(0_0_0_/_0.25)]"
-  >
-    <a
-      class="flex items-center gap-2 no-underline"
-      href="/home"
-      aria-label="TartanVote home"
-    >
-      <img
-        class="block h-[clamp(32px,3.073vw,59px)] w-[clamp(42px,4.01vw,77px)]"
-        src={logoUrl}
-        alt=""
-        width="77"
-        height="59"
-      />
-      <span
-        class="font-brand text-[clamp(24px,2.083vw,40px)] text-red-600 [-webkit-text-stroke:clamp(5px,0.521vw,10px)_var(--color-white)] [paint-order:stroke_fill]"
-        ><span class="text-black">Tartan</span>Vote</span
-      >
-    </a>
-    <p class="m-0 text-[clamp(18px,1.563vw,30px)] leading-[38px] text-white">
-      HOSTING DASHBOARD
-    </p>
-  </header>
 
   <div
     class="grid min-h-[calc(100svh-clamp(60px,5.833vw,112px)-81px)] flex-[1_0_calc(100svh-clamp(60px,5.833vw,112px)-81px)] grid-cols-[clamp(203px,19.792vw,380px)_minmax(0,1fr)]"
@@ -568,7 +539,6 @@
   </div>
 
   <AppFooter wide flow />
-</main>
 
 {#if organizationPendingDelete}
   <ConfirmDeleteOrganizationDialog

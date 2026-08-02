@@ -9,7 +9,6 @@
   import EndSessionDialog from "$lib/components/EndSessionDialog.svelte";
   import HostConfigurationDialog from "$lib/components/HostConfigurationDialog.svelte";
   import ProxyRequestDialog from "$lib/components/ProxyRequestDialog.svelte";
-  import logoUrl from "$lib/assets/tartanvote-logo.svg?url";
   import {
     exampleParticipants,
     type HostDialog,
@@ -241,37 +240,9 @@
   <title>TartanVote | Host Dashboard</title>
 </svelte:head>
 
-<main
-  class="relative min-h-svh w-full min-w-[1024px] overflow-hidden bg-(image:--gradient-screen-signin) text-grey-900 [&_a:focus-visible]:outline-3 [&_a:focus-visible]:outline-offset-2 [&_a:focus-visible]:outline-[color-mix(in_srgb,var(--color-red-600),transparent_70%)] [&_button:focus-visible]:outline-3 [&_button:focus-visible]:outline-offset-2 [&_button:focus-visible]:outline-[color-mix(in_srgb,var(--color-red-600),transparent_70%)]"
+<div
+  class="grid h-[calc(100svh-clamp(60px,5.833vw,112px)-81px)] min-h-[calc(100svh-clamp(60px,5.833vw,112px)-81px)] grid-cols-[clamp(203px,19.792vw,380px)_minmax(0,1fr)]"
 >
-  <header
-    class="flex h-[clamp(60px,5.833vw,112px)] items-center justify-between bg-red-600 pr-[clamp(34px,3.542vw,68px)] pl-[clamp(18px,1.771vw,34px)] shadow-[0_4px_4px_rgb(0_0_0_/_0.25)]"
-  >
-    <a
-      class="flex items-center gap-2 no-underline focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[color-mix(in_srgb,var(--color-red-600),transparent_70%)]"
-      href="/home"
-      aria-label="TartanVote home"
-    >
-      <img
-        class="block h-[clamp(32px,3.073vw,59px)] w-[clamp(42px,4.01vw,77px)]"
-        src={logoUrl}
-        alt=""
-        width="77"
-        height="59"
-      />
-      <span
-        class="font-brand text-[clamp(24px,2.083vw,40px)] text-red-600 [-webkit-text-stroke:clamp(5px,0.521vw,10px)_var(--color-white)] [paint-order:stroke_fill]"
-        ><span class="text-black">Tartan</span>Vote</span
-      >
-    </a>
-    <p class="m-0 text-[clamp(18px,1.563vw,30px)] leading-[38px] text-white">
-      HOSTING DASHBOARD
-    </p>
-  </header>
-
-  <div
-    class="grid h-[calc(100svh-clamp(60px,5.833vw,112px)-81px)] min-h-[calc(100svh-clamp(60px,5.833vw,112px)-81px)] grid-cols-[clamp(203px,19.792vw,380px)_minmax(0,1fr)]"
-  >
     <aside
       class="relative bg-grey-900 text-white"
       aria-label="Host dashboard navigation"
@@ -645,8 +616,7 @@
     </section>
   </div>
 
-  <AppFooter wide />
-</main>
+<AppFooter wide />
 
 {#if dialog === "motion" || dialog === "election"}
   <HostConfigurationDialog
