@@ -1,9 +1,9 @@
 use crate::AppState;
 use crate::core::auth::middleware::SyncedUser;
-use axum::{Json, extract::Path, extract::State, http::StatusCode, response::IntoResponse};
+use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
 use chrono::{FixedOffset, Utc};
 use entity::enums::StatusOption;
-use entity::{motion, user_session};
+use entity::{motion, session, user_session};
 use sea_orm::ActiveValue::Set;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, TransactionTrait,
@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashSet;
 use utoipa::ToSchema;
+use voting_app_store::Store;
 
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateMotionRequest {
@@ -82,6 +83,51 @@ fn validate_proxy_assignments(
     Ok(())
 }
 
+pub(crate) async fn resolve_caller_session(
+    store: &Store,
+    user_id: i32,
+) -> Result<session::Model, (StatusCode, Json<serde_json::Value>)> {
+    match store
+        .user_sessions()
+        .find_active_participation_session(user_id)
+        .await
+    {
+        Ok(Some(session)) => Ok(session),
+        Ok(None) => match store.sessions().find_active_hosted_by_user(user_id).await {
+            Ok(Some(session)) => Ok(session),
+            Ok(None) => Err((
+                StatusCode::NOT_FOUND,
+                Json(json!({"error": "No active session"})),
+            )),
+            Err(_) => Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Database error"})),
+            )),
+        },
+        Err(_) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": "Database error"})),
+        )),
+    }
+}
+
+pub(crate) async fn resolve_current_motion(
+    store: &Store,
+    session_id: i32,
+) -> Result<motion::Model, (StatusCode, Json<serde_json::Value>)> {
+    match store.motions().find_current_by_session_id(session_id).await {
+        Ok(Some(motion)) => Ok(motion),
+        Ok(None) => Err((
+            StatusCode::NOT_FOUND,
+            Json(json!({"error": "Motion not found"})),
+        )),
+        Err(_) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": "Database error"})),
+        )),
+    }
+}
+
 #[derive(Debug, Serialize, ToSchema)]
 pub struct EndMotionResponse {
     pub id: i32,
@@ -103,35 +149,19 @@ pub struct CheckMotionResponse {
 
 #[utoipa::path(
     get,
-    path = "/motions/{session_code}/check",
+    path = "/motions/check",
     tag = "motions",
-    params(
-        ("session_code" = String, Path, description = "Session join code")
-    ),
     responses(
-        (status = 200, description = "Active motion for the session, or null", body = CheckMotionResponse),
-        (status = 404, description = "Session not found"),
+        (status = 200, description = "Active motion for the caller's session, or null", body = CheckMotionResponse),
+        (status = 404, description = "No active session"),
     )
 )]
-pub async fn check_motion(
-    _user: SyncedUser,
-    State(state): State<AppState>,
-    Path(session_code): Path<String>,
-) -> impl IntoResponse {
+pub async fn check_motion(user: SyncedUser, State(state): State<AppState>) -> impl IntoResponse {
     let store = &state.store;
 
-    let session = match store.sessions().find_by_join_code(session_code).await {
-        Ok(Some(s)) => s,
-        Ok(None) => {
-            return (
-                StatusCode::NOT_FOUND,
-                Json(json!({"error": "Session not found"})),
-            )
-                .into_response();
-        }
-        Err(_) => {
-            return (StatusCode::INTERNAL_SERVER_ERROR).into_response();
-        }
+    let session = match resolve_caller_session(store, user.0.id).await {
+        Ok(session) => session,
+        Err(response) => return response.into_response(),
     };
 
     match store.motions().find_active_by_session_id(session.id).await {
@@ -159,36 +189,29 @@ pub async fn check_motion(
 
 #[utoipa::path(
     post,
-    path = "/motions/create/{session_code}",
+    path = "/motions/create",
     tag = "motions",
-    params(
-        ("session_code" = String, Path, description = "Session join code")
-    ),
     request_body = CreateMotionRequest,
     responses(
         (status = 201, description = "Motion created", body = CreateMotionResponse),
         (status = 400, description = "Invalid proxy configuration"),
-        (status = 404, description = "Session not found"),
+        (status = 404, description = "Caller is not hosting an active session"),
+        (status = 409, description = "Session already has an active motion"),
     )
 )]
 pub async fn create_motion(
     user: SyncedUser,
     State(state): State<AppState>,
-    Path(session_code): Path<String>,
     Json(req): Json<CreateMotionRequest>,
 ) -> impl IntoResponse {
     let store = &state.store;
 
-    let session = match store
-        .sessions()
-        .find_by_join_code(session_code.clone())
-        .await
-    {
+    let session = match store.sessions().find_active_hosted_by_user(user.0.id).await {
         Ok(Some(session)) => session,
         Ok(None) => {
             return (
                 StatusCode::NOT_FOUND,
-                Json(json!({"error": "Session not found"})),
+                Json(json!({"error": "No active hosted session"})),
             )
                 .into_response();
         }
@@ -200,6 +223,24 @@ pub async fn create_motion(
                 .into_response();
         }
     };
+
+    match store.motions().find_active_by_session_id(session.id).await {
+        Ok(Some(_)) => {
+            return (
+                StatusCode::CONFLICT,
+                Json(json!({"error": "Session already has an active motion"})),
+            )
+                .into_response();
+        }
+        Ok(None) => {}
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Database error"})),
+            )
+                .into_response();
+        }
+    }
 
     let now = Utc::now().with_timezone(&FixedOffset::east_opt(0).unwrap());
     let start_time = req.start_time.unwrap_or(now);
@@ -214,7 +255,7 @@ pub async fn create_motion(
         motion_data["visibility"] = json!({"participants": visibility});
     }
 
-    motion_data["session_code"] = json!(session_code);
+    motion_data["session_code"] = json!(session.join_code.clone());
 
     let proxy_assignments = parse_proxy_assignments(motion_data.get("proxy_assignments"));
 
@@ -383,30 +424,23 @@ pub async fn create_motion(
 
 #[utoipa::path(
     post,
-    path = "/motions/{id}/end",
+    path = "/motions/end",
     tag = "motions",
-    params(
-        ("id" = i32, Path, description = "Motion ID")
-    ),
     responses(
         (status = 200, description = "Motion ended (or already inactive)", body = EndMotionResponse),
         (status = 403, description = "Only the motion creator can end this motion"),
-        (status = 404, description = "Motion not found"),
+        (status = 404, description = "No active hosted session or motion"),
     )
 )]
-pub async fn end_motion(
-    user: SyncedUser,
-    State(state): State<AppState>,
-    Path(id): Path<i32>,
-) -> impl IntoResponse {
+pub async fn end_motion(user: SyncedUser, State(state): State<AppState>) -> impl IntoResponse {
     let store = &state.store;
 
-    let motion = match store.motions().find_by_id(id).await {
-        Ok(Some(motion)) => motion,
+    let session = match store.sessions().find_active_hosted_by_user(user.0.id).await {
+        Ok(Some(session)) => session,
         Ok(None) => {
             return (
                 StatusCode::NOT_FOUND,
-                Json(json!({"error": "Motion not found"})),
+                Json(json!({"error": "No active hosted session"})),
             )
                 .into_response();
         }
@@ -417,6 +451,11 @@ pub async fn end_motion(
             )
                 .into_response();
         }
+    };
+
+    let motion = match resolve_current_motion(store, session.id).await {
+        Ok(motion) => motion,
+        Err(response) => return response.into_response(),
     };
 
     if motion.created_by_user_id != user.0.id {
