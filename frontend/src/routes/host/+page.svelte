@@ -1,600 +1,644 @@
 <script lang="ts">
-	import AppFooter from '$lib/components/AppFooter.svelte';
-	import logoUrl from '$lib/assets/tartanvote-logo.svg?url';
-	import toggleUrl from '$lib/assets/toggle.svg?url';
+  import { page } from "$app/state";
+  import BriefcaseBusiness from "@lucide/svelte/icons/briefcase-business";
+  import FileUser from "@lucide/svelte/icons/file-user";
+  import Link2 from "@lucide/svelte/icons/link-2";
+  import Radio from "@lucide/svelte/icons/radio";
+  import Users from "@lucide/svelte/icons/users";
+  import AppFooter from "$lib/components/AppFooter.svelte";
+  import EndSessionDialog from "$lib/components/EndSessionDialog.svelte";
+  import HostConfigurationDialog from "$lib/components/HostConfigurationDialog.svelte";
+  import ProxyRequestDialog from "$lib/components/ProxyRequestDialog.svelte";
+  import {
+    exampleParticipants,
+    type HostDialog,
+    type HostParticipant,
+  } from "$lib/domain/host";
+  import { loadOrganizationSettings } from "$lib/domain/organizationSettings";
 
-	let compactMode = $state(false);
+  const initialState = page.url.searchParams.get("state");
+  const initialDialog = page.url.searchParams.get("dialog");
+  const initiallyCompact = page.url.searchParams.get("compact") === "true";
+  const initiallySelectAll = page.url.searchParams.get("selectAll") === "true";
+  const hasRunningVote = page.url.searchParams.get("running") === "true";
+  const runningTitle = page.url.searchParams.get("title")?.trim() || null;
+  const runningKind =
+    page.url.searchParams.get("type") === "election"
+      ? "election"
+      : page.url.searchParams.get("type") === "quick-vote"
+        ? "quick-vote"
+        : "motion";
+  const runningOptions = (page.url.searchParams.get("labels") ?? "")
+    .split("|")
+    .map((option) => option.trim())
+    .filter(Boolean);
+  const runningVotingType =
+    page.url.searchParams.get("style")?.trim() || "Standard";
+  const runningSubmitted = Math.max(
+    0,
+    Number.parseInt(page.url.searchParams.get("submitted") ?? "0", 10) || 0,
+  );
+  const runningEligible = Math.max(
+    runningSubmitted,
+    Number.parseInt(page.url.searchParams.get("eligible") ?? "0", 10) || 0,
+  );
+  const extendedParticipants: HostParticipant[] = [
+    ...exampleParticipants,
+    ...Array.from({ length: 30 }, (_, index) => ({
+      id: index + 21,
+      name: "Scotty Labs",
+      initials: "SL",
+      proxyStatus: "none" as const,
+      proxyVotes: [],
+    })),
+  ];
+  const avatarClasses = [
+    "bg-blue-100 text-blue-500",
+    "bg-blue-500 text-blue-100",
+    "bg-blue-200 text-blue-600",
+    "bg-blue-600 text-blue-200",
+    "bg-blue-300 text-blue-700",
+    "bg-blue-700 text-blue-300",
+    "bg-blue-400 text-blue-800",
+    "bg-blue-800 text-blue-400",
+  ];
+  const initialParticipants =
+    initialState === "inactive"
+      ? []
+      : initiallyCompact
+        ? initiallySelectAll
+          ? extendedParticipants
+          : exampleParticipants.slice(0, 5)
+        : exampleParticipants;
+  let compactMode = $state(initiallyCompact);
+  let dialog = $state<HostDialog>(
+    initialDialog === "motion" ||
+      initialDialog === "election" ||
+      initialDialog === "proxy"
+      ? initialDialog
+      : null,
+  );
+  let participants = $state<HostParticipant[]>(
+    initialParticipants.map((participant) => ({ ...participant })),
+  );
+  let selectedIds = $state<number[]>(
+    initiallySelectAll
+      ? initialParticipants.map((participant) => participant.id)
+      : [],
+  );
+  let activeParticipantId = $state<number | null>(null);
+  let quickVoteStarted = $state(false);
+  let activeVoteName = $state<string | null>(runningTitle);
+  let activeVoteKind = $state<"motion" | "election" | "quick-vote">(
+    runningKind,
+  );
+  let activeVoteOptions = $state<string[]>(runningOptions);
+  let activeVotingType = $state(runningVotingType);
+  let activeQuorum = $state(page.url.searchParams.get("quorum")?.trim() || "");
+  let votesSubmitted = $state(runningSubmitted);
+  let eligibleVotes = $state(runningEligible);
+  let endSessionDialogOpen = $state(false);
 
-	function toggleCompactMode() {
-		compactMode = !compactMode;
-	}
+  const selectedParticipant = $derived(
+    participants.find((participant) => participant.id === activeParticipantId),
+  );
+  const allSelected = $derived(
+    participants.length > 0 && selectedIds.length === participants.length,
+  );
+  const hasActiveVote = $derived(
+    hasRunningVote || quickVoteStarted || Boolean(activeVoteName),
+  );
+  const hasBulkSelection = $derived(selectedIds.length > 0);
+  const liveViewHref = $derived.by(() => {
+    const params = new URLSearchParams({
+      type: activeVoteKind,
+      title: activeVoteName ?? "QuickVote",
+      labels:
+        activeVoteOptions.length >= 2
+          ? activeVoteOptions.join("|")
+          : "Pass|Reject|Abstain",
+      style: activeVotingType,
+      quorum: activeQuorum,
+      eligible: String(eligibleVotes),
+    });
+    return `/host/live?${params.toString()}`;
+  });
 
+  function toggleCompactMode() {
+    compactMode = !compactMode;
+    selectedIds = [];
+  }
+
+  function toggleParticipant(id: number) {
+    selectedIds = selectedIds.includes(id)
+      ? selectedIds.filter((selectedId) => selectedId !== id)
+      : [...selectedIds, id];
+  }
+
+  function toggleAll() {
+    selectedIds = allSelected
+      ? []
+      : participants.map((participant) => participant.id);
+  }
+
+  function setSelectedProxyStatus(status: "accepted" | "declined") {
+    const selected = new Set(selectedIds);
+    participants = participants.map((participant) =>
+      selected.has(participant.id) && participant.proxyStatus !== "none"
+        ? { ...participant, proxyStatus: status }
+        : participant,
+    );
+  }
+
+  function kickSelected() {
+    const selected = new Set(selectedIds);
+    participants = participants.filter(
+      (participant) => !selected.has(participant.id),
+    );
+    selectedIds = [];
+  }
+
+  function showProxyRequest(participant: HostParticipant) {
+    activeParticipantId = participant.id;
+    dialog = "proxy";
+  }
+
+  function closeDialog() {
+    dialog = null;
+    activeParticipantId = null;
+  }
+
+  function updateParticipant(status: "accepted" | "declined") {
+    if (activeParticipantId === null) return;
+    participants = participants.map((participant) =>
+      participant.id === activeParticipantId
+        ? { ...participant, proxyStatus: status }
+        : participant,
+    );
+    closeDialog();
+  }
+
+  function setParticipantStatus(id: number, status: "accepted" | "declined") {
+    participants = participants.map((participant) =>
+      participant.id === id
+        ? { ...participant, proxyStatus: status }
+        : participant,
+    );
+  }
+
+  function kickParticipant(id: number) {
+    participants = participants.filter((participant) => participant.id !== id);
+    if (activeParticipantId === id) closeDialog();
+  }
+
+  function proxySummary(participant: HostParticipant) {
+    if (participant.proxyVotes.length === 0) return "Proxy Vote(s): N/A";
+    const prefix =
+      participant.proxyStatus === "accepted"
+        ? "Accepted Proxy Vote(s):"
+        : participant.proxyStatus === "declined"
+          ? "Unaccepted Proxy Vote(s):"
+          : "Proxy Vote(s):";
+    return `${prefix} ${participant.proxyVotes.join(", ")}`;
+  }
+
+  function startQuickVote() {
+    const organizationSettings = loadOrganizationSettings();
+    quickVoteStarted = true;
+    activeVoteName = "QuickVote";
+    activeVoteKind = "quick-vote";
+    activeVoteOptions =
+      organizationSettings.quickVoteOptions.length >= 2
+        ? organizationSettings.quickVoteOptions
+        : ["Yes", "No"];
+    activeVotingType = "Standard";
+    activeQuorum = organizationSettings.quorum;
+    votesSubmitted = 0;
+    eligibleVotes = 0;
+  }
+
+  function startConfiguredVote(configuration: {
+    kind: "motion" | "election";
+    name: string;
+    options: string[];
+    votingType: string;
+    enableQuorum: boolean;
+    quorum: string;
+  }) {
+    activeVoteName = configuration.name;
+    activeVoteKind = configuration.kind;
+    activeVoteOptions = configuration.options;
+    activeVotingType = configuration.votingType;
+    activeQuorum = configuration.enableQuorum ? configuration.quorum : "";
+    votesSubmitted = 0;
+    eligibleVotes = 0;
+    closeDialog();
+  }
 </script>
 
 <svelte:head>
-	<title>TartanVote | Host Dashboard</title>
+  <title>TartanVote | Host Dashboard</title>
 </svelte:head>
 
-<main class="host-page">
-	<header class="topbar">
-		<a class="brand-lockup" href="/home" aria-label="TartanVote home">
-			<img class="brand-mark" src={logoUrl} alt="" width="77" height="59" />
-			<span class="brand-wordmark"><span>Tartan</span>Vote</span>
-		</a>
-
-		<p class="dashboard-title">HOSTING DASHBOARD</p>
-	</header>
-
-	<div class="host-shell">
-		<aside class="sidebar" aria-label="Host dashboard navigation">
-			<section class="session-panel" aria-labelledby="session-code-label">
-				<h2 id="session-code-label">Session Code</h2>
-				<p>happy-giraffe</p>
-
-				<div class="copy-link-wrap">
-					<button class="copy-link" type="button" disabled title="Available after backend connection">
-						Invite link-not yet available
-					</button>
-				</div>
-			</section>
-
-			<nav class="sidebar-menu" aria-label="Session sections">
-				<a class="menu-item active" href="/host" aria-current="page">Overview</a>
-				<button class="menu-item" type="button" disabled title="Available after backend connection">Live View -not yet available</button>
-				<button class="menu-item" type="button" disabled title="Available after backend connection">Session Configuration -not yet available</button>
-				<button class="menu-item" type="button" disabled title="Available after backend connection">Session Results -not yet available</button>
-			</nav>
-
-			<button class="end-session" type="button" disabled title="Available after backend connection">End session -not yet available</button>
-		</aside>
-
-		<section class="overview" aria-label="Host overview">
-			<section class="running-card" aria-label="Currently running voting instance">
-				<div class="running-left">
-					<div class="running-title">
-						<svg class="radio-icon" viewBox="0 0 32 32" aria-hidden="true">
-							<path d="M7.9 20.2a8 8 0 0 1 0-8.4M12 17.7a3.9 3.9 0 0 1 0-3.4M24.1 11.8a8 8 0 0 1 0 8.4M20 14.3a3.9 3.9 0 0 1 0 3.4" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
-							<circle cx="16" cy="16" r="2.5" fill="currentColor" />
-						</svg>
-						<h1>Currently Running (N/A):</h1>
-					</div>
-
-					<p class="running-value">N/A</p>
-				</div>
-
-				<p class="votes-count">Votes Submitted: <span>N/A</span></p>
-			</section>
-
-			<div class="overview-grid">
-				<section class="participants-card" aria-labelledby="participants-title">
-					<header class="panel-header participants-header">
-						<div class="panel-heading">
-							<svg class="users-icon" viewBox="0 0 32 32" aria-hidden="true">
-								<path d="M11.5 15.5a5 5 0 1 0 0-10 5 5 0 0 0 0 10ZM3.5 27v-3a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v3M22 14.5a4 4 0 1 0 0-8M24 18a6 6 0 0 1 5 6v3" fill="none" stroke="currentColor" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round" />
-							</svg>
-							<h2 id="participants-title">Participants: 0</h2>
-						</div>
-
-						<div class="compact-mode">
-							<span class="compact-label">
-								<svg class="file-user-icon" viewBox="0 0 30 30" aria-hidden="true">
-									<path d="M8 3.5h9l5 5V26.5H8V3.5Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" />
-									<path d="M17 3.5V9h5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" />
-									<circle cx="15" cy="16" r="2.4" fill="none" stroke="currentColor" stroke-width="2" />
-									<path d="M10.8 23a4.4 4.4 0 0 1 8.4 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-								</svg>
-								Compact Mode:
-							</span>
-							<button class="compact-toggle" class:enabled={compactMode} type="button" aria-pressed={compactMode} aria-label="Toggle compact mode" onclick={toggleCompactMode}>
-								<img src={toggleUrl} alt="" width="56" height="36" />
-								<span></span>
-							</button>
-						</div>
-					</header>
-
-					<div class="participants-empty" aria-label="No participants yet"></div>
-				</section>
-
-				<section class="actions-card" aria-labelledby="actions-title">
-					<header class="panel-header actions-header">
-						<div class="panel-heading">
-							<svg class="briefcase-icon" viewBox="0 0 31 31" aria-hidden="true">
-								<path d="M10.5 9.5V7.3c0-1.1.9-2 2-2h6c1.1 0 2 .9 2 2v2.2M4 10h23v15H4V10Z" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" />
-								<path d="M4 15.5h23M13 17.5h5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" />
-							</svg>
-							<h2 id="actions-title">Actions</h2>
-						</div>
-					</header>
-
-					<div class="actions-body">
-						<button class="action-button" type="button" disabled title="Available after backend connection">Push a Motion -not yet available</button>
-						<button class="action-button" type="button" disabled title="Available after backend connection">Push an Election -not yet available</button>
-
-						<p>Create a new voting instance</p>
-					</div>
-				</section>
-			</div>
-		</section>
-	</div>
-
-	<AppFooter wide />
-</main>
-
-<style>
-	.host-page {
-		position: relative;
-		width: 100%;
-		min-height: 100svh;
-		overflow-x: hidden;
-		background: var(--gradient-screen-signin);
-		color: var(--color-grey-900);
-	}
-
-	.topbar {
-		height: clamp(96px, 5.833vw, 112px);
-		padding: clamp(22px, 1.354vw, 26px) clamp(44px, 3.542vw, 68px) clamp(22px, 1.406vw, 27px) clamp(28px, 1.771vw, 34px);
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		background: var(--color-red-600);
-		box-shadow: 0 4px 4px rgb(0 0 0 / 0.25);
-	}
-
-	.brand-lockup {
-		width: clamp(230px, 13.542vw, 260px);
-		height: clamp(52px, 3.073vw, 59px);
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		text-decoration: none;
-	}
-
-	.brand-mark {
-		width: clamp(68px, 4.01vw, 77px);
-		height: clamp(52px, 3.073vw, 59px);
-		flex: 0 0 auto;
-		display: block;
-	}
-
-	.brand-wordmark {
-		color: var(--color-red-600);
-		font-family: var(--font-brand);
-		font-size: clamp(36px, 2.083vw, 40px);
-		font-weight: 400;
-		line-height: 1;
-		letter-spacing: 0;
-		-webkit-text-stroke: clamp(8px, 0.521vw, 10px) var(--color-white);
-		paint-order: stroke fill;
-	}
-
-	.brand-wordmark span {
-		color: var(--color-black);
-	}
-
-	.dashboard-title {
-		width: clamp(300px, 17.188vw, 330px);
-		margin: 0 8px 0 0;
-		color: var(--color-white);
-		font-size: clamp(26px, 1.563vw, 30px);
-		font-weight: 400;
-		line-height: clamp(34px, 1.979vw, 38px);
-	}
-
-	.host-shell {
-		display: grid;
-		grid-template-columns: clamp(270px, 19.792vw, 380px) minmax(0, 1fr);
-		min-height: calc(100svh - clamp(96px, 5.833vw, 112px) - 81px);
-		padding-bottom: 81px;
-	}
-
-	.sidebar {
-		position: relative;
-		min-height: calc(100svh - clamp(96px, 5.833vw, 112px) - 81px);
-		background: var(--color-grey-900);
-		color: var(--color-white);
-	}
-
-	.session-panel {
-		height: clamp(190px, 11.198vw, 215px);
-		padding: clamp(30px, 2.188vw, 42px) clamp(18px, 1.354vw, 26px) 0;
-		background: var(--color-grey-800);
-	}
-
-	.session-panel h2 {
-		margin: 0 0 20px;
-		color: var(--color-grey-500);
-		font-size: clamp(16px, 0.938vw, 18px);
-		font-weight: 700;
-		line-height: 26px;
-	}
-
-	.session-panel p {
-		margin: 0 0 32px;
-		color: var(--color-white);
-		font-size: clamp(27px, 1.563vw, 30px);
-		font-weight: 600;
-		line-height: clamp(34px, 1.979vw, 38px);
-	}
-
-	.copy-link {
-		height: 24px;
-		border: 0;
-		padding: 0;
-		display: inline-flex;
-		align-items: center;
-		gap: 8px;
-		background: transparent;
-		color: var(--color-red-200);
-		font: inherit;
-		font-size: 16px;
-		font-weight: 400;
-		line-height: 24px;
-		cursor: pointer;
-	}
-
-	.copy-link-wrap {
-		position: relative;
-		width: max-content;
-	}
-
-	.sidebar-menu {
-		margin-top: 23px;
-		display: flex;
-		flex-direction: column;
-		gap: 5px;
-	}
-
-	.menu-item {
-		width: 100%;
-		border: 0;
-		height: 70px;
-		padding: 0 clamp(28px, 2.344vw, 45px);
-		display: flex;
-		align-items: center;
-		color: var(--color-white);
-		font-size: clamp(16px, 0.938vw, 18px);
-		font-weight: 700;
-		line-height: 26px;
-		text-decoration: none;
-		text-align: left;
-	}
-
-	.menu-item.active {
-		background: #66363e;
-	}
-
-	.menu-item:disabled {
-	background: var(--color-grey-900);
-	color: var(--color-grey-500);
-	cursor: not-allowed;
-	opacity: 1;
-	}
-
-	.end-session {
-		position: absolute;
-		left: 50%;
-		bottom: 35px;
-		width: min(calc(100% - 80px), 300px);
-		height: 60px;
-		transform: translateX(-50%);
-		border: 1px solid var(--color-red-500);
-		border-radius: 100px;
-		background: transparent;
-		color: var(--color-grey-200);
-		font: inherit;
-		font-size: 24px;
-		font-weight: 500;
-		line-height: 32px;
-		cursor: pointer;
-	}
-
-	.overview {
-		padding: clamp(30px, 2.188vw, 42px) clamp(24px, 3.229vw, 62px) 0 clamp(24px, 2.344vw, 45px);
-	}
-
-	.running-card {
-		height: clamp(150px, 9.01vw, 173px);
-		padding: clamp(18px, 1.146vw, 22px) clamp(22px, 1.51vw, 29px) 24px clamp(22px, 1.354vw, 26px);
-		display: flex;
-		align-items: flex-start;
-		justify-content: space-between;
-		background: var(--color-white);
-		border: 1px solid var(--color-grey-200);
-		border-radius: 10px;
-	}
-
-	.running-left {
-		display: flex;
-		flex-direction: column;
-	}
-
-	.running-title {
-		height: 32px;
-		display: flex;
-		align-items: center;
-		gap: 6px;
-	}
-
-	.radio-icon {
-		width: 32px;
-		height: 32px;
-		color: var(--color-black);
-		flex: 0 0 auto;
-	}
-
-	h1,
-	h2,
-	.running-value,
-	.votes-count {
-		margin: 0;
-	}
-
-	h1,
-	.votes-count {
-		color: var(--color-grey-900);
-		font-size: clamp(20px, 1.25vw, 24px);
-		font-weight: 700;
-		line-height: 32px;
-	}
-
-	.running-value {
-		margin: 15px 0 0 8px;
-		color: var(--color-grey-900);
-		font-size: clamp(30px, 1.875vw, 36px);
-		font-style: italic;
-		font-weight: 400;
-		line-height: 44px;
-	}
-
-	.votes-count {
-		margin-top: 5px;
-	}
-
-	.votes-count span {
-		color: var(--color-grey-600);
-	}
-
-	.overview-grid {
-		margin-top: 23px;
-		display: grid;
-		grid-template-columns: minmax(0, 1fr) clamp(280px, 19.01vw, 365px);
-		gap: clamp(20px, 1.615vw, 31px);
-		align-items: start;
-	}
-
-	.participants-card,
-	.actions-card {
-		background: var(--color-white);
-		border: 1px solid var(--color-grey-200);
-		border-radius: 10px;
-		overflow: hidden;
-	}
-
-	.participants-card {
-		height: clamp(500px, 33.177vw, 637px);
-		min-width: 0;
-	}
-
-	.panel-header {
-		height: 70px;
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		background: var(--color-grey-50);
-		border-bottom: 1px solid var(--color-grey-300);
-	}
-
-	.participants-header {
-		padding: 0 clamp(18px, 1.354vw, 26px) 0 clamp(20px, 1.458vw, 28px);
-	}
-
-	.panel-heading,
-	.compact-label {
-		display: inline-flex;
-		align-items: center;
-	}
-
-	.panel-heading {
-		gap: clamp(10px, 0.781vw, 15px);
-	}
-
-	.panel-heading h2,
-	.compact-label {
-		color: var(--color-grey-900);
-		font-size: clamp(18px, 1.042vw, 20px);
-		font-weight: 500;
-		line-height: 28px;
-	}
-
-	.users-icon {
-		width: 34px;
-		height: 34px;
-		color: var(--color-grey-900);
-	}
-
-	.file-user-icon {
-		width: 30px;
-		height: 30px;
-		margin-right: 8px;
-		color: var(--color-black);
-	}
-
-	.compact-mode {
-		display: flex;
-		align-items: center;
-		gap: 0;
-		flex: 0 0 auto;
-	}
-
-	.compact-toggle {
-		position: relative;
-		width: 56px;
-		height: 36px;
-		border: 0;
-		padding: 0;
-		background: transparent;
-		cursor: pointer;
-	}
-
-	.compact-toggle::before {
-		content: "";
-		position: absolute;
-		left: 6px;
-		top: 6px;
-		width: 44px;
-		height: 24px;
-		border-radius: 16px;
-		background: transparent;
-		transition: background 160ms ease;
-	}
-
-	.compact-toggle img {
-		position: relative;
-		z-index: 1;
-		width: 56px;
-		height: 36px;
-		display: block;
-		pointer-events: none;
-	}
-
-	.compact-toggle span {
-		position: absolute;
-		z-index: 2;
-		left: 9px;
-		top: 9px;
-		width: 18px;
-		height: 18px;
-		border-radius: 999px;
-		background: var(--color-slate-900);
-		transition:
-			background 160ms ease,
-			transform 160ms ease;
-	}
-
-	.compact-toggle.enabled span {
-		transform: translateX(19px);
-		background: var(--color-white);
-	}
-
-	.compact-toggle.enabled::before {
-		background: var(--color-grey-800);
-	}
-
-	.participants-empty {
-		height: calc(100% - 70px);
-		background: var(--color-white);
-	}
-
-	.actions-card {
-		height: 325px;
-		border-color: var(--color-grey-500);
-		min-width: 0;
-	}
-
-	.actions-header {
-		padding: 0 27px;
-	}
-
-	.briefcase-icon {
-		width: 31px;
-		height: 31px;
-		color: var(--color-grey-900);
-	}
-
-	.actions-body {
-		padding: 28px clamp(16px, 1.094vw, 21px) 26px;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-	}
-
-	.action-button {
-		width: min(100%, 280px);
-		height: 50px;
-		border: 0;
-		border-radius: 100px;
-		background: var(--color-red-600);
-		box-shadow: 0 4px 4px rgb(0 0 0 / 0.25);
-		color: var(--color-white);
-		font: inherit;
-		font-size: 18px;
-		font-weight: 500;
-		line-height: 26px;
-		cursor: pointer;
-	}
-
-	.action-button + .action-button {
-		margin-top: 20px;
-	}
-
-	.menu-item:disabled,
-	.copy-link:disabled,
-	.end-session:disabled,
-	.action-button:disabled {
-		cursor: not-allowed;
-		opacity: 0.58;
-	}
-
-	.actions-body p {
-		width: min(100%, 296px);
-		height: 44px;
-		margin: 36px 0 0;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		background: var(--color-grey-50);
-		border-radius: 2px;
-		color: var(--color-grey-600);
-		font-size: 16px;
-		font-weight: 500;
-		line-height: 24px;
-	}
-
-	button:hover,
-	.menu-item:hover {
-		filter: brightness(0.96);
-	}
-
-	button:focus-visible,
-	a:focus-visible {
-		outline: 3px solid color-mix(in srgb, var(--color-red-600), transparent 75%);
-		outline-offset: 3px;
-	}
-
-	@media (max-width: 1500px) {
-		.dashboard-title {
-			margin-right: 0;
-		}
-
-		.overview-grid {
-			grid-template-columns: minmax(0, 1fr) clamp(280px, 24vw, 330px);
-			gap: 24px;
-		}
-	}
-
-	@media (max-width: 1220px) {
-		.host-shell {
-			grid-template-columns: 260px minmax(0, 1fr);
-		}
-
-		.overview {
-			padding-left: 20px;
-			padding-right: 20px;
-		}
-
-		.overview-grid {
-			grid-template-columns: minmax(0, 1fr) 280px;
-			gap: 18px;
-		}
-
-		.compact-label {
-			font-size: 16px;
-		}
-
-		.file-user-icon,
-		.users-icon,
-		.briefcase-icon {
-			transform: scale(0.9);
-		}
-	}
-</style>
+<div
+  class="grid h-[calc(100svh-clamp(60px,5.833vw,112px)-81px)] min-h-[calc(100svh-clamp(60px,5.833vw,112px)-81px)] grid-cols-[clamp(203px,19.792vw,380px)_minmax(0,1fr)]"
+>
+    <aside
+      class="relative bg-grey-900 text-white"
+      aria-label="Host dashboard navigation"
+    >
+      <section
+        class="h-[clamp(115px,11.198vw,215px)] bg-grey-800 px-[clamp(14px,1.354vw,26px)] pt-[clamp(22px,2.188vw,42px)]"
+        aria-labelledby="session-code-label"
+      >
+        <h2
+          class="mt-0 mb-[clamp(4px,1.042vw,20px)] text-[clamp(10px,0.938vw,18px)] leading-[clamp(14px,1.354vw,26px)] text-grey-500"
+          id="session-code-label"
+        >
+          Session Code
+        </h2>
+        <p
+          class="mt-0 mb-[clamp(6px,1.667vw,32px)] text-[clamp(17px,1.563vw,30px)] leading-[clamp(22px,1.979vw,38px)] font-semibold"
+        >
+          happy-giraffe
+        </p>
+        <button
+          class="inline-flex h-6 max-w-full cursor-pointer items-center gap-2 border-0 bg-transparent p-0 text-[clamp(9px,0.833vw,16px)] text-red-200"
+          type="button"
+        >
+          <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
+            >Copy invite link</span
+          >
+          <span
+            class="grid size-[clamp(10px,1.042vw,20px)] shrink-0 place-items-center"
+            aria-hidden="true"
+          >
+            <Link2
+              class="block size-full text-red-200"
+              aria-hidden="true"
+            />
+          </span>
+        </button>
+      </section>
+
+      <nav
+        class="mt-[clamp(12px,1.198vw,23px)] grid gap-[5px]"
+        aria-label="Session sections"
+      >
+        <a
+          class="flex h-[clamp(40px,3.646vw,70px)] w-full items-center bg-[#66363e] px-[clamp(24px,2.344vw,45px)] text-[clamp(11px,0.938vw,18px)] leading-[26px] font-bold text-white no-underline"
+          href="/host"
+          aria-current="page">Overview</a
+        >
+        {#if hasActiveVote}
+          <a
+            class="flex h-[clamp(40px,3.646vw,70px)] w-full items-center px-[clamp(24px,2.344vw,45px)] text-[clamp(11px,0.938vw,18px)] leading-[26px] font-bold text-white no-underline"
+            href={liveViewHref}>Live View</a
+          >
+        {:else}
+          <button
+            class="flex h-[clamp(40px,3.646vw,70px)] w-full cursor-not-allowed items-center border-0 bg-transparent px-[clamp(24px,2.344vw,45px)] text-left text-[clamp(11px,0.938vw,18px)] leading-[26px] font-bold text-grey-100"
+            type="button"
+            disabled
+            title="Live View is available while a vote is running"
+          >
+            Live View
+          </button>
+        {/if}
+        <a
+          class="flex h-[clamp(40px,3.646vw,70px)] w-full items-center px-[clamp(24px,2.344vw,45px)] text-[clamp(11px,0.938vw,18px)] leading-[26px] font-bold text-white no-underline"
+          href="/host/configuration">Session Configuration</a
+        >
+        <button
+          class="flex h-[clamp(40px,3.646vw,70px)] w-full cursor-pointer items-center border-0 bg-transparent px-[clamp(24px,2.344vw,45px)] text-left text-[clamp(11px,0.938vw,18px)] leading-[26px] font-bold text-white"
+          type="button">Comprehensive Session Results</button
+        >
+      </nav>
+
+      <button
+        class="absolute bottom-[35px] left-1/2 h-[clamp(34px,3.125vw,60px)] w-[min(calc(100%-42px),300px)] -translate-x-1/2 cursor-pointer rounded-[100px] border border-red-500 bg-transparent text-[clamp(14px,1.25vw,24px)] text-grey-200"
+        type="button"
+        onclick={() => (endSessionDialogOpen = true)}>End session</button
+      >
+    </aside>
+
+    <section
+      class="flex min-h-0 flex-col pt-[clamp(22px,2.188vw,42px)] pr-[clamp(32px,3.229vw,62px)] pb-3 pl-[clamp(24px,2.344vw,45px)] max-[1200px]:px-6"
+      aria-label="Host overview"
+    >
+      <section
+        class="flex h-[clamp(93px,9.01vw,173px)] shrink-0 justify-between rounded-[10px] border border-grey-200 bg-white px-[clamp(15px,1.51vw,29px)] py-[clamp(11px,1.146vw,22px)]"
+        aria-label="Currently running voting instance"
+      >
+        <div>
+          <div class="flex items-center gap-1.5">
+            <Radio
+              class="size-[clamp(18px,1.667vw,32px)]"
+              strokeWidth={2.5}
+              aria-hidden="true"
+            />
+            <h1 class="m-0 text-[clamp(14px,1.25vw,24px)] leading-8">
+              Currently Running ({hasActiveVote
+                ? activeVoteKind === "election"
+                  ? "Election"
+                  : activeVoteKind === "quick-vote"
+                    ? "Quick Vote"
+                    : "Motion"
+                : "N/A"}):
+            </h1>
+          </div>
+          <p
+            class={[
+              "mt-[clamp(2px,0.781vw,15px)] mr-0 mb-0 ml-2 text-[clamp(22px,1.875vw,36px)] leading-11 italic",
+              !hasActiveVote && "text-grey-500",
+            ]}
+          >
+            {activeVoteName ?? "N/A"}
+          </p>
+        </div>
+        <p class="mt-[5px] mb-0 text-[clamp(14px,1.25vw,24px)] leading-8">
+          Votes Submitted:
+          <span class="text-grey-600"
+            >{hasActiveVote
+              ? `${votesSubmitted}/${eligibleVotes}`
+              : "N/A"}</span
+          >
+        </p>
+      </section>
+
+      <div
+        class="mt-[clamp(13px,1.198vw,23px)] grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_clamp(194px,19.01vw,365px)] items-start gap-[clamp(16px,1.615vw,31px)]"
+      >
+        <section
+          class="h-full min-h-0 overflow-hidden rounded-[10px] border border-grey-200 bg-white"
+          aria-labelledby="participants-title"
+        >
+          <header
+            class="flex h-[clamp(38px,3.646vw,70px)] items-center justify-between border-b border-grey-300 bg-grey-50 px-[clamp(13px,1.354vw,26px)]"
+          >
+            <div class="flex items-center gap-[clamp(7px,0.781vw,15px)]">
+              <Users
+                class="size-[clamp(18px,1.615vw,31px)] text-grey-900"
+                strokeWidth={2.5}
+                aria-hidden="true"
+              />
+              <h2
+                class="m-0 text-[clamp(12px,1.042vw,20px)] leading-7 font-medium"
+                id="participants-title"
+              >
+                Participants: {participants.length}
+              </h2>
+            </div>
+            <div
+              class="flex items-center gap-[7px] text-[clamp(12px,1.042vw,20px)] leading-7 font-medium"
+            >
+              <FileUser
+                class="size-[clamp(18px,1.615vw,31px)] text-black"
+                strokeWidth={2.5}
+                aria-hidden="true"
+              />
+              <span>Compact Mode:</span>
+              <button
+                class={[
+                  "relative h-6 w-11 cursor-pointer rounded-2xl border border-slate-900",
+                  compactMode ? "bg-slate-900" : "bg-white",
+                ]}
+                type="button"
+                role="switch"
+                aria-label="Compact mode"
+                aria-checked={compactMode}
+                onclick={toggleCompactMode}
+              >
+                <span
+                  class={[
+                    "absolute top-0.5 left-[3px] size-[18px] rounded-full transition-transform duration-150",
+                    compactMode
+                      ? "translate-x-[18px] bg-white"
+                      : "bg-slate-900",
+                  ]}
+                ></span>
+              </button>
+            </div>
+          </header>
+
+          {#if compactMode}
+            <div
+              class="grid h-[clamp(38px,3.646vw,70px)] grid-cols-[1.05fr_1.1fr_0.7fr_auto] items-center gap-2.5 overflow-hidden px-[13px]"
+            >
+              <button
+                class="h-[clamp(24px,2.083vw,40px)] min-w-0 cursor-pointer truncate rounded-full border-0 bg-green-400 px-[clamp(10px,0.833vw,16px)] text-[clamp(9px,0.833vw,16px)] leading-6 text-white shadow-[0_4px_2px_rgb(0_0_0_/_0.25)] disabled:cursor-not-allowed disabled:bg-green-100 disabled:text-green-600 disabled:shadow-none"
+                type="button"
+                disabled={!hasBulkSelection}
+                onclick={() => setSelectedProxyStatus("accepted")}
+                >Accept all selected Proxy Votes</button
+              >
+              <button
+                class="h-[clamp(24px,2.083vw,40px)] min-w-0 cursor-pointer truncate rounded-full border-0 bg-slate-500 px-[clamp(10px,0.833vw,16px)] text-[clamp(9px,0.833vw,16px)] leading-6 text-white shadow-[0_4px_2px_rgb(0_0_0_/_0.25)] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500 disabled:shadow-none"
+                type="button"
+                disabled={!hasBulkSelection}
+                onclick={() => setSelectedProxyStatus("declined")}
+                >Revoke all selected Proxy Votes</button
+              >
+              <button
+                class="h-[clamp(24px,2.083vw,40px)] min-w-0 cursor-pointer truncate rounded-full border-0 bg-slate-800 px-[clamp(10px,0.833vw,16px)] text-[clamp(9px,0.833vw,16px)] leading-6 text-white shadow-[0_4px_2px_rgb(0_0_0_/_0.25)] disabled:cursor-not-allowed disabled:bg-grey-200 disabled:text-grey-600 disabled:shadow-none"
+                type="button"
+                disabled={!hasBulkSelection}
+                onclick={kickSelected}>Kick all selected</button
+              >
+              <label
+                class="flex h-[clamp(24px,2.083vw,40px)] items-center justify-end gap-1.5 text-[clamp(11px,0.938vw,18px)] leading-none whitespace-nowrap"
+                >Select All <input
+                  class="size-[clamp(14px,1.042vw,20px)] accent-slate-900"
+                  type="checkbox"
+                  checked={allSelected}
+                  onchange={toggleAll}
+                /></label
+              >
+            </div>
+            <div
+              class="h-[calc(100%-clamp(76px,7.292vw,140px))] overflow-y-auto"
+            >
+              {#each participants as participant (participant.id)}
+                <div
+                  class="flex h-[clamp(18px,1.823vw,35px)] items-center gap-2 bg-grey-50 px-[clamp(14px,1.458vw,28px)] even:bg-white"
+                >
+                  <button
+                    class="flex min-w-0 flex-1 cursor-pointer flex-row items-start overflow-hidden border-0 bg-transparent p-0 text-left text-[clamp(9px,0.833vw,16px)] whitespace-nowrap"
+                    type="button"
+                    onclick={() => showProxyRequest(participant)}
+                  >
+                    <span class="text-black">{participant.name}</span><span
+                      class={participant.proxyStatus === "accepted"
+                        ? "text-green-500"
+                        : participant.proxyStatus === "pending" ||
+                            participant.proxyStatus === "declined"
+                          ? "text-red-500"
+                          : "text-grey-500"}
+                      >{" - "}{proxySummary(participant)}</span
+                    >
+                  </button>
+                  <input
+                    class="size-[clamp(14px,1.042vw,20px)] accent-slate-900"
+                    type="checkbox"
+                    aria-label={`Select ${participant.name}`}
+                    checked={selectedIds.includes(participant.id)}
+                    onchange={() => toggleParticipant(participant.id)}
+                  />
+                </div>
+              {/each}
+            </div>
+          {:else}
+            <div
+              class="h-[calc(100%-clamp(38px,3.646vw,70px))] overflow-y-auto"
+            >
+              {#each participants as participant, index (participant.id)}
+                <article
+                  class="grid min-h-[clamp(42px,4.167vw,80px)] grid-cols-[clamp(28px,2.604vw,50px)_minmax(0,1fr)_auto] items-center gap-[clamp(8px,0.833vw,16px)] bg-grey-50 px-[clamp(14px,2.604vw,50px)] py-[5px] even:bg-white"
+                >
+                  <div
+                    class={[
+                      "grid size-[clamp(28px,2.604vw,50px)] place-items-center rounded-full text-[clamp(14px,1.25vw,24px)] font-bold",
+                      avatarClasses[index % avatarClasses.length],
+                    ]}
+                    aria-hidden="true"
+                  >
+                    {participant.initials}
+                  </div>
+                  <button
+                    class="flex min-w-0 cursor-pointer flex-col items-start overflow-hidden border-0 bg-transparent p-0 text-left"
+                    type="button"
+                    onclick={() => showProxyRequest(participant)}
+                  >
+                    <strong
+                      class="text-[clamp(12px,0.938vw,18px)] leading-[26px]"
+                      >{participant.name}</strong
+                    >
+                    <span
+                      class={[
+                        "max-w-full truncate text-[clamp(10px,0.833vw,16px)]",
+                        participant.proxyStatus === "accepted"
+                          ? "text-green-500"
+                          : participant.proxyStatus === "pending" ||
+                              participant.proxyStatus === "declined"
+                            ? "text-red-500"
+                            : "text-grey-600",
+                      ]}
+                    >
+                      {proxySummary(participant)}
+                    </span>
+                  </button>
+                  <div class="flex gap-[15px] max-[1200px]:gap-2">
+                    {#if participant.proxyStatus === "pending"}
+                      <button
+                        class="h-[clamp(24px,2.083vw,40px)] w-[clamp(96px,9.375vw,180px)] cursor-pointer rounded-full border-0 bg-green-400 text-[clamp(10px,0.938vw,18px)] text-white shadow-[0_4px_2px_rgb(0_0_0_/_0.25)]"
+                        type="button"
+                        onclick={() => showProxyRequest(participant)}
+                        >Accept Proxy</button
+                      >
+                    {:else if participant.proxyStatus === "accepted"}
+                      <button
+                        class="h-[clamp(24px,2.083vw,40px)] w-[clamp(96px,9.375vw,180px)] cursor-pointer rounded-full border-0 bg-slate-500 text-[clamp(10px,0.938vw,18px)] text-white shadow-[0_4px_2px_rgb(0_0_0_/_0.25)]"
+                        type="button"
+                        onclick={() =>
+                          setParticipantStatus(participant.id, "declined")}
+                        >Revoke Proxy</button
+                      >
+                    {/if}
+                    <button
+                      class="h-[clamp(24px,2.083vw,40px)] w-[clamp(54px,5.208vw,100px)] cursor-pointer rounded-full border-0 bg-slate-800 text-[clamp(10px,0.938vw,18px)] text-white shadow-[0_4px_2px_rgb(0_0_0_/_0.25)]"
+                      type="button"
+                      onclick={() => kickParticipant(participant.id)}
+                      >Kick</button
+                    >
+                  </div>
+                </article>
+              {/each}
+            </div>
+          {/if}
+        </section>
+
+        <section
+          class="min-h-0 overflow-hidden rounded-[10px] border border-grey-500 bg-white"
+          aria-labelledby="actions-title"
+        >
+          <header
+            class="flex h-[clamp(38px,3.646vw,70px)] items-center justify-between border-b border-grey-300 bg-grey-50 px-[clamp(14px,1.406vw,27px)]"
+          >
+            <div class="flex items-center gap-[clamp(7px,0.781vw,15px)]">
+              <BriefcaseBusiness
+                class="size-[clamp(18px,1.615vw,31px)] text-grey-900"
+                strokeWidth={2.5}
+                aria-hidden="true"
+              />
+              <h2
+                class="m-0 text-[clamp(12px,1.042vw,20px)] leading-7 font-medium"
+                id="actions-title"
+              >
+                Actions
+              </h2>
+            </div>
+          </header>
+          <div
+            class="grid justify-items-center gap-[clamp(10px,1.042vw,20px)] pt-[clamp(15px,1.458vw,28px)] pr-[clamp(11px,1.094vw,21px)] pb-[clamp(11px,1.094vw,21px)] pl-[clamp(11px,1.094vw,21px)]"
+          >
+            <button
+              class="h-[clamp(28px,2.604vw,50px)] w-[min(100%,280px)] cursor-pointer rounded-[100px] border-0 bg-red-600 text-[clamp(11px,0.938vw,18px)] text-white shadow-[0_4px_2px_rgb(0_0_0_/_0.25)] disabled:cursor-not-allowed disabled:bg-red-200 disabled:shadow-none"
+              type="button"
+              disabled={hasActiveVote}
+              onclick={() => (dialog = "motion")}>+ Push a Motion</button
+            >
+            <button
+              class="h-[clamp(28px,2.604vw,50px)] w-[min(100%,280px)] cursor-pointer rounded-[100px] border-0 bg-red-600 text-[clamp(11px,0.938vw,18px)] text-white shadow-[0_4px_2px_rgb(0_0_0_/_0.25)] disabled:cursor-not-allowed disabled:bg-red-200 disabled:shadow-none"
+              type="button"
+              disabled={hasActiveVote}
+              onclick={() => (dialog = "election")}>+ Push an Election</button
+            >
+            <div
+              class="grid w-full justify-items-center gap-[clamp(10px,1.042vw,20px)]"
+            >
+              <button
+                class="h-[clamp(28px,2.604vw,50px)] w-[min(100%,280px)] cursor-pointer rounded-[100px] border-0 bg-red-600 text-[clamp(11px,0.938vw,18px)] text-white shadow-[0_4px_2px_rgb(0_0_0_/_0.25)] disabled:cursor-not-allowed disabled:bg-red-200 disabled:shadow-none"
+                type="button"
+                disabled={hasActiveVote}
+                onclick={startQuickVote}>+ Quick Vote</button
+              >
+              <p
+                class="mt-[clamp(8px,0.833vw,16px)] mb-0 grid min-h-[clamp(36px,3.125vw,60px)] w-full place-items-center bg-grey-50 px-3 py-2 text-center text-[clamp(9px,0.833vw,16px)] leading-[1.35] text-grey-600"
+              >
+                {hasActiveVote
+                  ? "You must end your current voting instance to begin a new one."
+                  : "Create a new voting instance"}
+              </p>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
+  </div>
+
+<AppFooter wide />
+
+{#if dialog === "motion" || dialog === "election"}
+  <HostConfigurationDialog
+    kind={dialog}
+    onclose={closeDialog}
+    onsubmit={startConfiguredVote}
+  />
+{:else if dialog === "proxy"}
+  <ProxyRequestDialog
+    requester={selectedParticipant?.name ?? "Scottylabs1"}
+    proxyVotes={selectedParticipant?.proxyVotes}
+    onclose={closeDialog}
+    onaccept={() => updateParticipant("accepted")}
+    ondecline={() => updateParticipant("declined")}
+    onkick={() =>
+      activeParticipantId !== null && kickParticipant(activeParticipantId)}
+  />
+{/if}
+
+{#if endSessionDialogOpen}
+  <EndSessionDialog
+    onclose={() => (endSessionDialogOpen = false)}
+    onconfirm={() => (window.location.href = "/home")}
+  />
+{/if}

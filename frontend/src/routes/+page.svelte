@@ -1,357 +1,82 @@
 <script lang="ts">
-	import { apiUrl } from '$lib/api/base';
-	import AppFooter from '$lib/components/AppFooter.svelte';
-	import logoUrl from '$lib/assets/tartanvote-logo.svg?url';
+  import { apiUrl } from "$lib/api/base";
+  import AppFooter from "$lib/components/AppFooter.svelte";
+  import logoUrl from "$lib/assets/tartanvote-logo.svg?url";
 
-	function signIn() {
-		window.location.href = apiUrl('/auth/login');
-	}
+  function signIn() {
+    window.location.href = apiUrl("/auth/login");
+  }
 </script>
 
 <svelte:head>
-	<title>TartanVote</title>
+  <title>TartanVote</title>
 </svelte:head>
 
-<main class="signin-page">
-	<section class="signin-content" aria-labelledby="app-title">
-		<div class="brand-lockup">
-			<img class="brand-mark" src={logoUrl} alt="" width="68" height="51" />
-			<h1 id="app-title"><span style="color: var(--color-black);">Tartan</span>Vote</h1>
-		</div>
+<main
+  class="relative mx-auto min-h-svh w-[min(100%,393px)] overflow-hidden bg-(image:--gradient-screen-signin) text-grey-900 sm:m-0 sm:w-full sm:rounded-none sm:shadow-none"
+>
+  <section
+    class="flex w-full flex-col items-center gap-4 px-[21px] pt-[186px] pb-[120px] max-[374px]:px-3.5 sm:min-h-[calc(100svh-81px)] sm:gap-[18px] sm:px-6 sm:pt-[clamp(88px,12vh,120px)] sm:pb-32 min-[1100px]:gap-0 min-[1100px]:pt-[clamp(96px,13.5vh,146px)] min-[1100px]:pb-[140px]"
+    aria-labelledby="app-title"
+  >
+    <div
+      class="flex h-[54px] w-[300px] items-center justify-center gap-1.5 max-[374px]:w-full sm:h-[72px] sm:w-[min(100%,390px)] sm:gap-2 min-[1100px]:h-[100px] min-[1100px]:w-[min(100%,545px)] min-[1100px]:gap-2.5"
+    >
+      <img
+        class="block h-[51px] w-[68px] shrink-0 sm:h-[62px] sm:w-[82px] min-[1100px]:h-[90px] min-[1100px]:w-[119px]"
+        src={logoUrl}
+        alt=""
+        width="68"
+        height="51"
+      />
+      <h1
+        class="m-0 font-brand text-[52.05px] leading-none font-normal tracking-normal text-red-600 [-webkit-text-stroke:8px_var(--color-white)] [paint-order:stroke_fill] max-[374px]:text-[46px] sm:text-[64px] min-[1100px]:text-8xl"
+        id="app-title"
+      >
+        <span class="text-black">Tartan</span>Vote
+      </h1>
+    </div>
 
-		<p class="description">An election management tool for proxy voting and campus governance.</p>
+    <p
+      class="mt-1 mb-0 w-[345px] text-center text-base leading-5 font-normal text-grey-600 max-[374px]:w-full sm:mt-2 sm:w-[min(calc(100vw-48px),760px)] sm:text-[22px] sm:leading-[30px] sm:text-balance min-[1100px]:mt-8 min-[1100px]:w-[min(calc(100vw-48px),1212px)] min-[1100px]:text-4xl min-[1100px]:leading-11"
+    >
+      An election management tool for proxy voting and campus governance.
+    </p>
 
-		<section class="signin-card" aria-label="Sign in with CMU account">
-			<div class="signin-copy">
-				<h2>Sign in</h2>
-				<p>with your CMU Account. You'll return to this page after authenticating.</p>
-			</div>
+    <section
+      class="mt-0 flex min-h-[225px] w-[350px] flex-col items-center gap-5 rounded-sm border border-grey-200 bg-white px-4 py-[29px] max-[374px]:w-full sm:mt-[22px] sm:min-h-[310px] sm:w-[min(calc(100vw-48px),620px)] sm:items-start sm:gap-6 sm:rounded-lg sm:px-7 sm:py-[34px] min-[1100px]:mt-[54px] min-[1100px]:min-h-[380px] min-[1100px]:w-[min(calc(100vw-48px),850px)] min-[1100px]:gap-0 min-[1100px]:rounded-[10px] min-[1100px]:px-[37px] min-[1100px]:py-[38px]"
+      aria-label="Sign in with CMU account"
+    >
+      <div
+        class="ml-1.5 flex w-[274px] flex-col gap-1.5 self-start max-[374px]:ml-0 max-[374px]:w-full sm:ml-0 sm:w-full sm:gap-1.5"
+      >
+        <h2
+          class="m-0 text-lg leading-[22px] font-semibold tracking-normal text-black sm:text-3xl sm:leading-[38px] min-[1100px]:text-[45px] min-[1100px]:leading-14"
+        >
+          Sign in
+        </h2>
+        <p
+          class="m-0 w-[324px] text-[10px] leading-[11.2px] font-medium text-grey-900 max-[374px]:w-full sm:w-auto sm:text-sm sm:leading-5 sm:text-balance min-[1100px]:text-xl min-[1100px]:leading-7"
+        >
+          with your CMU Account. You'll return to this page after
+          authenticating.
+        </p>
+      </div>
 
-			<button type="button" class="sso-button" onclick={signIn}>Sign in with CMU SSO</button>
+      <button
+        type="button"
+        class="h-[39px] w-[258px] cursor-pointer rounded-full border-0 bg-red-600 text-sm leading-[17.5px] font-semibold text-white shadow-[0_2.2px_2.2px_rgb(0_0_0_/_0.25)] hover:bg-red-700 focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-[color-mix(in_srgb,var(--color-red-600),transparent_75%)] max-[374px]:w-full sm:mx-auto sm:mt-[26px] sm:h-[50px] sm:w-[min(100%,420px)] sm:text-lg sm:leading-6 sm:shadow-[0_3px_2px_rgb(0_0_0_/_0.25)] min-[1100px]:mt-[84px] min-[1100px]:h-[60px] min-[1100px]:w-[min(100%,500px)] min-[1100px]:text-2xl min-[1100px]:leading-8 min-[1100px]:font-bold min-[1100px]:shadow-[0_4px_2px_rgb(0_0_0_/_0.25)]"
+        onclick={signIn}>Sign in with CMU SSO</button
+      >
 
-			<p class="auth-note">
-				CMU authentication is required to vote. Only @andrew.cmu.edu accounts can join sessions.
-			</p>
-		</section>
-	</section>
+      <p
+        class="m-0 flex min-h-[38px] w-[273px] items-center justify-center rounded-xs bg-grey-50 px-2 py-1.5 text-center text-[8.75px] leading-[13.1px] text-grey-600 max-[374px]:w-full sm:mx-auto sm:min-h-[54px] sm:w-[min(100%,420px)] sm:rounded-sm sm:px-3 sm:py-2 sm:text-xs sm:leading-[18px] min-[1100px]:mt-[30px] min-[1100px]:min-h-[70px] min-[1100px]:w-[min(100%,500px)] min-[1100px]:px-3.5 min-[1100px]:py-2.5 min-[1100px]:text-base min-[1100px]:leading-6 min-[1100px]:font-medium"
+      >
+        CMU authentication is required to vote. Only @andrew.cmu.edu accounts
+        can join sessions.
+      </p>
+    </section>
+  </section>
 
-	<AppFooter wide />
+  <AppFooter wide />
 </main>
-
-<style>
-	.signin-page {
-		position: relative;
-		width: min(100%, 393px);
-		min-height: 100svh;
-		margin: 0 auto;
-		overflow: hidden;
-		background: var(--gradient-screen-signin);
-		color: var(--color-grey-900);
-	}
-
-	.signin-content {
-		width: 100%;
-		padding: 186px 21px 120px;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 16px;
-	}
-
-	.brand-lockup {
-		width: 300px;
-		height: 54px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 6px;
-	}
-
-	.brand-mark {
-		width: 68px;
-		height: 51px;
-		flex: 0 0 auto;
-		display: block;
-	}
-
-	h1 {
-		margin: 0;
-		color: var(--color-red-600);
-		font-family: var(--font-brand);
-		font-size: 52.05px;
-		font-weight: 400;
-		line-height: 1;
-		letter-spacing: 0;
-		-webkit-text-stroke: 8px var(--color-white);
-		paint-order: stroke fill;
-	}
-
-	.description {
-		width: 345px;
-		margin: 4px 0 0;
-		color: var(--color-grey-600);
-		font-size: 16px;
-		font-weight: 400;
-		line-height: 20px;
-		text-align: center;
-	}
-
-	.signin-card {
-		width: 350px;
-		min-height: 225px;
-		margin-top: 0;
-		padding: 29px 16px;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 20px;
-		background: var(--color-white);
-		border: 1px solid var(--color-grey-200);
-		border-radius: 4px;
-	}
-
-	.signin-copy {
-		width: 274px;
-		display: flex;
-		flex-direction: column;
-		gap: 5px;
-		align-self: flex-start;
-		margin-left: 6px;
-	}
-
-	h2 {
-		margin: 0;
-		color: var(--color-black);
-		font-size: 18px;
-		font-weight: 600;
-		line-height: 22px;
-		letter-spacing: 0;
-	}
-
-	.signin-copy p {
-		width: 324px;
-		margin: 0;
-		color: var(--color-grey-900);
-		font-size: 10px;
-		font-weight: 500;
-		line-height: 11.2px;
-	}
-
-	.sso-button {
-		width: 258px;
-		height: 39px;
-		border: 0;
-		border-radius: 999px;
-		background: var(--color-red-600);
-		box-shadow: 0 2.2px 2.2px rgb(0 0 0 / 0.25);
-		color: var(--color-white);
-		font: inherit;
-		font-size: 14px;
-		font-weight: 600;
-		line-height: 17.5px;
-		cursor: pointer;
-	}
-
-	.sso-button:hover {
-		background: var(--color-red-700);
-	}
-
-	.sso-button:focus-visible {
-		outline: 3px solid color-mix(in srgb, var(--color-red-600), transparent 75%);
-		outline-offset: 3px;
-	}
-
-	.auth-note {
-		width: 273px;
-		min-height: 38px;
-		margin: 0;
-		padding: 5px 8px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		background: var(--color-grey-50);
-		border-radius: 2px;
-		color: var(--color-grey-600);
-		font-size: 8.75px;
-		line-height: 13.1px;
-		text-align: center;
-	}
-
-	@media (min-width: 640px) {
-		.signin-page {
-			width: 100%;
-			min-height: 100svh;
-			margin: 0;
-			border-radius: 0;
-			box-shadow: none;
-		}
-
-		.signin-content {
-			min-height: calc(100svh - 81px);
-			padding: clamp(88px, 12vh, 120px) 24px 128px;
-			gap: 18px;
-		}
-
-		.brand-lockup {
-			width: min(100%, 390px);
-			height: 72px;
-			gap: 8px;
-		}
-
-		.brand-mark {
-			width: 82px;
-			height: 62px;
-		}
-
-		h1 {
-			font-size: 64px;
-		}
-
-		.description {
-			width: min(calc(100vw - 48px), 760px);
-			margin-top: 8px;
-			font-size: 22px;
-			line-height: 30px;
-			text-wrap: balance;
-		}
-
-		.signin-card {
-			width: min(calc(100vw - 48px), 620px);
-			min-height: 310px;
-			margin-top: 22px;
-			padding: 34px 28px;
-			align-items: flex-start;
-			gap: 24px;
-			border-radius: 8px;
-		}
-
-		.signin-copy {
-			width: 100%;
-			margin-left: 0;
-			gap: 5px;
-		}
-
-		h2 {
-			font-size: 30px;
-			line-height: 38px;
-		}
-
-		.signin-copy p {
-			width: auto;
-			font-size: 14px;
-			line-height: 20px;
-			text-wrap: balance;
-		}
-
-		.sso-button {
-			width: min(100%, 420px);
-			height: 50px;
-			margin: 26px auto 0;
-			font-size: 18px;
-			line-height: 24px;
-			box-shadow: 0 3px 2px rgb(0 0 0 / 0.25);
-		}
-
-		.auth-note {
-			width: min(100%, 420px);
-			min-height: 54px;
-			margin: 0 auto;
-			padding: 8px 12px;
-			font-size: 12px;
-			line-height: 18px;
-			border-radius: 4px;
-		}
-
-	}
-
-	@media (min-width: 1100px) {
-		.signin-content {
-			padding: clamp(96px, 13.5vh, 146px) 24px 140px;
-			gap: 0;
-		}
-
-		.brand-lockup {
-			width: min(100%, 545px);
-			height: 100px;
-			gap: 10px;
-		}
-
-		.brand-mark {
-			width: 119px;
-			height: 90px;
-		}
-
-		h1 {
-			font-size: 96px;
-		}
-
-		.description {
-			width: min(calc(100vw - 48px), 1212px);
-			margin-top: 32px;
-			font-size: 36px;
-			line-height: 44px;
-		}
-
-		.signin-card {
-			width: min(calc(100vw - 48px), 850px);
-			min-height: 380px;
-			margin-top: 54px;
-			padding: 38px 37px;
-			gap: 0;
-			border-radius: 10px;
-		}
-
-		h2 {
-			font-size: 45px;
-			line-height: 56px;
-		}
-
-		.signin-copy p {
-			font-size: 20px;
-			line-height: 28px;
-		}
-
-		.sso-button {
-			width: min(100%, 500px);
-			height: 60px;
-			margin-top: 84px;
-			font-size: 24px;
-			font-weight: 700;
-			line-height: 32px;
-			box-shadow: 0 4px 2px rgb(0 0 0 / 0.25);
-		}
-
-		.auth-note {
-			width: min(100%, 500px);
-			min-height: 70px;
-			margin-top: 30px;
-			padding: 10px 14px;
-			font-size: 16px;
-			font-weight: 500;
-			line-height: 24px;
-		}
-	}
-
-	@media (max-width: 374px) {
-		.signin-content {
-			padding-inline: 14px;
-		}
-
-		.brand-lockup,
-		.description,
-		.signin-card {
-			width: 100%;
-		}
-
-		h1 {
-			font-size: 46px;
-		}
-
-		.signin-copy,
-		.signin-copy p,
-		.sso-button,
-		.auth-note {
-			width: 100%;
-		}
-	}
-</style>
