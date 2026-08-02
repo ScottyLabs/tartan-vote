@@ -33,6 +33,7 @@
   git-hooks.hooks = {
     deno-check.entry = lib.mkForce "bash -c 'cd frontend && deno check .'";
     deno-test.entry = lib.mkForce "deno test --ignore=.devenv,.direnv --permit-no-files";
+    block-ai-slop.excludes = [ "^docs/" ];
   };
 
   scripts = {

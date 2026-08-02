@@ -16,12 +16,12 @@
 
   function updateSessionCode(event: Event) {
     const input = event.currentTarget as HTMLInputElement;
-    sessionCode = input.value.replace(/^\s+/, "").replace(/\s+/g, "-");
+    sessionCode = input.value.replaceAll(/^\s+/gu, "").replaceAll(/\s+/gu, "-");
   }
 
   function joinSession() {
-    const normalizedSessionCode = sessionCode.replace(/^-+|-+$/g, "");
-    if (!normalizedSessionCode) return;
+    const normalizedSessionCode = sessionCode.replaceAll(/^-+|-+$/gu, "");
+    if (normalizedSessionCode === "") return;
 
     const searchParams = new URLSearchParams({
       sessionCode: normalizedSessionCode,

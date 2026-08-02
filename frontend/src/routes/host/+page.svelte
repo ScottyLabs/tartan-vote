@@ -36,11 +36,11 @@
     page.url.searchParams.get("style")?.trim() || "Standard";
   const runningSubmitted = Math.max(
     0,
-    Number.parseInt(page.url.searchParams.get("submitted") ?? "0", 10) || 0,
+    Math.trunc(Number(page.url.searchParams.get("submitted") ?? "0")) || 0,
   );
   const runningEligible = Math.max(
     runningSubmitted,
-    Number.parseInt(page.url.searchParams.get("eligible") ?? "0", 10) || 0,
+    Math.trunc(Number(page.url.searchParams.get("eligible") ?? "0")) || 0,
   );
   const extendedParticipants: HostParticipant[] = [
     ...exampleParticipants,

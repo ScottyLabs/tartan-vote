@@ -97,7 +97,7 @@
           class="m-0 text-[13px] leading-5 font-medium text-grey-700 sm:w-[min(100%,780px)] sm:text-[clamp(18px,1.25vw,24px)] sm:leading-[clamp(26px,1.67vw,32px)]"
         >
           Your host will push a motion or election shortly. Please ensure that
-          all inputted Proxy IDs are accurate before requesting the host’s
+          all inputted Proxy IDs are accurate before requesting the host's
           confirmation.
         </p>
       {:else}
