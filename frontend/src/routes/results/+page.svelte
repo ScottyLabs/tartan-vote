@@ -27,8 +27,12 @@
   <meta name="description" content="View voting results for the active TartanVote election." />
 </svelte:head>
 
-<main class="results-page">
-  <div class="page-underlay" aria-hidden="true"></div>
+<main
+  class="relative grid min-h-svh w-full place-items-center overflow-hidden py-5
+    [background:linear-gradient(rgb(102_102_102_/_0.4),rgb(102_102_102_/_0.4)),var(--gradient-screen-signin)]
+    [&_.results-dialog]:relative [&_.results-dialog]:z-[1]"
+>
+  <div class="absolute inset-0 bg-grey-700/6" aria-hidden="true"></div>
   <ResultsDialog
     heading={results.heading}
     countLabel={results.countLabel}
@@ -38,29 +42,3 @@
     initiallyExpanded={results.initiallyExpanded}
   />
 </main>
-
-<style>
-  .results-page {
-    position: relative;
-    width: 100%;
-    min-height: 100svh;
-    padding: 20px 0;
-    display: grid;
-    place-items: center;
-    overflow: hidden;
-    background:
-      linear-gradient(rgb(102 102 102 / 0.4), rgb(102 102 102 / 0.4)),
-      var(--gradient-screen-signin);
-  }
-
-  .page-underlay {
-    position: absolute;
-    inset: 0;
-    background: rgb(102 102 102 / 0.06);
-  }
-
-  :global(.results-dialog) {
-    position: relative;
-    z-index: 1;
-  }
-</style>

@@ -1,7 +1,7 @@
 <script lang="ts">
-  import type { BallotChoice, VotingInstance } from '$lib/domain/ballot';
-  import radioUrl from '$lib/assets/ballot-radio.svg?url';
-  import selectedRadioUrl from '$lib/assets/ballot-radio-selected.svg?url';
+  import type { BallotChoice, VotingInstance } from "$lib/domain/ballot";
+  import radioUrl from "$lib/assets/ballot-radio.svg?url";
+  import selectedRadioUrl from "$lib/assets/ballot-radio-selected.svg?url";
 
   interface Props {
     instance: VotingInstance;
@@ -20,26 +20,50 @@
     disabled = false,
     compact = false,
     quickVote = false,
-    onChange
+    onChange,
   }: Props = $props();
 
   const groupName = $derived(`vote-${instance.id}`);
 </script>
 
-<fieldset class:compact class:quick-vote={quickVote} {disabled}>
-  <legend>Ballot for {instance.votingId}{instance.proxy ? ', proxy vote' : ''}</legend>
+<fieldset
+  class={[
+    "m-0 min-h-[220px] min-w-0 rounded-[10px] border border-grey-400 bg-white px-5 pt-[22px] pb-6 sm:px-[clamp(32px,2.24vw,43px)]",
+    quickVote
+      ? "sm:min-h-[clamp(190px,10.938vw,210px)] sm:py-[clamp(20px,1.563vw,30px)]"
+      : compact
+        ? "sm:min-h-[clamp(230px,13.54vw,260px)] sm:py-[clamp(24px,1.56vw,30px)]"
+        : "sm:min-h-[clamp(240px,15.63vw,300px)] sm:py-[clamp(28px,1.88vw,36px)]",
+  ]}
+  {disabled}
+>
+  <legend class="sr-only">
+    Ballot for {instance.votingId}{instance.proxy ? ", proxy vote" : ""}
+  </legend>
 
-  <div class="instance-header">
+  <div
+    class="flex w-full items-center justify-between gap-4 text-sm leading-5 font-medium text-grey-900 sm:text-[clamp(16px,0.94vw,18px)] sm:leading-[clamp(24px,1.35vw,26px)]"
+  >
     <span>VotingID: {instance.votingId}</span>
     {#if instance.proxy}
-      <span class="proxy-label">Proxy Vote</span>
+      <span class="text-grey-700">Proxy Vote</span>
     {/if}
   </div>
 
-  <div class="choice-list">
+  <div
+    class="mx-auto mt-[22px] flex w-[min(100%,300px)] flex-col gap-[7px] sm:mt-[clamp(24px,1.41vw,27px)] sm:w-[min(100%,431px)]"
+  >
     {#each choices as choice (choice.id)}
-      <label class:selected={selectedChoiceId === choice.id}>
+      <label
+        class={[
+          "relative flex min-h-[42px] cursor-pointer items-center gap-2 rounded-lg text-sm leading-5 font-medium text-slate-900 hover:border-red-400 sm:min-h-[50px] sm:rounded-[10px] sm:text-lg sm:leading-[26px]",
+          selectedChoiceId === choice.id
+            ? "border-2 border-red-400 bg-red-50 px-[13px] py-2 sm:py-2.5"
+            : "border border-slate-900 bg-white px-3.5 py-[9px] sm:py-[11px]",
+        ]}
+      >
         <input
+          class="peer sr-only"
           type="radio"
           name={groupName}
           value={choice.id}
@@ -47,7 +71,7 @@
           onchange={() => onChange(instance.id, choice.id)}
         />
         <img
-          class="radio-mark"
+          class="block size-3.5 flex-none peer-focus-visible:[outline:3px_solid_color-mix(in_srgb,var(--color-red-600),transparent_72%)] peer-focus-visible:outline-offset-[3px] sm:size-[18px]"
           src={selectedChoiceId === choice.id ? selectedRadioUrl : radioUrl}
           alt=""
           width="20"
@@ -58,150 +82,3 @@
     {/each}
   </div>
 </fieldset>
-
-<style>
-  fieldset {
-    min-width: 0;
-    min-height: 220px;
-    margin: 0;
-    padding: 22px 20px 24px;
-    border: 1px solid var(--color-grey-400);
-    border-radius: 10px;
-    background: var(--color-white);
-  }
-
-  legend {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    margin: -1px;
-    padding: 0;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
-    border: 0;
-  }
-
-  .instance-header {
-    width: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    color: var(--color-grey-900);
-    font-size: 14px;
-    font-weight: 500;
-    line-height: 20px;
-  }
-
-  .proxy-label {
-    color: var(--color-grey-700);
-  }
-
-  .choice-list {
-    width: min(100%, 300px);
-    margin: 22px auto 0;
-    display: flex;
-    flex-direction: column;
-    gap: 7px;
-  }
-
-  label {
-    position: relative;
-    min-height: 42px;
-    padding: 9px 14px;
-    border: 1px solid var(--color-slate-900);
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    background: var(--color-white);
-    color: var(--color-slate-900);
-    font-size: 14px;
-    font-weight: 500;
-    line-height: 20px;
-    cursor: pointer;
-  }
-
-  label:hover {
-    border-color: var(--color-red-400);
-  }
-
-  label.selected {
-    border: 2px solid var(--color-red-400);
-    padding: 8px 13px;
-    background: var(--color-red-50);
-  }
-
-  input {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-  }
-
-  .radio-mark {
-    width: 14px;
-    height: 14px;
-    display: block;
-    flex: 0 0 auto;
-  }
-
-  input:focus-visible + .radio-mark {
-    outline: 3px solid color-mix(in srgb, var(--color-red-600), transparent 72%);
-    outline-offset: 3px;
-  }
-
-  @media (min-width: 640px) {
-    fieldset {
-      min-height: clamp(240px, 15.63vw, 300px);
-      padding: clamp(28px, 1.88vw, 36px) clamp(32px, 2.24vw, 43px);
-    }
-
-    fieldset.compact {
-      min-height: clamp(230px, 13.54vw, 260px);
-      padding-top: clamp(24px, 1.56vw, 30px);
-      padding-bottom: clamp(24px, 1.56vw, 30px);
-    }
-
-    fieldset.quick-vote {
-      min-height: clamp(190px, 10.938vw, 210px);
-      padding-top: clamp(20px, 1.563vw, 30px);
-      padding-bottom: clamp(20px, 1.563vw, 30px);
-    }
-
-    .instance-header {
-      font-size: clamp(16px, 0.94vw, 18px);
-      line-height: clamp(24px, 1.35vw, 26px);
-    }
-
-    .choice-list {
-      width: min(100%, 431px);
-      margin-top: clamp(24px, 1.41vw, 27px);
-    }
-
-    label {
-      min-height: 50px;
-      padding: 11px 14px;
-      border-radius: 10px;
-      font-size: 18px;
-      line-height: 26px;
-    }
-
-    label.selected {
-      padding: 10px 13px;
-    }
-
-    .radio-mark {
-      width: 18px;
-      height: 18px;
-    }
-
-    label.selected .radio-mark::after {
-      width: 7px;
-      height: 7px;
-    }
-  }
-</style>
