@@ -1,4 +1,4 @@
-use crate::m20260310_000844_create_events::Event;
+use crate::m20260310_000844_create_motions::Motion;
 use crate::m20260325_032552_create_user_sessions::UserSession;
 use sea_orm_migration::prelude::*;
 
@@ -20,7 +20,7 @@ impl MigrationTrait for Migration {
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(Vote::EventId).integer().not_null())
+                    .col(ColumnDef::new(Vote::MotionId).integer().not_null())
                     .col(ColumnDef::new(Vote::UserSessionId).integer().not_null())
                     .col(
                         ColumnDef::new(Vote::CastTime)
@@ -31,8 +31,8 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(Vote::Data).json_binary().not_null())
                     .foreign_key(
                         ForeignKey::create()
-                            .from(Vote::Table, Vote::EventId)
-                            .to(Event::Table, Event::Id)
+                            .from(Vote::Table, Vote::MotionId)
+                            .to(Motion::Table, Motion::Id)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
                     .foreign_key(
@@ -48,9 +48,9 @@ impl MigrationTrait for Migration {
         manager
             .create_index(
                 Index::create()
-                    .name("idx-vote-event-user-session-unique")
+                    .name("idx-vote-motion-user-session-unique")
                     .table(Vote::Table)
-                    .col(Vote::EventId)
+                    .col(Vote::MotionId)
                     .col(Vote::UserSessionId)
                     .unique()
                     .to_owned(),
@@ -69,7 +69,7 @@ impl MigrationTrait for Migration {
 pub enum Vote {
     Table,
     Id,
-    EventId,
+    MotionId,
     UserSessionId,
     CastTime,
     Data,

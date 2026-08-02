@@ -1,7 +1,7 @@
 # JSON Information
 
 - [vote.data](db-json.md#votedata)
-- [event.data](db-json.md#eventdata)
+- [motion.data](db-json.md#motiondata)
 - [organization.data](db-json.md#organizationdata)
 - [log.data](db-json.md#logdata)
 
@@ -13,7 +13,6 @@ The `vote.data` field stores the submitted voting payload for a single vote reco
 
 ```typescript
 type VoteData = {
-    vote_type: string;
     proxy: boolean;
     proxy_for_user_id: number | null;
     vote_response: string[];
@@ -22,37 +21,33 @@ type VoteData = {
 
 ### Field Descriptions
 
-- `vote_type`: Specifies the type of vote represented by this response. Examples include `"motion"` and `"election"`.
 - `proxy`: Whether this vote was cast as a proxy vote instance.
 - `proxy_for_user_id`: If `proxy` is true, this stores the proxied user's id; otherwise `null`.
-- `vote_response`: Stores the participant’s submitted response as an array.
-  - For a standard motion, this array typically contains a single value.
-  - For a ranked-choice election, this array stores the ranked selections in order of preference.
+- `vote_response`: Stores the participant's submitted response as an array.
+  - For a standard single-choice motion, this array typically contains a single value.
+  - For a ranked-choice ballot, this array stores the ranked selections in order of preference.
   - A lower array index indicates a higher preference (e.g., index 0 = first choice, index 1 = second choice).
 
 ### Example Usage
 
 ```json
 {
-    "vote_type": "motion",
     "proxy": false,
     "proxy_for_user_id": null,
-    "vote_response": ["choice1", "choice2"]
+    "vote_response": ["choice1"]
 }
 ```
 
-## `event.data`
+## `motion.data`
 
-The `event.data` field stores event-specific configuration and metadata.
+The `motion.data` field stores motion-specific configuration and metadata.
 
 ### Type Definition
 
 ```typescript
-type EventData = {
+type MotionData = {
     description: string;
     session_code: string;
-    vote_type: string;
-    threshold: number;
     visibility: {
         participants: string;
     };
@@ -63,22 +58,18 @@ type EventData = {
 
 ### Field Descriptions
 
-- `description`: A textual description of the event.
+- `description`: A textual description of the motion.
 - `session_code`: A code used for joining or identifying the session.
-- `vote_type`: Specifies whether the event is a motion or an election.
-- `threshold`: A floating-point value representing the approval threshold required for the vote. This value in the range [0, 1].
-- `visibility.participants`: Defines what participants can see during the event. Example values include `"hidden_until_release"` and `"live"`.
-- `proxy`: Indicates whether proxy voting is enabled for the event.
-- `vote_options`: Lists the selectable voting options for the event.
+- `visibility.participants`: Defines what participants can see during the motion. Example values include `"hidden_until_release"` and `"live"`.
+- `proxy`: Indicates whether proxy voting is enabled for the motion.
+- `vote_options`: Lists the selectable voting options for the motion.
 
 ### Example Usage
 
 ```json
 {
-    "description": "Event description goes here",
+    "description": "Motion description goes here",
     "session_code": "code",
-    "vote_type": "motion",
-    "threshold": 0.75,
     "visibility": {
         "participants": "hidden_until_release"
     },

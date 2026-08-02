@@ -49,9 +49,9 @@ pub async fn setup(config: Config) {
             OpenApiRouter::new()
                 .routes(routes!(crate::domain::auth::handlers::auth_status))
                 .routes(routes!(health))
-                .routes(routes!(crate::domain::event::handlers::create_event))
-                .routes(routes!(crate::domain::event::handlers::check_event))
-                .routes(routes!(crate::domain::event::handlers::end_event))
+                .routes(routes!(crate::domain::motion::handlers::create_motion))
+                .routes(routes!(crate::domain::motion::handlers::check_motion))
+                .routes(routes!(crate::domain::motion::handlers::end_motion))
                 .routes(routes!(crate::domain::attendance::handlers::attendance))
                 .routes(routes!(crate::domain::votes::handlers::cast_vote))
                 .routes(routes!(crate::domain::votes::handlers::get_motion_results))
@@ -61,7 +61,7 @@ pub async fn setup(config: Config) {
                 ))
                 .routes(routes!(crate::domain::votes::handlers::assign_proxy))
                 .routes(routes!(
-                    crate::domain::votes::handlers::export_event_results
+                    crate::domain::votes::handlers::export_motion_results
                 ))
                 .routes(routes!(crate::domain::session::handlers::create_session))
                 .routes(routes!(crate::domain::session::handlers::join_session))
@@ -72,7 +72,7 @@ pub async fn setup(config: Config) {
                 .routes(routes!(crate::domain::session::handlers::status_session))
                 .routes(routes!(crate::domain::session::export::export_session_data))
                 .routes(routes!(
-                    crate::domain::session::export::export_session_events_json
+                    crate::domain::session::export::export_session_motions_json
                 )),
         )
         .split_for_parts();

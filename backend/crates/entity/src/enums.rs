@@ -2,24 +2,6 @@
 
 use sea_orm::entity::prelude::*;
 
-#[derive(
-    Debug,
-    Clone,
-    PartialEq,
-    Eq,
-    EnumIter,
-    DeriveActiveEnum,
-    serde::Serialize,
-    serde::Deserialize,
-    utoipa::ToSchema,
-)]
-#[sea_orm(rs_type = "String", db_type = "Enum", enum_name = "event_type")]
-pub enum EventType {
-    #[sea_orm(string_value = "motion")]
-    Motion,
-    #[sea_orm(string_value = "election")]
-    Election,
-}
 #[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum)]
 #[sea_orm(rs_type = "String", db_type = "Enum", enum_name = "join_left")]
 pub enum JoinLeft {

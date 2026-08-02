@@ -3,7 +3,7 @@
 pub mod prelude;
 
 pub mod enums;
-pub mod event;
+pub mod motion;
 pub mod organization;
 pub mod organization_member;
 pub mod session;

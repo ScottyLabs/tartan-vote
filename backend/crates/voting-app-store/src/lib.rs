@@ -1,4 +1,4 @@
-pub mod events;
+pub mod motions;
 pub mod organization_members;
 pub mod organizations;
 pub mod sessions;
@@ -42,8 +42,8 @@ impl Store {
         user_sessions::UserSessionRepository::new(&self.db)
     }
 
-    pub fn events(&self) -> events::EventRepository<'_> {
-        events::EventRepository::new(&self.db)
+    pub fn motions(&self) -> motions::MotionRepository<'_> {
+        motions::MotionRepository::new(&self.db)
     }
 
     pub fn votes(&self) -> votes::VoteRepository<'_> {

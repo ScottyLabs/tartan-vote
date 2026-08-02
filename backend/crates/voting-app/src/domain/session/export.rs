@@ -8,7 +8,7 @@ use axum::{
     response::IntoResponse,
 };
 use entity::enums::JoinLeft;
-use entity::event;
+use entity::motion;
 use entity::session::{self, Entity as Session};
 use sea_orm::{
     ColumnTrait, DatabaseConnection, DbBackend, EntityTrait, FromQueryResult, QueryFilter,
@@ -84,28 +84,27 @@ struct VoteCount {
 }
 
 #[derive(Debug, serde::Serialize, ToSchema)]
-pub struct SessionEventExportItem {
-    pub event_id: i32,
-    pub event_name: String,
-    pub event_type: String,
+pub struct SessionMotionExportItem {
+    pub motion_id: i32,
+    pub motion_name: String,
     pub status: String,
     pub start_time: String,
     pub end_time: Option<String>,
     pub total_votes: u32,
-    pub option_counts: Vec<SessionEventOptionCount>,
+    pub option_counts: Vec<SessionMotionOptionCount>,
 }
 
 #[derive(Debug, serde::Serialize, ToSchema)]
-pub struct SessionEventOptionCount {
+pub struct SessionMotionOptionCount {
     pub option: String,
     pub count: u32,
 }
 
 #[derive(Debug, serde::Serialize, ToSchema)]
-pub struct SessionEventsExportResponse {
+pub struct SessionMotionsExportResponse {
     pub session_code: String,
-    pub total_events: usize,
-    pub events: Vec<SessionEventExportItem>,
+    pub total_motions: usize,
+    pub motions: Vec<SessionMotionExportItem>,
 }
 
 #[derive(Debug, Clone)]
@@ -129,8 +128,8 @@ async fn get_vote_counts(
         r#"
         SELECT vote.data->'vote_response'->>0 AS option, COUNT(*) AS count
         FROM vote
-        JOIN event ON vote.event_id = event.id
-        WHERE event.session_id = $1
+        JOIN motion ON vote.motion_id = motion.id
+        WHERE motion.session_id = $1
         GROUP BY vote.data->'vote_response'->>0
         "#,
         [session.id.into()],
@@ -597,18 +596,18 @@ pub async fn export_session_data(
 
 #[utoipa::path(
     get,
-    path = "/session/{session_code}/events/export",
+    path = "/session/{session_code}/motions/export",
     tag = "sessions",
     params(
         ("session_code" = String, Path, description = "Session join code")
     ),
     responses(
-        (status = 200, description = "Session events export", body = SessionEventsExportResponse),
-        (status = 403, description = "Only the session host may export events"),
+        (status = 200, description = "Session motions export", body = SessionMotionsExportResponse),
+        (status = 403, description = "Only the session host may export motions"),
         (status = 404, description = "Session not found"),
     )
 )]
-pub async fn export_session_events_json(
+pub async fn export_session_motions_json(
     user: SyncedUser,
     State(state): State<AppState>,
     Path(session_code): Path<String>,
@@ -638,14 +637,14 @@ pub async fn export_session_events_json(
     if session.created_by_user_id != user.0.id {
         return (
             StatusCode::FORBIDDEN,
-            Json(serde_json::json!({"error": "Only the session host may export events"})),
+            Json(serde_json::json!({"error": "Only the session host may export motions"})),
         )
             .into_response();
     }
 
-    let events = match entity::prelude::Event::find()
-        .filter(event::Column::SessionId.eq(session.id))
-        .order_by_asc(event::Column::StartTime)
+    let events = match entity::prelude::Motion::find()
+        .filter(motion::Column::SessionId.eq(session.id))
+        .order_by_asc(motion::Column::StartTime)
         .all(&state.db)
         .await
     {
@@ -659,11 +658,11 @@ pub async fn export_session_events_json(
         }
     };
 
-    let mut event_exports = Vec::with_capacity(events.len());
+    let mut motion_exports = Vec::with_capacity(events.len());
 
-    for session_event in events {
+    for session_motion in events {
         let vote_rows = match entity::prelude::Vote::find()
-            .filter(entity::vote::Column::EventId.eq(session_event.id))
+            .filter(entity::vote::Column::MotionId.eq(session_motion.id))
             .all(&state.db)
             .await
         {
@@ -677,7 +676,7 @@ pub async fn export_session_events_json(
             }
         };
 
-        let option_labels = session_event
+        let option_labels = session_motion
             .data
             .get("vote_options")
             .and_then(|value| value.as_array())
@@ -718,17 +717,16 @@ pub async fn export_session_events_json(
 
         let mut option_counts = counts
             .into_iter()
-            .map(|(option, count)| SessionEventOptionCount { option, count })
+            .map(|(option, count)| SessionMotionOptionCount { option, count })
             .collect::<Vec<_>>();
         option_counts.sort_by(|a, b| a.option.cmp(&b.option));
 
-        event_exports.push(SessionEventExportItem {
-            event_id: session_event.id,
-            event_name: session_event.name,
-            event_type: format!("{:?}", session_event.event_type),
-            status: format!("{:?}", session_event.status),
-            start_time: session_event.start_time.to_rfc3339(),
-            end_time: session_event.end_time.map(|value| value.to_rfc3339()),
+        motion_exports.push(SessionMotionExportItem {
+            motion_id: session_motion.id,
+            motion_name: session_motion.name,
+            status: format!("{:?}", session_motion.status),
+            start_time: session_motion.start_time.to_rfc3339(),
+            end_time: session_motion.end_time.map(|value| value.to_rfc3339()),
             total_votes,
             option_counts,
         });
@@ -736,10 +734,10 @@ pub async fn export_session_events_json(
 
     (
         StatusCode::OK,
-        Json(SessionEventsExportResponse {
+        Json(SessionMotionsExportResponse {
             session_code,
-            total_events: event_exports.len(),
-            events: event_exports,
+            total_motions: motion_exports.len(),
+            motions: motion_exports,
         }),
     )
         .into_response()
@@ -773,8 +771,8 @@ pub async fn ret_vote_csv(session_code: &str) -> Vec<u8> {
 mod integration_tests {
     use super::*;
     use chrono::Utc;
-    use entity::enums::{EventType, JoinLeft, SessionStatus, StatusOption};
-    use entity::{event, session, user, user_session, vote};
+    use entity::enums::{JoinLeft, SessionStatus, StatusOption};
+    use entity::{motion, session, user, user_session, vote};
     use sea_orm::{ActiveModelTrait, ActiveValue::Set, Database, EntityTrait};
     use serde_json::json;
 
@@ -792,7 +790,7 @@ mod integration_tests {
             .one(db)
             .await
         {
-            // Deleting the creator user cascades: session -> events -> votes, user_sessions
+            // Deleting the creator user cascades: session -> motions -> votes, user_sessions
             let _ = entity::user::Entity::delete_by_id(s.created_by_user_id)
                 .exec(db)
                 .await;
@@ -923,16 +921,18 @@ mod integration_tests {
         .expect("Failed to insert user_session");
     }
 
-    async fn insert_event(db: &DatabaseConnection, sess_id: i32, creator_id: i32) -> event::Model {
-        event::ActiveModel {
-            event_type: Set(EventType::Motion),
+    async fn insert_motion(
+        db: &DatabaseConnection,
+        sess_id: i32,
+        creator_id: i32,
+    ) -> motion::Model {
+        motion::ActiveModel {
             name: Set("Test Motion".to_string()),
             status: Set(StatusOption::Active),
             start_time: Set(Utc::now().fixed_offset()),
             end_time: Set(None),
             data: Set(json!({
                 "vote_options": ["pass", "reject", "abstain"],
-                "threshold": 0.5,
                 "proxy": false,
                 "visibility": { "participants": "live" }
             })),
@@ -942,13 +942,13 @@ mod integration_tests {
         }
         .insert(db)
         .await
-        .expect("Failed to insert event")
+        .expect("Failed to insert motion")
     }
 
     async fn insert_vote_for(
         db: &DatabaseConnection,
         session_id: i32,
-        event_id: i32,
+        motion_id: i32,
         user_id: i32,
         response: &str,
     ) {
@@ -965,11 +965,10 @@ mod integration_tests {
         .expect("Failed to insert user_session");
 
         vote::ActiveModel {
-            event_id: Set(event_id),
+            motion_id: Set(motion_id),
             user_session_id: Set(user_session_row.id),
             cast_time: Set(Utc::now().fixed_offset()),
             data: Set(json!({
-                "vote_type": "motion",
                 "proxy": false,
                 "vote_response": [response]
             })),
@@ -991,7 +990,7 @@ mod integration_tests {
 
         let user = insert_user(&db, "Test Voter", "tvoter").await;
         let sess = insert_session(&db, code, user.id).await;
-        let evt = insert_event(&db, sess.id, user.id).await;
+        let evt = insert_motion(&db, sess.id, user.id).await;
         insert_vote_for(&db, sess.id, evt.id, user.id, "pass").await;
 
         let bytes = ret_vote_pdf(code).await;
@@ -1019,7 +1018,7 @@ mod integration_tests {
 
         let user = insert_user(&db, "Test Voter2", "tvoter2").await;
         let sess = insert_session(&db, code, user.id).await;
-        let evt = insert_event(&db, sess.id, user.id).await;
+        let evt = insert_motion(&db, sess.id, user.id).await;
         insert_vote_for(&db, sess.id, evt.id, user.id, "pass").await;
 
         let bytes = ret_vote_csv(code).await;
@@ -1043,7 +1042,7 @@ mod integration_tests {
 
         let host = insert_user(&db, "Host", "host03").await;
         let sess = insert_session(&db, code, host.id).await;
-        let evt = insert_event(&db, sess.id, host.id).await;
+        let evt = insert_motion(&db, sess.id, host.id).await;
 
         let responses = [("pass", 5), ("reject", 3), ("abstain", 2)];
         let mut all_users = vec![host.id];
@@ -1080,7 +1079,7 @@ mod integration_tests {
 
         let host = insert_user(&db, "Host4", "host04").await;
         let sess = insert_session(&db, code, host.id).await;
-        let evt = insert_event(&db, sess.id, host.id).await;
+        let evt = insert_motion(&db, sess.id, host.id).await;
 
         let responses = [("pass", 3), ("reject", 2), ("abstain", 1)];
         let mut all_users = vec![host.id];
@@ -1236,7 +1235,7 @@ mod integration_tests {
 
         let host = insert_user(&db, "Host5", "host05").await;
         let sess = insert_session(&db, code, host.id).await;
-        let evt = insert_event(&db, sess.id, host.id).await;
+        let evt = insert_motion(&db, sess.id, host.id).await;
 
         let responses = [("pass", 12), ("reject", 5), ("abstain", 3)];
         let mut all_users = vec![host.id];
