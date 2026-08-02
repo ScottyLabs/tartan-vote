@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
-    "moduleResolution": "bundler",
     "target": "ESNext",
     "module": "ESNext",
+    "moduleResolution": "bundler",
     "allowJs": true,
     "checkJs": true,
     "esModuleInterop": true,
@@ -12,7 +12,11 @@
     "skipLibCheck": true,
     "sourceMap": true,
     "strict": true,
-    "types": ["svelte"]
+    "types": ["svelte"],
+    "paths": {
+      "$lib": ["./src/lib"],
+      "$lib/*": ["./src/lib/*"]
+    }
   },
   "include": ["src/**/*.ts", "src/**/*.js", "src/**/*.svelte"]
 }

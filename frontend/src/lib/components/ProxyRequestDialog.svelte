@@ -60,7 +60,7 @@
       />
     </button>
     <h2 class="m-0 text-2xl leading-8" id="proxy-dialog-title">
-      {requester}’s Requested Proxy Votes:
+      {requester}'s Requested Proxy Votes:
     </h2>
     <p
       class="mx-auto mt-[27px] mb-[45px] max-w-[1120px] text-lg leading-[26px]"

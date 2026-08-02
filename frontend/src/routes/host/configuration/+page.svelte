@@ -27,7 +27,12 @@
   let dropdownOpen = $state(page.url.searchParams.get("dropdown") === "true");
   let error = $state("");
   let organizations = $state<OrganizationSettings[]>(
-    exampleOrganizations.map((settings) => ({ ...settings })),
+    exampleOrganizations.map((settings) => ({
+      name: settings.name,
+      quorum: settings.quorum,
+      quickVoteOptions: settings.quickVoteOptions,
+      approvedMembers: settings.approvedMembers,
+    })),
   );
   let organizationPendingDelete = $state<string | null>(
     page.url.searchParams.get("delete"),
@@ -111,16 +116,22 @@
         quickVoteOptions: ["Yes", "No"],
         approvedMembers: [],
       });
-      hasUnsavedChanges = true;
     } else {
       const oldName = organization;
       organization = name;
       organizations = organizations.map((settings) =>
-        settings.name === oldName ? { ...settings, name } : settings,
+        settings.name === oldName
+          ? {
+              name,
+              quorum: settings.quorum,
+              quickVoteOptions: settings.quickVoteOptions,
+              approvedMembers: settings.approvedMembers,
+            }
+          : settings,
       );
       saved = false;
-      hasUnsavedChanges = true;
     }
+    hasUnsavedChanges = true;
     nameDialogMode = null;
     nameDialogError = "";
   }
@@ -148,9 +159,20 @@
   }
 
   function normalizeQuorum(value: string) {
-    const digits = value.replace(/\D/g, "").slice(0, 5);
+    const digits = value.replaceAll(/\D/gu, "").slice(0, 5);
 
     return digits !== "" && Number(digits) > 0 ? digits : "";
+  }
+
+  function parseCommaList(value: string): string[] {
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter((item) => item !== "");
+  }
+
+  function hasUniqueIgnoreCase(items: string[]): boolean {
+    return new Set(items.map((item) => item.toLocaleLowerCase())).size === items.length;
   }
 
   function keepDigits(event: Event) {
@@ -184,35 +206,21 @@
   function saveSettings(event: SubmitEvent) {
     event.preventDefault();
     if (isDefault) return;
-    if (!organization.trim()) {
+    if (organization.trim() === "") {
       error = "Enter an organization name.";
       return;
     }
-    const options = quickVoteOptions
-      .split(",")
-      .map((option) => option.trim())
-      .filter(Boolean);
+    const options = parseCommaList(quickVoteOptions);
     if (options.length < 2) {
       error = "Enter at least two Quick Vote options.";
       return;
     }
-    if (
-      new Set(options.map((option) => option.toLocaleLowerCase())).size !==
-      options.length
-    ) {
+    if (!hasUniqueIgnoreCase(options)) {
       error = "Each Quick Vote option must be unique.";
       return;
     }
-    const members = approvedMembers
-      .split(",")
-      .map((andrewId) => andrewId.trim())
-      .filter(Boolean);
-
-    const normalizedMembers = members.map((andrewId) =>
-      andrewId.toLocaleLowerCase(),
-    );
-
-    if (new Set(normalizedMembers).size !== normalizedMembers.length) {
+    const members = parseCommaList(approvedMembers);
+    if (!hasUniqueIgnoreCase(members)) {
       error = "Each approved AndrewID must be unique.";
       return;
     }
@@ -224,14 +232,10 @@
     };
     saveOrganizationSettings(savedSettings);
     saveDeletedOrganizationNames(
-      loadDeletedOrganizationNames().filter(
-        (name) => name !== savedSettings.name,
-      ),
+      loadDeletedOrganizationNames().filter((name) => name !== savedSettings.name),
     );
     organizations = [
-      ...organizations.filter(
-        (settings) => settings.name !== savedSettings.name,
-      ),
+      ...organizations.filter((settings) => settings.name !== savedSettings.name),
       savedSettings,
     ];
     error = "";
@@ -394,7 +398,7 @@
                   aria-expanded={dropdownOpen}
                   onclick={() => (dropdownOpen = !dropdownOpen)}
                 >
-                  <span>{organization}</span><span aria-hidden="true">›</span>
+                  <span>{organization}</span><span aria-hidden="true">></span>
                 </button>
 
                 {#if dropdownOpen}
@@ -416,7 +420,7 @@
                             onclick={() =>
                               requestOrganizationDeletion(settings.name)}
                           >
-                            ×
+                            x
                           </button>
                         {:else}
                           <span class="w-[38px]" aria-hidden="true"></span>
