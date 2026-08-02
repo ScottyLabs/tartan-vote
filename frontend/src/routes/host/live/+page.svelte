@@ -1,12 +1,12 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
+  import Link2 from "@lucide/svelte/icons/link-2";
   import AppFooter from "$lib/components/AppFooter.svelte";
   import ConfirmLiveResultsSharingDialog from "$lib/components/ConfirmLiveResultsSharingDialog.svelte";
   import EndSessionDialog from "$lib/components/EndSessionDialog.svelte";
   import EndVotingInstanceDialog from "$lib/components/EndVotingInstanceDialog.svelte";
   import HostFinalResultsDialog from "$lib/components/HostFinalResultsDialog.svelte";
-  import linkUrl from "$lib/assets/host-link.svg?url";
   import logoUrl from "$lib/assets/tartanvote-logo.svg?url";
   import { createHostLiveView } from "$lib/domain/hostLive";
 
@@ -115,10 +115,9 @@
           <span
             class="grid size-[clamp(10px,1.042vw,20px)] flex-none place-items-center"
             aria-hidden="true"
-            ><img
-              class="block h-1/2 w-[91.6665%] object-contain"
-              src={linkUrl}
-              alt=""
+            ><Link2
+              class="block size-full text-red-200"
+              aria-hidden="true"
             /></span
           >
         </button>

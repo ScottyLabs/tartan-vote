@@ -1,6 +1,6 @@
 <script lang="ts">
+  import LogOut from "@lucide/svelte/icons/log-out";
   import logoUrl from "$lib/assets/tartanvote-logo.svg?url";
-  import signoutUrl from "$lib/assets/signout.svg?url";
 
   interface Props {
     sessionCode: string;
@@ -42,12 +42,10 @@
     type="button"
     onclick={onSignOut}
   >
-    <img
-      class="size-2.5 sm:size-[clamp(16px,1.04vw,20px)]"
-      src={signoutUrl}
-      alt=""
-      width="20"
-      height="20"
+    <LogOut
+      class="size-2.5 text-slate-800 sm:size-[clamp(16px,1.04vw,20px)]"
+      strokeWidth={2.5}
+      aria-hidden="true"
     />
     <span>Sign out</span>
   </button>

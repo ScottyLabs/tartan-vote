@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import closeUrl from "$lib/assets/host-close.svg?url";
-  import trashUrl from "$lib/assets/host-trash.svg?url";
+  import Trash2 from "@lucide/svelte/icons/trash-2";
+  import X from "@lucide/svelte/icons/x";
   import { loadOrganizationSettings } from "$lib/domain/organizationSettings";
 
   interface Props {
@@ -117,7 +117,11 @@
       aria-label={`Close ${noun.toLowerCase()} configuration`}
       onclick={onclose}
     >
-      <img class="block size-full" src={closeUrl} alt="" />
+      <X
+        class="block size-full text-grey-400"
+        strokeWidth={3}
+        aria-hidden="true"
+      />
     </button>
 
     <h2
@@ -192,7 +196,11 @@
                       aria-label={`Delete option ${index + 1}`}
                       onclick={() => removeOption(index)}
                     >
-                      <img class="block size-full" src={trashUrl} alt="" />
+                      <Trash2
+                        class="block size-full text-grey-200"
+                        strokeWidth={2.5}
+                        aria-hidden="true"
+                      />
                     </button>
                   {/if}
                 </div>

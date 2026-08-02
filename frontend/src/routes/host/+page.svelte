@@ -1,14 +1,14 @@
 <script lang="ts">
   import { page } from "$app/state";
+  import BriefcaseBusiness from "@lucide/svelte/icons/briefcase-business";
+  import FileUser from "@lucide/svelte/icons/file-user";
+  import Link2 from "@lucide/svelte/icons/link-2";
+  import Radio from "@lucide/svelte/icons/radio";
+  import Users from "@lucide/svelte/icons/users";
   import AppFooter from "$lib/components/AppFooter.svelte";
   import EndSessionDialog from "$lib/components/EndSessionDialog.svelte";
   import HostConfigurationDialog from "$lib/components/HostConfigurationDialog.svelte";
   import ProxyRequestDialog from "$lib/components/ProxyRequestDialog.svelte";
-  import actionsUrl from "$lib/assets/host-actions.svg?url";
-  import fileUserUrl from "$lib/assets/host-file-user.svg?url";
-  import linkUrl from "$lib/assets/host-link.svg?url";
-  import radioUrl from "$lib/assets/host-radio.svg?url";
-  import usersUrl from "$lib/assets/host-users.svg?url";
   import logoUrl from "$lib/assets/tartanvote-logo.svg?url";
   import {
     exampleParticipants,
@@ -302,10 +302,9 @@
             class="grid size-[clamp(10px,1.042vw,20px)] shrink-0 place-items-center"
             aria-hidden="true"
           >
-            <img
-              class="block h-1/2 w-[91.6665%] object-contain"
-              src={linkUrl}
-              alt=""
+            <Link2
+              class="block size-full text-red-200"
+              aria-hidden="true"
             />
           </span>
         </button>
@@ -362,10 +361,10 @@
       >
         <div>
           <div class="flex items-center gap-1.5">
-            <img
+            <Radio
               class="size-[clamp(18px,1.667vw,32px)]"
-              src={radioUrl}
-              alt=""
+              strokeWidth={2.5}
+              aria-hidden="true"
             />
             <h1 class="m-0 text-[clamp(14px,1.25vw,24px)] leading-8">
               Currently Running ({hasActiveVote
@@ -407,10 +406,10 @@
             class="flex h-[clamp(38px,3.646vw,70px)] items-center justify-between border-b border-grey-300 bg-grey-50 px-[clamp(13px,1.354vw,26px)]"
           >
             <div class="flex items-center gap-[clamp(7px,0.781vw,15px)]">
-              <img
-                class="size-[clamp(18px,1.615vw,31px)]"
-                src={usersUrl}
-                alt=""
+              <Users
+                class="size-[clamp(18px,1.615vw,31px)] text-grey-900"
+                strokeWidth={2.5}
+                aria-hidden="true"
               />
               <h2
                 class="m-0 text-[clamp(12px,1.042vw,20px)] leading-7 font-medium"
@@ -422,10 +421,10 @@
             <div
               class="flex items-center gap-[7px] text-[clamp(12px,1.042vw,20px)] leading-7 font-medium"
             >
-              <img
-                class="size-[clamp(18px,1.615vw,31px)]"
-                src={fileUserUrl}
-                alt=""
+              <FileUser
+                class="size-[clamp(18px,1.615vw,31px)] text-black"
+                strokeWidth={2.5}
+                aria-hidden="true"
               />
               <span>Compact Mode:</span>
               <button
@@ -595,10 +594,10 @@
             class="flex h-[clamp(38px,3.646vw,70px)] items-center justify-between border-b border-grey-300 bg-grey-50 px-[clamp(14px,1.406vw,27px)]"
           >
             <div class="flex items-center gap-[clamp(7px,0.781vw,15px)]">
-              <img
-                class="size-[clamp(18px,1.615vw,31px)]"
-                src={actionsUrl}
-                alt=""
+              <BriefcaseBusiness
+                class="size-[clamp(18px,1.615vw,31px)] text-grey-900"
+                strokeWidth={2.5}
+                aria-hidden="true"
               />
               <h2
                 class="m-0 text-[clamp(12px,1.042vw,20px)] leading-7 font-medium"

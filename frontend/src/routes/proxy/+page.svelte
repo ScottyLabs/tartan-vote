@@ -1,5 +1,6 @@
 <script lang="ts">
   import { page } from "$app/state";
+  import ChevronLeft from "@lucide/svelte/icons/chevron-left";
   import { apiUrl } from "$lib/api/base";
   import AppFooter from "$lib/components/AppFooter.svelte";
   import VoterHeader from "$lib/components/VoterHeader.svelte";
@@ -46,7 +47,20 @@
 <main
   class="relative mx-auto min-h-svh w-[min(100%,393px)] overflow-hidden bg-(image:--gradient-screen-signin) text-grey-900 sm:m-0 sm:w-full"
 >
-  <VoterHeader {sessionCode} onSignOut={signOut} />
+
+<VoterHeader {sessionCode} onSignOut={signOut} />
+
+  <button
+    class="absolute top-[clamp(128px,8.33vw,160px)] left-[clamp(28px,3.6vw,69px)] hidden size-[clamp(32px,2.08vw,40px)] cursor-pointer items-center justify-center rounded-full border-0 bg-red-500 p-0 text-grey-50 sm:inline-flex"
+    type="button"
+    aria-label="Back to home"
+    onclick={goBack}
+  >
+    <ChevronLeft
+      class="size-[clamp(22px,1.46vw,28px)]"
+      aria-hidden="true"
+    />
+  </button>
 
   <div
     class="mt-4 ml-[21px] flex h-5 w-[372px] items-center justify-between max-[374px]:w-[calc(100%-28px)] sm:hidden"
@@ -57,16 +71,7 @@
       aria-label="Back to home"
       onclick={goBack}
     >
-      <svg class="size-4" viewBox="0 0 20 20" aria-hidden="true">
-        <path
-          d="M12.5 4.5 7 10l5.5 5.5"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        />
-      </svg>
+      <ChevronLeft class="size-4" aria-hidden="true" />
     </button>
 
   </div>

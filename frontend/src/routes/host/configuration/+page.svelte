@@ -1,12 +1,12 @@
 <script lang="ts">
   import { page } from "$app/state";
+  import Link2 from "@lucide/svelte/icons/link-2";
+  import Pencil from "@lucide/svelte/icons/pencil";
   import { onMount } from "svelte";
   import AppFooter from "$lib/components/AppFooter.svelte";
   import ConfirmDeleteOrganizationDialog from "$lib/components/ConfirmDeleteOrganizationDialog.svelte";
   import EndSessionDialog from "$lib/components/EndSessionDialog.svelte";
   import OrganizationNameDialog from "$lib/components/OrganizationNameDialog.svelte";
-  import linkUrl from "$lib/assets/host-link.svg?url";
-  import pencilUrl from "$lib/assets/host-pencil.svg?url";
   import logoUrl from "$lib/assets/tartanvote-logo.svg?url";
   import {
     clearOrganizationSettings,
@@ -305,10 +305,9 @@
           <span
             class="grid size-[clamp(10px,1.042vw,20px)] shrink-0 place-items-center"
             aria-hidden="true"
-            ><img
-              class="block h-1/2 w-[91.6665%] object-contain"
-              src={linkUrl}
-              alt=""
+            ><Link2
+              class="block size-full text-red-200"
+              aria-hidden="true"
             /></span
           >
         </button>
@@ -381,10 +380,10 @@
             disabled={isDefault}
             onclick={openEditOrganizationDialog}
           >
-            <img
-              class="size-[clamp(12px,1.094vw,21px)] object-contain"
-              src={pencilUrl}
-              alt=""
+            <Pencil
+              class="size-[clamp(12px,1.094vw,21px)] text-grey-700"
+              strokeWidth={2.5}
+              aria-hidden="true"
             />
             <span
               >{isDefault

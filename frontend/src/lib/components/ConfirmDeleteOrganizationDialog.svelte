@@ -1,5 +1,5 @@
 <script lang="ts">
-  import closeUrl from "$lib/assets/host-close.svg?url";
+  import X from "@lucide/svelte/icons/x";
 
   interface Props {
     organizationName: string;
@@ -15,8 +15,8 @@
   role="presentation"
 >
   <div
-    class="relative min-h-[270px] w-[min(calc(100%_-_40px),720px)] rounded-[10px]
-    border border-grey-600 bg-white px-[38px] pt-12 pb-[30px] text-center"
+    class="relative min-h-67.5 w-[min(calc(100%-40px),720px)] rounded-[10px]
+    border border-grey-600 bg-white px-9.5 pt-12 pb-7.5 text-center"
     role="alertdialog"
     aria-modal="true"
     aria-labelledby="delete-title"
@@ -28,7 +28,11 @@
       aria-label="Cancel deleting organization"
       onclick={onclose}
     >
-      <img class="block size-full" src={closeUrl} alt="" />
+      <X
+        class="block size-full text-grey-400"
+        strokeWidth={3}
+        aria-hidden="true"
+      />
     </button>
     <h2 class="m-0 text-2xl leading-8" id="delete-title">
       Delete {organizationName}?

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { page } from "$app/state";
+  import ChevronLeft from "@lucide/svelte/icons/chevron-left";
   import { apiUrl } from "$lib/api/base";
   import AppFooter from "$lib/components/AppFooter.svelte";
   import VoterHeader from "$lib/components/VoterHeader.svelte";
@@ -48,20 +49,10 @@
     aria-label="Back to proxy setup"
     onclick={goBack}
   >
-    <svg
+    <ChevronLeft
       class="size-[clamp(22px,1.46vw,28px)]"
-      viewBox="0 0 20 20"
       aria-hidden="true"
-    >
-      <path
-        d="M12.5 4.5 7 10l5.5 5.5"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      />
-    </svg>
+    />
   </button>
 
   <div
@@ -73,16 +64,7 @@
       aria-label="Back to proxy setup"
       onclick={goBack}
     >
-      <svg class="size-4" viewBox="0 0 20 20" aria-hidden="true">
-        <path
-          d="M12.5 4.5 7 10l5.5 5.5"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        />
-      </svg>
+      <ChevronLeft class="size-4" aria-hidden="true" />
     </button>
 
   </div>

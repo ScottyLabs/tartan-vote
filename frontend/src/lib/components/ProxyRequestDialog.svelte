@@ -1,5 +1,5 @@
 <script lang="ts">
-  import closeUrl from "$lib/assets/host-close.svg?url";
+  import X from "@lucide/svelte/icons/x";
 
   interface Props {
     requester?: string;
@@ -53,7 +53,11 @@
       aria-label="Close proxy request"
       onclick={onclose}
     >
-      <img class="block size-full" src={closeUrl} alt="" />
+      <X
+        class="block size-full text-grey-400"
+        strokeWidth={3}
+        aria-hidden="true"
+      />
     </button>
     <h2 class="m-0 text-2xl leading-8" id="proxy-dialog-title">
       {requester}’s Requested Proxy Votes:

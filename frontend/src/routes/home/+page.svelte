@@ -1,4 +1,5 @@
 <script lang="ts">
+  import LogOut from "@lucide/svelte/icons/log-out";
   import { apiUrl } from "$lib/api/base";
   import AppFooter from "$lib/components/AppFooter.svelte";
   import logoUrl from "$lib/assets/tartanvote-logo.svg?url";
@@ -62,27 +63,11 @@
       type="button"
       onclick={signOut}
     >
-      <svg
+      <LogOut
         class="size-2.5 sm:size-[clamp(12px,1.05vw,20px)]"
-        viewBox="0 0 16 16"
+        strokeWidth={2.5}
         aria-hidden="true"
-      >
-        <path
-          d="M6.7 3.2H4.1a1.4 1.4 0 0 0-1.4 1.4v6.8a1.4 1.4 0 0 0 1.4 1.4h2.6"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.4"
-          stroke-linecap="round"
-        />
-        <path
-          d="M9.4 4.9 12.5 8l-3.1 3.1M12.2 8H6.7"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.4"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        />
-      </svg>
+      />
       Sign out
     </button>
   </header>

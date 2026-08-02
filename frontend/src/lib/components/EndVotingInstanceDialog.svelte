@@ -1,5 +1,5 @@
 <script lang="ts">
-  import closeUrl from "$lib/assets/host-close.svg?url";
+  import X from "@lucide/svelte/icons/x";
 
   interface Props {
     onclose: () => void;
@@ -26,7 +26,11 @@
       aria-label="Close"
       onclick={onclose}
     >
-      <img class="block size-full" src={closeUrl} alt="" />
+      <X
+        class="block size-full text-grey-400"
+        strokeWidth={3}
+        aria-hidden="true"
+      />
     </button>
     <div class="text-center">
       <h2

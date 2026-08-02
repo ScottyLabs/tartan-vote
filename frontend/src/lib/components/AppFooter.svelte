@@ -1,4 +1,5 @@
 <script lang="ts">
+  import MessageSquareText from "@lucide/svelte/icons/message-square-text";
   import heartUrl from "$lib/assets/heart.svg?url";
 
   let { wide = false, flow = false } = $props();
@@ -43,21 +44,11 @@
     ]}
     href="https://docs.google.com/forms/u/2/d/e/1FAIpQLSdyrmvSSwyizNVZ97jyVT-r8D-bNVg_x0DYFBecJ9Mwhhteug/viewform?usp=send_form"
   >
-    <svg class="size-5 flex-none" viewBox="0 0 20 20" aria-hidden="true">
-      <path
-        d="M4 4.5h12a1.5 1.5 0 0 1 1.5 1.5v6.7a1.5 1.5 0 0 1-1.5 1.5H9.2L5.5 17v-2.8H4A1.5 1.5 0 0 1 2.5 12.7V6A1.5 1.5 0 0 1 4 4.5Z"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="1.6"
-        stroke-linejoin="round"
-      />
-      <path
-        d="M6 8h8M6 11h5"
-        stroke="currentColor"
-        stroke-width="1.6"
-        stroke-linecap="round"
-      />
-    </svg>
+    <MessageSquareText
+      class="size-5 flex-none"
+      strokeWidth={1.9}
+      aria-hidden="true"
+    />
     Feedback
   </a>
 </footer>

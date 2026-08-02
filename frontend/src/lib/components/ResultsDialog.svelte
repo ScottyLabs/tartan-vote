@@ -1,5 +1,5 @@
 <script lang="ts">
-  import chevronUrl from "$lib/assets/results-chevron.svg?url";
+  import ChevronDown from "@lucide/svelte/icons/chevron-down";
   import { calculatePercentage, type ResultOption } from "$lib/domain/results";
 
   interface Props {
@@ -121,11 +121,12 @@
                 onclick={() => toggleOption(option.id)}
               >
                 {isExpanded(option.id) ? "View Less" : "View All"}
-                <img
-                  class="h-5 w-4 transition-transform duration-160 ease-[ease] motion-reduce:transition-none sm:h-[26px] sm:w-5"
-                  class:rotate-180={isExpanded(option.id)}
-                  src={chevronUrl}
-                  alt=""
+                <ChevronDown
+                  class={[
+                    "h-5 w-4 text-slate-600 transition-transform duration-160 ease-[ease] motion-reduce:transition-none sm:h-[26px] sm:w-5",
+                    isExpanded(option.id) && "rotate-180",
+                  ]}
+                  aria-hidden="true"
                 />
               </button>
             {/if}

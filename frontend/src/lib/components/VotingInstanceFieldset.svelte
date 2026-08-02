@@ -1,7 +1,7 @@
 <script lang="ts">
+  import Circle from "@lucide/svelte/icons/circle";
+  import CircleDot from "@lucide/svelte/icons/circle-dot";
   import type { BallotChoice, VotingInstance } from "$lib/domain/ballot";
-  import radioUrl from "$lib/assets/ballot-radio.svg?url";
-  import selectedRadioUrl from "$lib/assets/ballot-radio-selected.svg?url";
 
   interface Props {
     instance: VotingInstance;
@@ -70,13 +70,17 @@
           checked={selectedChoiceId === choice.id}
           onchange={() => onChange(instance.id, choice.id)}
         />
-        <img
-          class="block size-3.5 flex-none peer-focus-visible:[outline:3px_solid_color-mix(in_srgb,var(--color-red-600),transparent_72%)] peer-focus-visible:outline-offset-[3px] sm:size-[18px]"
-          src={selectedChoiceId === choice.id ? selectedRadioUrl : radioUrl}
-          alt=""
-          width="20"
-          height="20"
-        />
+        {#if selectedChoiceId === choice.id}
+          <CircleDot
+            class="block size-3.5 flex-none text-red-500 peer-focus-visible:[outline:3px_solid_color-mix(in_srgb,var(--color-red-600),transparent_72%)] peer-focus-visible:outline-offset-[3px] sm:size-[18px]"
+            aria-hidden="true"
+          />
+        {:else}
+          <Circle
+            class="block size-3.5 flex-none text-slate-900 peer-focus-visible:[outline:3px_solid_color-mix(in_srgb,var(--color-red-600),transparent_72%)] peer-focus-visible:outline-offset-[3px] sm:size-[18px]"
+            aria-hidden="true"
+          />
+        {/if}
         <span>{choice.label}</span>
       </label>
     {/each}

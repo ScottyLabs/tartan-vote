@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import closeUrl from "$lib/assets/host-close.svg?url";
+  import X from "@lucide/svelte/icons/x";
 
   interface Props {
     mode: "create" | "edit";
@@ -45,7 +45,11 @@
       aria-label="Close organization name dialog"
       onclick={onclose}
     >
-      <img class="block size-full" src={closeUrl} alt="" />
+      <X
+        class="block size-full text-grey-400"
+        strokeWidth={3}
+        aria-hidden="true"
+      />
     </button>
     <h2
       class="mx-0 mt-0 mb-[30px] text-center text-2xl leading-8"
