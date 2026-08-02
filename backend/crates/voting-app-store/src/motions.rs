@@ -36,4 +36,19 @@ impl<'a> MotionRepository<'a> {
             .one(self.db)
             .await
     }
+
+    pub async fn find_current_by_session_id(
+        &self,
+        session_id: i32,
+    ) -> Result<Option<motion::Model>, DbErr> {
+        if let Some(active) = self.find_active_by_session_id(session_id).await? {
+            return Ok(Some(active));
+        }
+
+        Motion::find()
+            .filter(motion::Column::SessionId.eq(session_id))
+            .order_by_desc(motion::Column::StartTime)
+            .one(self.db)
+            .await
+    }
 }
