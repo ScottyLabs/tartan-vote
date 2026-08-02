@@ -1,11 +1,7 @@
 use crate::AppState;
 use crate::core::auth::middleware::SyncedUser;
-use axum::{
-    Json,
-    extract::{Path, State},
-    http::StatusCode,
-    response::IntoResponse,
-};
+use crate::domain::motion::handlers::{resolve_caller_session, resolve_current_motion};
+use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
 use chrono::Utc;
 use entity::enums::{JoinLeft, StatusOption};
 use entity::{prelude::User, prelude::UserSession, prelude::Vote, user_session, vote};
@@ -151,11 +147,8 @@ fn select_voter_instance(
 
 #[utoipa::path(
     post,
-    path = "/motions/{id}/vote",
+    path = "/motions/vote",
     tag = "votes",
-    params(
-        ("id" = i32, Path, description = "Motion id")
-    ),
     request_body = CastVoteRequest,
     responses(
         (status = 201, description = "Vote cast", body = CastVoteResponse),
@@ -167,27 +160,18 @@ fn select_voter_instance(
 pub async fn cast_vote(
     user: SyncedUser,
     State(state): State<AppState>,
-    Path(motion_id): Path<i32>,
     Json(body): Json<CastVoteRequest>,
 ) -> impl IntoResponse {
     let store = &state.store;
 
-    let event = match store.motions().find_by_id(motion_id).await {
-        Ok(Some(e)) => e,
-        Ok(None) => {
-            return (
-                StatusCode::NOT_FOUND,
-                Json(json!({"error": "Motion not found"})),
-            )
-                .into_response();
-        }
-        Err(_) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"error": "Database error"})),
-            )
-                .into_response();
-        }
+    let session = match resolve_caller_session(store, user.0.id).await {
+        Ok(session) => session,
+        Err(response) => return response.into_response(),
+    };
+
+    let event = match resolve_current_motion(store, session.id).await {
+        Ok(motion) => motion,
+        Err(response) => return response.into_response(),
     };
 
     let event_data = event.data.clone();
@@ -317,11 +301,8 @@ pub async fn cast_vote(
 
 #[utoipa::path(
     get,
-    path = "/motions/{id}/results",
+    path = "/motions/results",
     tag = "votes",
-    params(
-        ("id" = i32, Path, description = "Motion id")
-    ),
     responses(
         (status = 200, description = "Option counts for the motion", body = MotionResults),
         (status = 403, description = "Results not yet available"),
@@ -329,33 +310,25 @@ pub async fn cast_vote(
     )
 )]
 pub async fn get_motion_results(
-    _user: SyncedUser,
+    user: SyncedUser,
     State(state): State<AppState>,
-    Path(motion_id): Path<i32>,
 ) -> impl IntoResponse {
     let store = state.store;
 
-    let event = match store.motions().find_by_id(motion_id).await {
-        Ok(Some(e)) => e,
-        Ok(None) => {
-            return (
-                StatusCode::NOT_FOUND,
-                Json(json!({"error": "Motion not found"})),
-            )
-                .into_response();
-        }
-        Err(_) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"error": "Database error"})),
-            )
-                .into_response();
-        }
+    let session = match resolve_caller_session(&store, user.0.id).await {
+        Ok(session) => session,
+        Err(response) => return response.into_response(),
     };
+
+    let event = match resolve_current_motion(&store, session.id).await {
+        Ok(motion) => motion,
+        Err(response) => return response.into_response(),
+    };
+
+    let motion_id = event.id;
 
     let event_data = event.data.clone();
 
-    //Place holder for when we figure the visibility out
     let visibility = event_data["visibility"]["participants"]
         .as_str()
         .unwrap_or("");
@@ -429,11 +402,8 @@ pub async fn get_motion_results(
 
 #[utoipa::path(
     post,
-    path = "/motions/{id}/proxies",
+    path = "/motions/proxies",
     tag = "votes",
-    params(
-        ("id" = i32, Path, description = "Motion id")
-    ),
     request_body = AssignProxyRequest,
     responses(
         (status = 201, description = "Proxy assigned", body = AssignProxyResponse),
@@ -446,10 +416,19 @@ pub async fn get_motion_results(
 pub async fn assign_proxy(
     user: SyncedUser,
     State(state): State<AppState>,
-    Path(motion_id): Path<i32>,
     Json(body): Json<AssignProxyRequest>,
 ) -> impl IntoResponse {
     let store = &state.store;
+
+    let session = match resolve_caller_session(store, user.0.id).await {
+        Ok(session) => session,
+        Err(response) => return response.into_response(),
+    };
+
+    let event = match resolve_current_motion(store, session.id).await {
+        Ok(motion) => motion,
+        Err(response) => return response.into_response(),
+    };
 
     if body.proxy_holder_user_id == body.proxied_senator_user_id {
         return (
@@ -458,24 +437,6 @@ pub async fn assign_proxy(
         )
             .into_response();
     }
-
-    let event = match store.motions().find_by_id(motion_id).await {
-        Ok(Some(e)) => e,
-        Ok(None) => {
-            return (
-                StatusCode::NOT_FOUND,
-                Json(json!({"error": "Motion not found"})),
-            )
-                .into_response();
-        }
-        Err(_) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"error": "Database error"})),
-            )
-                .into_response();
-        }
-    };
 
     if user.0.id != event.created_by_user_id {
         return (
@@ -602,11 +563,8 @@ pub async fn assign_proxy(
 
 #[utoipa::path(
     get,
-    path = "/motions/{id}/proxies",
+    path = "/motions/proxies",
     tag = "votes",
-    params(
-        ("id" = i32, Path, description = "Motion id")
-    ),
     responses(
         (status = 200, description = "Proxy assignments for the motion", body = Vec<ProxyAssignment>),
         (status = 403, description = "Only the motion host may view proxy assignments"),
@@ -616,26 +574,17 @@ pub async fn assign_proxy(
 pub async fn list_proxy_assignments(
     user: SyncedUser,
     State(state): State<AppState>,
-    Path(motion_id): Path<i32>,
 ) -> impl IntoResponse {
     let store = &state.store;
 
-    let event = match store.motions().find_by_id(motion_id).await {
-        Ok(Some(e)) => e,
-        Ok(None) => {
-            return (
-                StatusCode::NOT_FOUND,
-                Json(json!({"error": "Motion not found"})),
-            )
-                .into_response();
-        }
-        Err(_) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"error": "Database error"})),
-            )
-                .into_response();
-        }
+    let session = match resolve_caller_session(store, user.0.id).await {
+        Ok(session) => session,
+        Err(response) => return response.into_response(),
+    };
+
+    let event = match resolve_current_motion(store, session.id).await {
+        Ok(motion) => motion,
+        Err(response) => return response.into_response(),
     };
 
     if user.0.id != event.created_by_user_id {
@@ -684,11 +633,8 @@ pub async fn list_proxy_assignments(
 
 #[utoipa::path(
     get,
-    path = "/motions/{id}/vote-instances",
+    path = "/motions/vote-instances",
     tag = "votes",
-    params(
-        ("id" = i32, Path, description = "Motion id")
-    ),
     responses(
         (status = 200, description = "Vote instances available to the current user", body = Vec<VoteInstance>),
         (status = 404, description = "Motion not found"),
@@ -697,41 +643,17 @@ pub async fn list_proxy_assignments(
 pub async fn get_vote_instances(
     user: SyncedUser,
     State(state): State<AppState>,
-    Path(motion_id): Path<i32>,
 ) -> impl IntoResponse {
     let store = &state.store;
 
-    if store
-        .motions()
-        .find_by_id(motion_id)
-        .await
-        .ok()
-        .flatten()
-        .is_none()
-    {
-        return (
-            StatusCode::NOT_FOUND,
-            Json(json!({"error": "Motion not found"})),
-        )
-            .into_response();
-    }
+    let session = match resolve_caller_session(store, user.0.id).await {
+        Ok(session) => session,
+        Err(response) => return response.into_response(),
+    };
 
-    let event = match store.motions().find_by_id(motion_id).await {
-        Ok(Some(event)) => event,
-        Ok(None) => {
-            return (
-                StatusCode::NOT_FOUND,
-                Json(json!({"error": "Motion not found"})),
-            )
-                .into_response();
-        }
-        Err(_) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"error": "Database error"})),
-            )
-                .into_response();
-        }
+    let event = match resolve_current_motion(store, session.id).await {
+        Ok(motion) => motion,
+        Err(response) => return response.into_response(),
     };
 
     let voter_instances = match UserSession::find()
@@ -781,11 +703,8 @@ pub async fn get_vote_instances(
 
 #[utoipa::path(
     get,
-    path = "/motions/{id}/export",
+    path = "/motions/export",
     tag = "votes",
-    params(
-        ("id" = i32, Path, description = "Motion id")
-    ),
     responses(
         (status = 200, description = "Full motion export including votes and proxies", body = MotionExportResponse),
         (status = 403, description = "Only the motion host may export results"),
@@ -795,27 +714,20 @@ pub async fn get_vote_instances(
 pub async fn export_motion_results(
     user: SyncedUser,
     State(state): State<AppState>,
-    Path(motion_id): Path<i32>,
 ) -> impl IntoResponse {
     let store = &state.store;
 
-    let event = match store.motions().find_by_id(motion_id).await {
-        Ok(Some(event)) => event,
-        Ok(None) => {
-            return (
-                StatusCode::NOT_FOUND,
-                Json(json!({"error": "Motion not found"})),
-            )
-                .into_response();
-        }
-        Err(_) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"error": "Database error"})),
-            )
-                .into_response();
-        }
+    let session = match resolve_caller_session(store, user.0.id).await {
+        Ok(session) => session,
+        Err(response) => return response.into_response(),
     };
+
+    let event = match resolve_current_motion(store, session.id).await {
+        Ok(motion) => motion,
+        Err(response) => return response.into_response(),
+    };
+
+    let motion_id = event.id;
 
     if user.0.id != event.created_by_user_id {
         return (
