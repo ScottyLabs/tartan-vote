@@ -1,10 +1,34 @@
 <script lang="ts">
+  import { goto } from "$app/navigation";
   import LogOut from "@lucide/svelte/icons/log-out";
+  import { onMount } from "svelte";
+  import { fetchAuthStatus } from "$lib/api/auth";
   import { apiUrl } from "$lib/api/base";
   import AppFooter from "$lib/components/AppFooter.svelte";
   import logoUrl from "$lib/assets/tartanvote-logo.svg?url";
 
   let sessionCode = $state("");
+  let checkingAuth = $state(true);
+  let userName = $state<string | null>(null);
+  let userAndrewId = $state<string | null>(null);
+
+  const greetingName = $derived(userName?.trim() || userAndrewId?.trim() || "there");
+
+  onMount(() => {
+    void fetchAuthStatus()
+      .then((status) => {
+        if (!status.logged_in) {
+          void goto("/", { replaceState: true });
+          return;
+        }
+        userName = status.user_name;
+        userAndrewId = status.user_andrew_id;
+        checkingAuth = false;
+      })
+      .catch(() => {
+        void goto("/", { replaceState: true });
+      });
+  });
 
   function signOut() {
     window.location.href = apiUrl("/auth/logout");
@@ -34,6 +58,7 @@
   <title>TartanVote | Home</title>
 </svelte:head>
 
+{#if !checkingAuth}
 <main
   class="relative mx-auto min-h-svh w-[min(100%,393px)] overflow-hidden bg-(image:--gradient-screen-signin) text-grey-900 sm:m-0 sm:w-full sm:rounded-none sm:shadow-none"
 >
@@ -58,18 +83,27 @@
       >
     </a>
 
-    <button
-      class="inline-flex h-[35px] w-20 cursor-pointer items-center justify-center gap-1 rounded-full border-0 bg-grey-100 text-[10px] leading-[12.75px] font-normal text-slate-800 sm:h-[clamp(42px,3.2vw,61px)] sm:w-[clamp(110px,10.4vw,199px)] sm:gap-[clamp(4px,0.42vw,8px)] sm:text-[clamp(14px,1.25vw,24px)] sm:leading-[clamp(20px,1.7vw,32px)]"
-      type="button"
-      onclick={signOut}
-    >
-      <LogOut
-        class="size-2.5 sm:size-[clamp(12px,1.05vw,20px)]"
-        strokeWidth={2.5}
-        aria-hidden="true"
-      />
-      Sign out
-    </button>
+    <div class="flex flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-3">
+      {#if userAndrewId}
+        <p
+          class="m-0 text-[10px] leading-[12.75px] font-medium text-white sm:text-[clamp(12px,1.04vw,18px)] sm:leading-[clamp(16px,1.4vw,24px)]"
+        >
+          {userAndrewId}
+        </p>
+      {/if}
+      <button
+        class="inline-flex h-[35px] w-20 cursor-pointer items-center justify-center gap-1 rounded-full border-0 bg-grey-100 text-[10px] leading-[12.75px] font-normal text-slate-800 sm:h-[clamp(42px,3.2vw,61px)] sm:w-[clamp(110px,10.4vw,199px)] sm:gap-[clamp(4px,0.42vw,8px)] sm:text-[clamp(14px,1.25vw,24px)] sm:leading-[clamp(20px,1.7vw,32px)]"
+        type="button"
+        onclick={signOut}
+      >
+        <LogOut
+          class="size-2.5 sm:size-[clamp(12px,1.05vw,20px)]"
+          strokeWidth={2.5}
+          aria-hidden="true"
+        />
+        Sign out
+      </button>
+    </div>
   </header>
 
   <section
@@ -83,7 +117,7 @@
         class="m-0 text-lg leading-[21.95px] font-semibold tracking-normal text-black sm:text-[clamp(20px,1.56vw,30px)] sm:leading-[clamp(26px,1.98vw,38px)]"
         id="home-title"
       >
-        Hello, Scottylabs
+        Hello, {greetingName}
       </h1>
       <p
         class="m-0 flex h-[30.55px] w-[345px] items-center justify-center text-[13.86px] leading-[18.48px] font-normal text-grey-700 max-[374px]:w-full sm:h-auto sm:w-[min(100%,843px)] sm:px-[5px] sm:py-[clamp(5px,0.52vw,10px)] sm:text-[clamp(16px,1.25vw,24px)] sm:leading-[clamp(22px,1.67vw,32px)]"
@@ -149,3 +183,4 @@
 
   <AppFooter wide />
 </main>
+{/if}
