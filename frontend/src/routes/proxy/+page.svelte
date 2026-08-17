@@ -2,13 +2,16 @@
   import { page } from "$app/state";
   import ChevronLeft from "@lucide/svelte/icons/chevron-left";
   import { apiUrl } from "$lib/api/base";
+  import { setSessionProxy } from "$lib/api/session";
   import AppFooter from "$lib/components/AppFooter.svelte";
   import VoterHeader from "$lib/components/VoterHeader.svelte";
 
   let proxyFor = $state(page.url.searchParams.get("proxyVotes") ?? "");
-  const sessionCode = $derived(
-    page.url.searchParams.get("sessionCode")?.trim() || "Demo session",
-  );
+  let submitting = $state(false);
+  let error = $state("");
+  const sessionCode = $derived(page.url.searchParams.get("sessionCode")?.trim() || "");
+  const hasSessionCode = $derived(sessionCode.length > 0);
+  const sessionCodeDisplay = $derived(hasSessionCode ? sessionCode : "N/A");
 
   const hasProxyInput = $derived(proxyFor.trim().length > 0);
 
@@ -20,21 +23,42 @@
     window.location.href = "/home";
   }
 
-  function submitProxy() {
-    if (!hasProxyInput) return;
-    // This will POST to /session/{sessionCode}/proxy once backend wiring is ready.
-    // For now, show the pending proxy review waiting state.
-    const searchParams = new URLSearchParams({
-      sessionCode,
-      proxyStatus: "pending",
-      proxyVotes: proxyFor.trim(),
-    });
+  async function submitProxy() {
+    if (!hasSessionCode) {
+      error = "Missing session code. Rejoin from Home.";
+      return;
+    }
+    if (!hasProxyInput || submitting) return;
+    error = "";
+    submitting = true;
+    try {
+      await setSessionProxy(sessionCode, {
+        is_senator: true,
+        proxy_for: proxyFor.trim(),
+      });
+      const searchParams = new URLSearchParams({
+        sessionCode,
+        proxyStatus: "pending",
+        proxyVotes: proxyFor.trim(),
+      });
 
-    window.location.href = `/waiting?${searchParams.toString()}`;
+      window.location.href = `/waiting?${searchParams.toString()}`;
+    } catch (requestError) {
+      error =
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to save proxy votes.";
+    } finally {
+      submitting = false;
+    }
   }
 
   function continueWithoutProxy() {
-    if (hasProxyInput) return;
+    if (!hasSessionCode) {
+      error = "Missing session code. Rejoin from Home.";
+      return;
+    }
+    if (hasProxyInput || submitting) return;
     const searchParams = new URLSearchParams({ sessionCode });
     window.location.href = `/waiting?${searchParams.toString()}`;
   }
@@ -48,7 +72,7 @@
   class="relative mx-auto min-h-svh w-[min(100%,393px)] overflow-hidden bg-(image:--gradient-screen-signin) text-grey-900 sm:m-0 sm:w-full"
 >
 
-<VoterHeader {sessionCode} onSignOut={signOut} />
+<VoterHeader sessionCode={sessionCodeDisplay} onSignOut={signOut} />
 
   <button
     class="absolute top-[clamp(128px,8.33vw,160px)] left-[clamp(28px,3.6vw,69px)] hidden size-[clamp(32px,2.08vw,40px)] cursor-pointer items-center justify-center rounded-full border-0 bg-red-500 p-0 text-grey-50 sm:inline-flex"
@@ -112,6 +136,7 @@
         bind:value={proxyFor}
         placeholder="ex: scottylabs0, scottylabs1, scottylabs123"
         autocomplete="off"
+        disabled={!hasSessionCode}
       />
     </section>
 
@@ -121,16 +146,22 @@
       <button
         class="h-9 min-w-0 flex-1 cursor-pointer rounded-full border-0 bg-red-600 text-xs leading-[18.48px] font-semibold text-white shadow-[0_2.31px_2.31px_rgb(0_0_0_/_0.25)] hover:brightness-96 disabled:cursor-not-allowed disabled:bg-red-200 disabled:hover:brightness-100 sm:h-[clamp(52px,3.13vw,60px)] sm:w-[clamp(240px,14.58vw,280px)] sm:flex-[0_0_clamp(240px,14.58vw,280px)] sm:text-[clamp(20px,1.25vw,24px)] sm:leading-[clamp(28px,1.67vw,32px)] sm:font-bold sm:shadow-[0_4px_4px_rgb(0_0_0_/_0.25)]"
         type="button"
-        disabled={!hasProxyInput}
-        onclick={submitProxy}>Submit proxy</button
+        disabled={!hasSessionCode || !hasProxyInput || submitting}
+        onclick={() => void submitProxy()}
+        >{submitting ? "Submitting..." : "Submit proxy"}</button
       >
       <button
         class="h-9 min-w-0 flex-1 cursor-pointer rounded-full border-0 bg-red-600 text-xs leading-[18.48px] font-semibold text-white shadow-[0_2.31px_2.31px_rgb(0_0_0_/_0.25)] hover:brightness-96 disabled:cursor-not-allowed disabled:bg-red-200 disabled:hover:brightness-100 sm:h-[clamp(52px,3.13vw,60px)] sm:w-[clamp(240px,14.58vw,280px)] sm:flex-[0_0_clamp(240px,14.58vw,280px)] sm:text-[clamp(20px,1.25vw,24px)] sm:leading-[clamp(28px,1.67vw,32px)] sm:font-bold sm:shadow-[0_4px_4px_rgb(0_0_0_/_0.25)]"
         type="button"
-        disabled={hasProxyInput}
+        disabled={!hasSessionCode || hasProxyInput || submitting}
         onclick={continueWithoutProxy}>Continue without proxy</button
       >
     </div>
+    {#if error}
+      <p class="m-0 mt-4 text-center text-sm font-semibold text-red-700" role="alert">
+        {error}
+      </p>
+    {/if}
   </section>
 
   <AppFooter wide />

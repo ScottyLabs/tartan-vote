@@ -4,6 +4,11 @@
   import { onMount } from "svelte";
   import { fetchAuthStatus } from "$lib/api/auth";
   import { apiUrl } from "$lib/api/base";
+  import {
+    createSession as createSessionRequest,
+    fetchSessionStatus,
+    joinSession as joinSessionRequest,
+  } from "$lib/api/session";
   import AppFooter from "$lib/components/AppFooter.svelte";
   import logoUrl from "$lib/assets/tartanvote-logo.svg?url";
 
@@ -11,8 +16,18 @@
   let checkingAuth = $state(true);
   let userName = $state<string | null>(null);
   let userAndrewId = $state<string | null>(null);
+  let sessionActionError = $state("");
+  let creatingSession = $state(false);
+  let joiningSession = $state(false);
+  let hasActiveHostedSession = $state(false);
 
   const greetingName = $derived(userName?.trim() || userAndrewId?.trim() || "there");
+  const hostButtonLabel = $derived.by(() => {
+    if (creatingSession) {
+      return hasActiveHostedSession ? "Resuming..." : "Creating...";
+    }
+    return hasActiveHostedSession ? "Resume hosted session" : "Host a session";
+  });
 
   onMount(() => {
     void fetchAuthStatus()
@@ -24,6 +39,7 @@
         userName = status.user_name;
         userAndrewId = status.user_andrew_id;
         checkingAuth = false;
+        void syncHostedSessionState();
       })
       .catch(() => {
         void goto("/", { replaceState: true });
@@ -34,8 +50,55 @@
     window.location.href = apiUrl("/auth/logout");
   }
 
-  function createSession() {
-    window.location.href = "/host";
+  async function getHostedSessionCode(): Promise<string> {
+    try {
+      const status = await fetchSessionStatus();
+      return status.hosting?.session_code.trim() ?? "";
+    } catch {
+      return "";
+    }
+  }
+
+  async function syncHostedSessionState() {
+    const hostedSessionCode = await getHostedSessionCode();
+    hasActiveHostedSession = hostedSessionCode !== "";
+  }
+
+  async function redirectToHostedSessionIfPresent(): Promise<boolean> {
+    const hostedSessionCode = await getHostedSessionCode();
+    hasActiveHostedSession = hostedSessionCode !== "";
+    if (!hostedSessionCode) {
+      return false;
+    }
+    const searchParams = new URLSearchParams({
+      sessionCode: hostedSessionCode,
+    });
+    window.location.href = `/host?${searchParams.toString()}`;
+    return true;
+  }
+
+  async function createSession() {
+    if (creatingSession || joiningSession) return;
+    sessionActionError = "";
+    creatingSession = true;
+    try {
+      if (await redirectToHostedSessionIfPresent()) {
+        return;
+      }
+      const response = await createSessionRequest();
+      const searchParams = new URLSearchParams({
+        sessionCode: response.session_code,
+      });
+      window.location.href = `/host?${searchParams.toString()}`;
+    } catch (error) {
+      if (await redirectToHostedSessionIfPresent()) {
+        return;
+      }
+      sessionActionError =
+        error instanceof Error ? error.message : "Failed to create session.";
+    } finally {
+      creatingSession = false;
+    }
   }
 
   function updateSessionCode(event: Event) {
@@ -43,14 +106,25 @@
     sessionCode = input.value.replaceAll(/^\s+/gu, "").replaceAll(/\s+/gu, "-");
   }
 
-  function joinSession() {
+  async function joinSession() {
+    if (joiningSession || creatingSession) return;
     const normalizedSessionCode = sessionCode.replaceAll(/^-+|-+$/gu, "");
     if (normalizedSessionCode === "") return;
+    sessionActionError = "";
+    joiningSession = true;
 
-    const searchParams = new URLSearchParams({
-      sessionCode: normalizedSessionCode,
-    });
-    window.location.href = `/proxy?${searchParams.toString()}`;
+    try {
+      await joinSessionRequest(normalizedSessionCode);
+      const searchParams = new URLSearchParams({
+        sessionCode: normalizedSessionCode,
+      });
+      window.location.href = `/proxy?${searchParams.toString()}`;
+    } catch (error) {
+      sessionActionError =
+        error instanceof Error ? error.message : "Failed to join session.";
+    } finally {
+      joiningSession = false;
+    }
   }
 </script>
 
@@ -134,7 +208,7 @@
         class="flex w-[326px] flex-col items-center gap-4 max-[374px]:w-full sm:w-[min(100%,550px)] sm:gap-[clamp(18px,1.46vw,28px)]"
         onsubmit={(event) => {
           event.preventDefault();
-          joinSession();
+          void joinSession();
         }}
       >
         <label
@@ -155,7 +229,8 @@
         <button
           class="inline-flex h-9 min-h-9 w-[300px] shrink-0 basis-9 cursor-pointer items-center justify-center rounded-full border-0 bg-red-600 px-4 text-[13px] leading-5 font-medium text-white shadow-[0_2.39px_2.39px_rgb(0_0_0_/_0.25)] hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-red-200 disabled:shadow-none disabled:hover:bg-red-200 max-[374px]:w-full sm:h-[clamp(42px,3.13vw,60px)] sm:min-h-[clamp(42px,3.13vw,60px)] sm:w-[min(100%,500px)] sm:text-[clamp(15px,1.04vw,20px)] sm:leading-[clamp(21px,1.46vw,28px)] sm:shadow-[0_clamp(2.39px,0.21vw,4px)_2px_rgb(0_0_0_/_0.25)]"
           type="submit"
-          disabled={!sessionCode.trim()}>Join session</button
+          disabled={!sessionCode.trim() || joiningSession || creatingSession}
+          >{joiningSession ? "Joining..." : "Join session"}</button
         >
       </form>
 
@@ -176,8 +251,15 @@
       <button
         class="hidden h-[clamp(42px,3.13vw,60px)] min-h-[clamp(42px,3.13vw,60px)] w-[min(100%,500px)] shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-red-600 px-4 text-[clamp(15px,1.04vw,20px)] leading-[clamp(21px,1.46vw,28px)] font-medium text-white shadow-[0_clamp(2.39px,0.21vw,4px)_2px_rgb(0_0_0_/_0.25)] hover:bg-red-700 max-[374px]:w-full sm:inline-flex"
         type="button"
-        onclick={createSession}>Host a session</button
+        onclick={() => void createSession()}
+        disabled={creatingSession || joiningSession}
+        >{hostButtonLabel}</button
       >
+      {#if sessionActionError}
+        <p class="m-0 mt-3 text-center text-sm font-semibold text-red-700" role="alert">
+          {sessionActionError}
+        </p>
+      {/if}
     </section>
   </section>
 

@@ -1,6 +1,8 @@
 <script lang="ts">
   import { page } from "$app/state";
   import ChevronLeft from "@lucide/svelte/icons/chevron-left";
+  import { onMount } from "svelte";
+  import { fetchAuthStatus } from "$lib/api/auth";
   import { apiUrl } from "$lib/api/base";
   import AppFooter from "$lib/components/AppFooter.svelte";
   import VoterHeader from "$lib/components/VoterHeader.svelte";
@@ -22,6 +24,17 @@
   );
   const pendingProxyVoteText = $derived(pendingProxyVoteList.join(", "));
   const pendingProxyVoteCount = $derived(pendingProxyVoteList.length);
+  let userAndrewId = $state<string | null>(null);
+
+  onMount(() => {
+    void fetchAuthStatus()
+      .then((status) => {
+        userAndrewId = status.user_andrew_id;
+      })
+      .catch(() => {
+        userAndrewId = null;
+      });
+  });
 
   function signOut() {
     window.location.href = apiUrl("/auth/logout");
@@ -123,8 +136,8 @@
       <p
         class="m-0 w-[325px] text-sm leading-5 font-medium text-slate-800 sm:text-[clamp(18px,1.25vw,24px)] sm:leading-[clamp(26px,1.67vw,32px)]"
       >
-        <strong class="font-bold">Your AndrewID:</strong> Available after backend
-        connection
+        <strong class="font-bold">Your AndrewID:</strong>
+        {userAndrewId ?? "Unavailable"}
       </p>
       {#if hasPendingProxyReview}
         <p

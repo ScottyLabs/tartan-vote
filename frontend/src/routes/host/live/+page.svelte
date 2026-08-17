@@ -8,6 +8,12 @@
   import EndVotingInstanceDialog from "$lib/components/EndVotingInstanceDialog.svelte";
   import HostFinalResultsDialog from "$lib/components/HostFinalResultsDialog.svelte";
   import { createHostLiveView } from "$lib/domain/hostLive";
+  import {
+    displayHostSessionCode,
+    endHostedSessionWithRedirect,
+    ensureHostedSessionCode,
+  } from "$lib/domain/hostSession";
+  import { onMount } from "svelte";
 
   const liveView = createHostLiveView(page.url.searchParams);
   const overviewParams = new URLSearchParams({
@@ -20,6 +26,10 @@
     submitted: String(liveView.votesSubmitted),
     eligible: String(liveView.eligibleVotes),
   });
+  const initialSessionCode = page.url.searchParams.get("sessionCode")?.trim();
+  if (initialSessionCode) {
+    overviewParams.set("sessionCode", initialSessionCode);
+  }
   let resultsShared = $state(page.url.searchParams.get("shared") === "true");
   let endDialogOpen = $state(page.url.searchParams.get("dialog") === "end");
   let finalDialogOpen = $state(page.url.searchParams.get("dialog") === "final");
@@ -28,6 +38,15 @@
   );
   let instanceEnded = $state(false);
   let endSessionDialogOpen = $state(false);
+  let sessionCode = $state(page.url.searchParams.get("sessionCode")?.trim() || "");
+  let endingSession = $state(false);
+  let sessionError = $state("");
+  const displayedSessionCode = $derived(displayHostSessionCode(sessionCode));
+  const configurationHref = $derived.by(() => {
+    const params = new URLSearchParams();
+    if (sessionCode) params.set("sessionCode", sessionCode);
+    return params.size > 0 ? `/host/configuration?${params.toString()}` : "/host/configuration";
+  });
 
   function confirmEnd() {
     endDialogOpen = false;
@@ -43,6 +62,24 @@
   function confirmLiveResultsSharing() {
     resultsShared = !resultsShared;
     sharingDialogOpen = false;
+  }
+
+  onMount(() => {
+    void ensureHostedSessionCode(sessionCode).then((resolvedSessionCode) => {
+      sessionCode = resolvedSessionCode;
+    });
+  });
+
+  async function confirmEndSession() {
+    if (endingSession) return;
+    endingSession = true;
+    const success = await endHostedSessionWithRedirect((message) => {
+      sessionError = message;
+    });
+    if (!success) {
+      endingSession = false;
+      endSessionDialogOpen = false;
+    }
   }
 </script>
 
@@ -74,7 +111,7 @@
         <p
           class="mt-0 mb-[clamp(6px,1.667vw,32px)] text-[clamp(17px,1.563vw,30px)] leading-[clamp(22px,1.979vw,38px)] font-semibold"
         >
-          happy-giraffe
+          {displayedSessionCode}
         </p>
         <button
           class="inline-flex h-6 max-w-full cursor-pointer items-center gap-2 border-0 bg-transparent p-0 font-sans text-[clamp(9px,0.833vw,16px)] text-red-200"
@@ -109,7 +146,7 @@
         >
         <a
           class="flex h-[clamp(40px,3.646vw,70px)] w-full cursor-pointer items-center border-0 bg-transparent px-[clamp(24px,2.344vw,45px)] font-sans text-[clamp(11px,0.938vw,18px)] leading-[26px] font-bold text-white no-underline"
-          href="/host/configuration">Session Configuration</a
+          href={configurationHref}>Session Configuration</a
         >
         <button
           class="flex h-[clamp(40px,3.646vw,70px)] w-full cursor-pointer items-center border-0 bg-transparent px-[clamp(24px,2.344vw,45px)] text-left font-sans text-[clamp(11px,0.938vw,18px)] leading-[26px] font-bold text-white"
@@ -238,6 +275,11 @@
           </button>
         </div>
       </article>
+      {#if sessionError}
+        <p class="m-0 mt-3 text-sm font-semibold text-red-700" role="alert">
+          {sessionError}
+        </p>
+      {/if}
     </section>
   </div>
 
@@ -271,6 +313,6 @@
 {#if endSessionDialogOpen}
   <EndSessionDialog
     onclose={() => (endSessionDialogOpen = false)}
-    onconfirm={() => (window.location.href = "/home")}
+    onconfirm={() => void confirmEndSession()}
   />
 {/if}

@@ -14,7 +14,13 @@
     type HostDialog,
     type HostParticipant,
   } from "$lib/domain/host";
+  import {
+    displayHostSessionCode,
+    endHostedSessionWithRedirect,
+    ensureHostedSessionCode,
+  } from "$lib/domain/hostSession";
   import { loadOrganizationSettings } from "$lib/domain/organizationSettings";
+  import { onMount } from "svelte";
 
   const initialState = page.url.searchParams.get("state");
   const initialDialog = page.url.searchParams.get("dialog");
@@ -98,6 +104,9 @@
   let votesSubmitted = $state(runningSubmitted);
   let eligibleVotes = $state(runningEligible);
   let endSessionDialogOpen = $state(false);
+  let sessionCode = $state(page.url.searchParams.get("sessionCode")?.trim() || "");
+  let endingSession = $state(false);
+  let sessionError = $state("");
 
   const selectedParticipant = $derived(
     participants.find((participant) => participant.id === activeParticipantId),
@@ -109,6 +118,12 @@
     hasRunningVote || quickVoteStarted || Boolean(activeVoteName),
   );
   const hasBulkSelection = $derived(selectedIds.length > 0);
+  const displayedSessionCode = $derived(displayHostSessionCode(sessionCode));
+  const configurationHref = $derived.by(() => {
+    const params = new URLSearchParams();
+    if (sessionCode) params.set("sessionCode", sessionCode);
+    return params.size > 0 ? `/host/configuration?${params.toString()}` : "/host/configuration";
+  });
   const liveViewHref = $derived.by(() => {
     const params = new URLSearchParams({
       type: activeVoteKind,
@@ -121,7 +136,16 @@
       quorum: activeQuorum,
       eligible: String(eligibleVotes),
     });
+    if (sessionCode) {
+      params.set("sessionCode", sessionCode);
+    }
     return `/host/live?${params.toString()}`;
+  });
+
+  onMount(() => {
+    void ensureHostedSessionCode(sessionCode).then((resolvedSessionCode) => {
+      sessionCode = resolvedSessionCode;
+    });
   });
 
   function toggleCompactMode() {
@@ -234,6 +258,18 @@
     eligibleVotes = 0;
     closeDialog();
   }
+
+  async function confirmEndSession() {
+    if (endingSession) return;
+    endingSession = true;
+    const success = await endHostedSessionWithRedirect((message) => {
+      sessionError = message;
+    });
+    if (!success) {
+      endingSession = false;
+      endSessionDialogOpen = false;
+    }
+  }
 </script>
 
 <svelte:head>
@@ -260,7 +296,7 @@
         <p
           class="mt-0 mb-[clamp(6px,1.667vw,32px)] text-[clamp(17px,1.563vw,30px)] leading-[clamp(22px,1.979vw,38px)] font-semibold"
         >
-          happy-giraffe
+          {displayedSessionCode}
         </p>
         <button
           class="inline-flex h-6 max-w-full cursor-pointer items-center gap-2 border-0 bg-transparent p-0 text-[clamp(9px,0.833vw,16px)] text-red-200"
@@ -307,7 +343,7 @@
         {/if}
         <a
           class="flex h-[clamp(40px,3.646vw,70px)] w-full items-center px-[clamp(24px,2.344vw,45px)] text-[clamp(11px,0.938vw,18px)] leading-[26px] font-bold text-white no-underline"
-          href="/host/configuration">Session Configuration</a
+          href={configurationHref}>Session Configuration</a
         >
         <button
           class="flex h-[clamp(40px,3.646vw,70px)] w-full cursor-pointer items-center border-0 bg-transparent px-[clamp(24px,2.344vw,45px)] text-left text-[clamp(11px,0.938vw,18px)] leading-[26px] font-bold text-white"
@@ -613,6 +649,11 @@
           </div>
         </section>
       </div>
+      {#if sessionError}
+        <p class="m-0 mt-2 text-sm font-semibold text-red-700" role="alert">
+          {sessionError}
+        </p>
+      {/if}
     </section>
   </div>
 
@@ -639,6 +680,6 @@
 {#if endSessionDialogOpen}
   <EndSessionDialog
     onclose={() => (endSessionDialogOpen = false)}
-    onconfirm={() => (window.location.href = "/home")}
+    onconfirm={() => void confirmEndSession()}
   />
 {/if}
