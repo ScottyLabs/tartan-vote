@@ -1,6 +1,7 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
+  import { toErrorMessage } from "$lib/errors";
   import Link2 from "@lucide/svelte/icons/link-2";
   import { fetchAttendance } from "$lib/api/attendance";
   import { checkMotion, endMotion, exportMotionResults } from "$lib/api/motion";
@@ -75,16 +76,9 @@
   });
   const liveResultsStatusLabel = $derived(
     liveResultsVisibleToParticipants
-      ? "Live results visible to voters"
-      : "Live results hidden until end",
+      ? "Live results shared"
+      : "Share live results",
   );
-
-  function toErrorMessage(error: unknown, fallback: string): string {
-    if (error instanceof Error && error.message.trim() !== "") {
-      return error.message;
-    }
-    return fallback;
-  }
 
   async function loadHostTotals() {
     const exported = await exportMotionResults();
@@ -245,7 +239,7 @@
           {displayedSessionCode}
         </p>
         <button
-          class="inline-flex h-6 max-w-full cursor-pointer items-center gap-2 border-0 bg-transparent p-0 font-sans text-[clamp(9px,0.833vw,16px)] text-red-200"
+          class="inline-flex h-6 max-w-full cursor-pointer items-center gap-2 bg-transparent p-0 text-[clamp(9px,0.833vw,16px)] text-red-200"
           type="button"
         >
           <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
@@ -263,32 +257,32 @@
       </section>
 
       <nav
-        class="mt-[clamp(12px,1.198vw,23px)] grid gap-[5px]"
+        class="mt-[clamp(12px,1.198vw,23px)] grid gap-1"
         aria-label="Session sections"
       >
         <a
-          class="flex h-[clamp(40px,3.646vw,70px)] w-full cursor-pointer items-center border-0 bg-transparent px-[clamp(24px,2.344vw,45px)] font-sans text-[clamp(11px,0.938vw,18px)] leading-[26px] font-bold text-white no-underline"
+          class="flex h-[clamp(40px,3.646vw,70px)] w-full cursor-pointer items-center bg-transparent px-[clamp(24px,2.344vw,45px)] text-[clamp(11px,0.938vw,18px)] leading-7 font-bold text-white"
           href={overviewHref}>Overview</a
         >
         <a
-          class="flex h-[clamp(40px,3.646vw,70px)] w-full cursor-pointer items-center border-0 bg-[#66363e] px-[clamp(24px,2.344vw,45px)] font-sans text-[clamp(11px,0.938vw,18px)] leading-[26px] font-bold text-white no-underline"
+          class="flex h-[clamp(40px,3.646vw,70px)] w-full cursor-pointer items-center bg-[#66363e] px-[clamp(24px,2.344vw,45px)] text-[clamp(11px,0.938vw,18px)] leading-7 font-bold text-white"
           href={sessionCode
             ? `/host/live?sessionCode=${encodeURIComponent(sessionCode)}`
             : "/host/live"}
           aria-current="page">Live View</a
         >
         <a
-          class="flex h-[clamp(40px,3.646vw,70px)] w-full cursor-pointer items-center border-0 bg-transparent px-[clamp(24px,2.344vw,45px)] font-sans text-[clamp(11px,0.938vw,18px)] leading-[26px] font-bold text-white no-underline"
+          class="flex h-[clamp(40px,3.646vw,70px)] w-full cursor-pointer items-center bg-transparent px-[clamp(24px,2.344vw,45px)] text-[clamp(11px,0.938vw,18px)] leading-7 font-bold text-white"
           href={configurationHref}>Session Configuration</a
         >
         <button
-          class="flex h-[clamp(40px,3.646vw,70px)] w-full cursor-pointer items-center border-0 bg-transparent px-[clamp(24px,2.344vw,45px)] text-left font-sans text-[clamp(11px,0.938vw,18px)] leading-[26px] font-bold text-white"
+          class="flex h-[clamp(40px,3.646vw,70px)] w-full cursor-pointer items-center bg-transparent px-[clamp(24px,2.344vw,45px)] text-left text-[clamp(11px,0.938vw,18px)] leading-7 font-bold text-white"
           type="button">Comprehensive Session Results</button
         >
       </nav>
 
       <button
-        class="absolute bottom-[35px] left-1/2 h-[clamp(34px,3.125vw,60px)] w-[min(calc(100%-42px),300px)] -translate-x-1/2 cursor-pointer rounded-[100px] border border-red-500 bg-transparent font-sans text-[clamp(14px,1.25vw,24px)] text-grey-200"
+        class="absolute bottom-9 left-1/2 h-[clamp(34px,3.125vw,60px)] w-[min(calc(100%-42px),300px)] -translate-x-1/2 cursor-pointer rounded-full border border-red-500 bg-transparent text-[clamp(14px,1.25vw,24px)] text-grey-200"
         type="button"
         onclick={() => (endSessionDialogOpen = true)}>End session</button
       >
@@ -299,17 +293,17 @@
       aria-labelledby="live-view-heading"
     >
       <article
-        class="flex min-h-[clamp(376px,36.719vw,705px)] w-full flex-col rounded-[10px] border-2 border-grey-200 bg-white px-[clamp(34px,4.688vw,90px)] pt-[clamp(30px,3.125vw,60px)] pb-[clamp(28px,3.125vw,60px)]"
+        class="flex min-h-[clamp(376px,36.719vw,705px)] w-full flex-col rounded-lg border-2 border-grey-200 bg-white px-[clamp(34px,4.688vw,90px)] pt-[clamp(30px,3.125vw,60px)] pb-[clamp(28px,3.125vw,60px)]"
         class:opacity-78={instanceEnded}
       >
-        <header class="flex items-start justify-between gap-[30px]">
+        <header class="flex items-start justify-between gap-8">
           <h1
-            class="m-0 max-w-[70%] text-[clamp(22px,1.875vw,36px)] leading-[1.3] font-semibold italic [overflow-wrap:anywhere]"
+            class="max-w-[70%] text-[clamp(22px,1.875vw,36px)] leading-[1.3] font-semibold italic [overflow-wrap:anywhere]"
           >
             {liveView.title}
           </h1>
           <p
-            class="m-0 flex-none text-[clamp(14px,1.042vw,20px)] leading-[1.4] font-semibold"
+            class="flex-none text-[clamp(14px,1.042vw,20px)] leading-[1.4] font-semibold"
           >
             Votes Submitted:
             <strong class="text-red-400">
@@ -331,7 +325,7 @@
           {votingStyleLabel}
         </p>
 
-        <div class="mt-[clamp(12px,1.042vw,20px)] h-0.5 bg-grey-100"></div>
+        <div class="mt-[clamp(12px,1.042vw,20px)] h-1 bg-grey-100"></div>
 
         <section
           class="mx-auto mt-[clamp(16px,1.302vw,25px)] w-[min(100%,859px)]"
@@ -360,7 +354,7 @@
                   </strong>
                 </div>
                 <div
-                  class="mt-[5px] h-2 w-full overflow-hidden rounded-[30px] bg-grey-200"
+                  class="mt-1 h-2 w-full overflow-hidden rounded-4xl bg-grey-200"
                   role="progressbar"
                   aria-label={`${option.label}: ${option.percentage}%`}
                   aria-valuenow={option.percentage}
@@ -386,7 +380,7 @@
           class="mt-auto flex justify-end gap-[clamp(14px,1.042vw,20px)] pt-[clamp(28px,3.125vw,60px)]"
         >
           <button
-            class="h-[clamp(36px,2.604vw,50px)] w-[clamp(140px,10.417vw,200px)] cursor-pointer rounded-[100px] border border-red-500 bg-white font-sans text-[clamp(13px,0.938vw,18px)] font-medium text-red-500 disabled:cursor-not-allowed disabled:border-red-200 disabled:bg-red-200 disabled:text-white"
+            class="h-[clamp(36px,2.604vw,50px)] w-[clamp(140px,10.417vw,200px)] cursor-pointer rounded-full border border-red-500 bg-white text-[clamp(13px,0.938vw,18px)] font-medium text-red-500 disabled:cursor-not-allowed disabled:border-red-200 disabled:bg-red-200 disabled:text-white"
             type="button"
             disabled={instanceEnded || endingMotion}
             onclick={() => (endDialogOpen = true)}
@@ -394,7 +388,7 @@
             {instanceEnded ? "Ended" : endingMotion ? "Ending..." : "End now"}
           </button>
           <button
-            class="h-[clamp(36px,2.604vw,50px)] w-[clamp(180px,14.583vw,280px)] cursor-not-allowed rounded-[100px] border font-sans text-[clamp(13px,0.938vw,18px)] font-medium text-white disabled:border-red-200 disabled:bg-red-200 disabled:text-white"
+            class="h-[clamp(36px,2.604vw,50px)] w-[clamp(180px,14.583vw,280px)] cursor-not-allowed rounded-full border text-[clamp(13px,0.938vw,18px)] font-medium text-white"
             class:border-slate-700={liveResultsVisibleToParticipants}
             class:bg-slate-700={liveResultsVisibleToParticipants}
             class:border-red-600={!liveResultsVisibleToParticipants}
@@ -409,12 +403,12 @@
         </div>
       </article>
       {#if liveError}
-        <p class="m-0 mt-3 text-sm font-semibold text-red-700" role="alert">
+        <p class="mt-3 text-sm font-semibold text-red-700" role="alert">
           {liveError}
         </p>
       {/if}
       {#if sessionError}
-        <p class="m-0 mt-3 text-sm font-semibold text-red-700" role="alert">
+        <p class="mt-3 text-sm font-semibold text-red-700" role="alert">
           {sessionError}
         </p>
       {/if}

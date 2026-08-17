@@ -164,7 +164,7 @@
   <VoterHeader {sessionCode} onSignOut={signOut} />
 
   <button
-    class="absolute top-[clamp(128px,8.33vw,160px)] left-[clamp(28px,3.6vw,69px)] hidden size-[clamp(32px,2.08vw,40px)] cursor-pointer items-center justify-center rounded-full border-0 bg-red-500 p-0 text-grey-50 sm:inline-flex"
+    class="absolute top-[clamp(128px,8.33vw,160px)] left-[clamp(28px,3.6vw,69px)] hidden size-[clamp(32px,2.08vw,40px)] cursor-pointer items-center justify-center rounded-full bg-red-500 p-0 text-grey-50 sm:inline-flex"
     type="button"
     aria-label="Back to proxy setup"
     onclick={goBack}
@@ -176,10 +176,10 @@
   </button>
 
   <div
-    class="mt-4 ml-[21px] flex h-5 w-[372px] items-center justify-between max-[374px]:w-[calc(100%-28px)] sm:hidden"
+    class="mt-4 ml-5 flex h-5 w-93 items-center justify-between max-[374px]:w-[calc(100%-28px)] sm:hidden"
   >
     <button
-      class="inline-flex size-5 cursor-pointer items-center justify-center rounded-full border-0 bg-red-500 p-0 text-grey-50"
+      class="inline-flex size-5 cursor-pointer items-center justify-center rounded-full bg-red-500 p-0 text-grey-50"
       type="button"
       aria-label="Back to proxy setup"
       onclick={goBack}
@@ -190,21 +190,21 @@
   </div>
 
   <section
-    class="mx-auto mt-[62px] flex w-[350px] flex-col items-center gap-5 max-[374px]:w-[calc(100%-28px)] sm:mt-[clamp(132px,13.33vw,256px)] sm:w-[min(calc(100vw-80px),916px)] sm:gap-[30px]"
+    class="mx-auto mt-16 flex w-88 flex-col items-center gap-5 max-[374px]:w-[calc(100%-28px)] sm:mt-[clamp(132px,13.33vw,256px)] sm:w-[min(calc(100vw-80px),916px)] sm:gap-8"
     aria-labelledby="waiting-title"
   >
     <div
-      class="flex w-[345px] flex-col items-center gap-2.5 text-center max-[374px]:w-[calc(100%-28px)] sm:w-[min(100%,916px)]"
+      class="flex w-86 flex-col items-center gap-3 text-center max-[374px]:w-[calc(100%-28px)] sm:w-[min(100%,916px)]"
     >
       {#if votedWaitingForHost}
         <h1
-          class="m-0 text-lg leading-[21.95px] font-semibold text-black sm:text-[clamp(22px,1.56vw,30px)] sm:leading-[clamp(30px,1.98vw,38px)]"
+          class="text-lg leading-5 font-semibold text-black sm:text-[clamp(22px,1.56vw,30px)] sm:leading-[clamp(30px,1.98vw,38px)]"
           id="waiting-title"
         >
           Vote submitted
         </h1>
         <p
-          class="m-0 text-[13px] leading-5 font-medium text-grey-700 sm:w-[min(100%,780px)] sm:text-[clamp(18px,1.25vw,24px)] sm:leading-[clamp(26px,1.67vw,32px)]"
+          class="text-xs leading-5 font-medium text-grey-700 sm:w-[min(100%,780px)] sm:text-[clamp(18px,1.25vw,24px)] sm:leading-[clamp(26px,1.67vw,32px)]"
         >
           {#if activeMotionName}
             You have voted on <strong class="font-bold">{activeMotionName}</strong>.
@@ -215,13 +215,13 @@
         </p>
       {:else}
         <h1
-          class="m-0 text-lg leading-[21.95px] font-semibold text-black sm:text-[clamp(22px,1.56vw,30px)] sm:leading-[clamp(30px,1.98vw,38px)]"
+          class="text-lg leading-5 font-semibold text-black sm:text-[clamp(22px,1.56vw,30px)] sm:leading-[clamp(30px,1.98vw,38px)]"
           id="waiting-title"
         >
           You are in the Waiting Room
         </h1>
         <p
-          class="m-0 text-[13px] leading-3.5 font-medium text-grey-700 sm:text-[clamp(18px,1.25vw,24px)] sm:leading-[clamp(26px,1.67vw,32px)]"
+          class="text-xs leading-4 font-medium text-grey-700 sm:text-[clamp(18px,1.25vw,24px)] sm:leading-[clamp(26px,1.67vw,32px)]"
         >
           Proxy Request:
           {#if hasPendingProxyReview}
@@ -232,7 +232,7 @@
         </p>
         {#if hasPendingProxyReview}
           <p
-            class="m-0 text-[13px] leading-5 font-medium text-grey-700 sm:w-[min(100%,780px)] sm:text-[clamp(18px,1.25vw,24px)] sm:leading-[clamp(26px,1.67vw,32px)]"
+            class="text-xs leading-5 font-medium text-grey-700 sm:w-[min(100%,780px)] sm:text-[clamp(18px,1.25vw,24px)] sm:leading-[clamp(26px,1.67vw,32px)]"
           >
             Your host will push a motion or election shortly. Please ensure that
             all inputted Proxy IDs are accurate before requesting the host's
@@ -240,57 +240,57 @@
           </p>
         {:else}
           <p
-            class="m-0 hidden text-[clamp(18px,1.25vw,24px)] leading-[clamp(26px,1.67vw,32px)] font-medium text-grey-700 sm:block sm:w-[min(100%,778px)]"
+            class="hidden text-[clamp(18px,1.25vw,24px)] leading-[clamp(26px,1.67vw,32px)] font-medium text-grey-700 sm:block sm:w-[min(100%,778px)]"
           >
-            Your host will push a motion or election shortly. You are continuing
-            without proxy votes.
+            Your host will push a motion or election shortly. If the shown proxy
+            votes are incorrect, correct them on the previous page.
           </p>
           <p
-            class="m-0 text-[13px] leading-5 font-medium text-grey-700 sm:hidden"
+            class="text-xs leading-5 font-medium text-grey-700 sm:hidden"
           >
-            Your host will push a motion or election shortly. You are continuing
-            without proxy votes.
+            Your host will push a motion or election shortly. If the shown proxy
+            votes are incorrect, correct them on the previous page.
           </p>
         {/if}
       {/if}
     </div>
 
     <section
-      class="flex h-[120px] w-[350px] flex-col items-center justify-center rounded-[10px] border border-grey-200 bg-white px-[50px] py-[30px] text-center max-[374px]:w-[calc(100%-28px)] sm:h-auto sm:min-h-[82px] sm:w-[min(100%,780px)]"
+      class="flex h-30 w-88 flex-col items-center justify-center rounded-lg border border-grey-200 bg-white px-13 py-8 text-center max-[374px]:w-[calc(100%-28px)] sm:h-auto sm:min-h-21 sm:w-[min(100%,780px)]"
       aria-label="Current voter information"
     >
       <p
-        class="m-0 w-[325px] text-sm leading-5 font-medium text-slate-800 sm:text-[clamp(18px,1.25vw,24px)] sm:leading-[clamp(26px,1.67vw,32px)]"
+        class="w-81 text-sm leading-5 font-medium text-slate-800 sm:text-[clamp(18px,1.25vw,24px)] sm:leading-[clamp(26px,1.67vw,32px)]"
       >
         <strong class="font-bold">Your AndrewID:</strong>
         {userAndrewId ?? "Unavailable"}
       </p>
       {#if hasPendingProxyReview && !votedWaitingForHost}
         <p
-          class="mt-5 hidden w-[325px] text-[clamp(18px,1.25vw,24px)] leading-[clamp(26px,1.67vw,32px)] font-medium text-slate-800 sm:block"
+          class="mt-5 hidden w-81 text-[clamp(18px,1.25vw,24px)] leading-[clamp(26px,1.67vw,32px)] font-medium text-slate-800 sm:block"
         >
           <strong class="font-bold"
             >Your Proxy Votes({pendingProxyVoteCount}):</strong
-          > <em class="italic text-slate-300">{pendingProxyVoteText}</em>
+          > <em class="text-slate-300">{pendingProxyVoteText}</em>
         </p>
         <p
-          class="mt-5 w-[325px] text-sm leading-5 font-medium text-slate-800 sm:hidden"
+          class="mt-5 w-81 text-sm leading-5 font-medium text-slate-800 sm:hidden"
         >
           <strong class="font-bold"
             >Your Pending Proxy Votes ({pendingProxyVoteCount}):</strong
-          > <em class="italic text-slate-300">{pendingProxyVoteText}</em>
+          > <em class="text-slate-300">{pendingProxyVoteText}</em>
         </p>
       {/if}
       {#if votedWaitingForHost}
         <p
-          class="mt-5 w-[325px] text-sm leading-5 font-medium text-slate-800 sm:text-[clamp(18px,1.25vw,24px)] sm:leading-[clamp(26px,1.67vw,32px)]"
+          class="mt-5 w-81 text-sm leading-5 font-medium text-slate-800 sm:text-[clamp(18px,1.25vw,24px)] sm:leading-[clamp(26px,1.67vw,32px)]"
         >
           <strong class="font-bold text-red-500">Status:</strong> Voted, waiting
           for host
         </p>
       {:else if noVoteInstances}
         <p
-          class="mt-5 w-[325px] text-sm leading-5 font-medium text-slate-800 sm:text-[clamp(18px,1.25vw,24px)] sm:leading-[clamp(26px,1.67vw,32px)]"
+          class="mt-5 w-81 text-sm leading-5 font-medium text-slate-800 sm:text-[clamp(18px,1.25vw,24px)] sm:leading-[clamp(26px,1.67vw,32px)]"
         >
           <strong class="font-bold text-red-500">Status:</strong> No voting
           instances for this motion
@@ -300,38 +300,38 @@
 
     {#if hasPendingProxyReview && !votedWaitingForHost}
       <button
-        class="inline-flex h-9 w-[174px] cursor-pointer items-center justify-center rounded-[50px] border-0 bg-red-500 text-sm leading-[18.48px] font-semibold text-white shadow-[0_2.31px_1.16px_rgb(0_0_0_/_0.25)] hover:bg-red-600 disabled:cursor-not-allowed disabled:bg-red-200 disabled:shadow-none disabled:hover:bg-red-200 sm:h-[clamp(52px,3.13vw,60px)] sm:w-[clamp(250px,18.59vw,357px)] sm:text-[clamp(20px,1.25vw,24px)] sm:leading-[clamp(28px,1.67vw,32px)] sm:font-bold sm:shadow-[0_4px_2px_rgb(0_0_0_/_0.25)]"
+        class="inline-flex h-9 w-44 cursor-pointer items-center justify-center rounded-full bg-red-500 text-sm leading-5 font-semibold text-white shadow-[0_2.31px_1.16px_rgb(0_0_0_/_0.25)] hover:bg-red-600 disabled:cursor-not-allowed disabled:bg-red-200 disabled:shadow-none disabled:hover:bg-red-200 sm:h-[clamp(52px,3.13vw,60px)] sm:w-[clamp(250px,18.59vw,357px)] sm:text-[clamp(20px,1.25vw,24px)] sm:leading-[clamp(28px,1.67vw,32px)] sm:font-bold sm:shadow-[0_4px_2px_rgb(0_0_0_/_0.25)]"
         type="button"
         disabled
-        title="Available after backend connection"
-        >Proxy Review-not yet available</button
+        title="Proxy review request is not available yet"
+        >Request Proxy Review</button
       >
     {/if}
 
     {#if checkingMotion}
       <p
-        class="m-0 text-[13px] leading-5 font-medium text-grey-600 sm:text-[clamp(16px,1.04vw,20px)]"
+        class="text-xs leading-5 font-medium text-grey-600 sm:text-[clamp(16px,1.04vw,20px)]"
         aria-live="polite"
       >
         Checking for an active motion...
       </p>
     {:else if pollError}
       <p
-        class="m-0 text-[13px] leading-5 font-medium text-red-600 sm:text-[clamp(16px,1.04vw,20px)]"
+        class="text-xs leading-5 font-medium text-red-600 sm:text-[clamp(16px,1.04vw,20px)]"
         role="alert"
       >
         {pollError} Retrying...
       </p>
     {:else if votedWaitingForHost}
       <p
-        class="m-0 text-[13px] leading-5 font-medium text-grey-600 sm:text-[clamp(16px,1.04vw,20px)]"
+        class="text-xs leading-5 font-medium text-grey-600 sm:text-[clamp(16px,1.04vw,20px)]"
         aria-live="polite"
       >
         Waiting for the host to end this motion and release results...
       </p>
     {:else if noVoteInstances}
       <p
-        class="m-0 text-[13px] leading-5 font-medium text-grey-600 sm:text-[clamp(16px,1.04vw,20px)]"
+        class="text-xs leading-5 font-medium text-grey-600 sm:text-[clamp(16px,1.04vw,20px)]"
         aria-live="polite"
       >
         A motion is active, but you don't have any vote instances. Stay here or
