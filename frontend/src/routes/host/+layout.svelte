@@ -22,7 +22,7 @@
     ]}
   >
     <a
-      class="flex items-center gap-2 no-underline"
+      class="flex items-center gap-2"
       href="/home"
       aria-label="TartanVote home"
     >
@@ -40,7 +40,7 @@
       </span>
     </a>
 
-    <p class="m-0 text-[clamp(18px,1.563vw,30px)] leading-[38px] text-white">
+    <p class="text-[clamp(18px,1.563vw,30px)] leading-10 text-white">
       HOSTING DASHBOARD
     </p>
   </header>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
+  import { page } from "$app/state";
   import LogOut from "@lucide/svelte/icons/log-out";
   import { onMount } from "svelte";
   import { fetchAuthStatus } from "$lib/api/auth";
@@ -12,7 +13,7 @@
   import AppFooter from "$lib/components/AppFooter.svelte";
   import logoUrl from "$lib/assets/tartanvote-logo.svg?url";
 
-  let sessionCode = $state("");
+  let sessionCode = $state(page.url.searchParams.get("sessionCode")?.trim() || "");
   let checkingAuth = $state(true);
   let userName = $state<string | null>(null);
   let userAndrewId = $state<string | null>(null);
