@@ -20,6 +20,10 @@
   let creatingSession = $state(false);
   let joiningSession = $state(false);
   let hasActiveHostedSession = $state(false);
+  let activeParticipatingSessionCode = $state("");
+  const hasActiveParticipatingSession = $derived(
+    activeParticipatingSessionCode !== "",
+  );
 
   const greetingName = $derived(userName?.trim() || userAndrewId?.trim() || "there");
   const hostButtonLabel = $derived.by(() => {
@@ -27,6 +31,12 @@
       return hasActiveHostedSession ? "Resuming..." : "Creating...";
     }
     return hasActiveHostedSession ? "Resume hosted session" : "Host a session";
+  });
+  const joinButtonLabel = $derived.by(() => {
+    if (joiningSession) {
+      return hasActiveParticipatingSession ? "Resuming..." : "Joining...";
+    }
+    return hasActiveParticipatingSession ? "Resume session" : "Join session";
   });
 
   onMount(() => {
@@ -39,7 +49,7 @@
         userName = status.user_name;
         userAndrewId = status.user_andrew_id;
         checkingAuth = false;
-        void syncHostedSessionState();
+        void syncSessionState();
       })
       .catch(() => {
         void goto("/", { replaceState: true });
@@ -50,23 +60,36 @@
     window.location.href = apiUrl("/auth/logout");
   }
 
-  async function getHostedSessionCode(): Promise<string> {
+  async function getSessionInvolvementCodes(): Promise<{
+    hostedSessionCode: string;
+    participatingSessionCode: string;
+  }> {
     try {
       const status = await fetchSessionStatus();
-      return status.hosting?.session_code.trim() ?? "";
+      return {
+        hostedSessionCode: status.hosting?.session_code.trim() ?? "",
+        participatingSessionCode: status.participating?.session_code.trim() ?? "",
+      };
     } catch {
-      return "";
+      return {
+        hostedSessionCode: "",
+        participatingSessionCode: "",
+      };
     }
   }
 
-  async function syncHostedSessionState() {
-    const hostedSessionCode = await getHostedSessionCode();
+  async function syncSessionState() {
+    const { hostedSessionCode, participatingSessionCode } =
+      await getSessionInvolvementCodes();
     hasActiveHostedSession = hostedSessionCode !== "";
+    activeParticipatingSessionCode = participatingSessionCode;
   }
 
   async function redirectToHostedSessionIfPresent(): Promise<boolean> {
-    const hostedSessionCode = await getHostedSessionCode();
+    const { hostedSessionCode, participatingSessionCode } =
+      await getSessionInvolvementCodes();
     hasActiveHostedSession = hostedSessionCode !== "";
+    activeParticipatingSessionCode = participatingSessionCode;
     if (!hostedSessionCode) {
       return false;
     }
@@ -75,6 +98,16 @@
     });
     window.location.href = `/host?${searchParams.toString()}`;
     return true;
+  }
+
+  function redirectToParticipatingSession(
+    sessionCodeToOpen: string,
+    destination: "proxy" | "waiting" = "proxy",
+  ): void {
+    const searchParams = new URLSearchParams({
+      sessionCode: sessionCodeToOpen,
+    });
+    window.location.href = `/${destination}?${searchParams.toString()}`;
   }
 
   async function createSession() {
@@ -109,16 +142,39 @@
   async function joinSession() {
     if (joiningSession || creatingSession) return;
     const normalizedSessionCode = sessionCode.replaceAll(/^-+|-+$/gu, "");
-    if (normalizedSessionCode === "") return;
+    if (normalizedSessionCode === "" && !hasActiveParticipatingSession) return;
     sessionActionError = "";
     joiningSession = true;
 
     try {
+      // Re-check server state so a leave/removal in another tab can't leave
+      // this page blocking joins with a stale "already in session" guard.
+      await syncSessionState();
+
+      if (hasActiveParticipatingSession) {
+        if (
+          normalizedSessionCode === "" ||
+          normalizedSessionCode === activeParticipatingSessionCode
+        ) {
+          redirectToParticipatingSession(
+            activeParticipatingSessionCode,
+            "waiting",
+          );
+          return;
+        }
+
+        sessionActionError =
+          `You're already in session ${activeParticipatingSessionCode}. ` +
+          "Resume it before joining another.";
+        return;
+      }
+
+      if (normalizedSessionCode === "") {
+        return;
+      }
+
       await joinSessionRequest(normalizedSessionCode);
-      const searchParams = new URLSearchParams({
-        sessionCode: normalizedSessionCode,
-      });
-      window.location.href = `/proxy?${searchParams.toString()}`;
+      redirectToParticipatingSession(normalizedSessionCode, "proxy");
     } catch (error) {
       sessionActionError =
         error instanceof Error ? error.message : "Failed to join session.";
@@ -227,10 +283,19 @@
           spellcheck="false"
         />
         <button
-          class="inline-flex h-9 min-h-9 w-[300px] shrink-0 basis-9 cursor-pointer items-center justify-center rounded-full border-0 bg-red-600 px-4 text-[13px] leading-5 font-medium text-white shadow-[0_2.39px_2.39px_rgb(0_0_0_/_0.25)] hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-red-200 disabled:shadow-none disabled:hover:bg-red-200 max-[374px]:w-full sm:h-[clamp(42px,3.13vw,60px)] sm:min-h-[clamp(42px,3.13vw,60px)] sm:w-[min(100%,500px)] sm:text-[clamp(15px,1.04vw,20px)] sm:leading-[clamp(21px,1.46vw,28px)] sm:shadow-[0_clamp(2.39px,0.21vw,4px)_2px_rgb(0_0_0_/_0.25)]"
+          class="inline-flex h-9 min-h-9 w-[300px] shrink-0 basis-9 cursor-pointer items-center justify-center gap-1 rounded-full border-0 bg-red-600 px-4 text-[13px] leading-5 font-medium text-white shadow-[0_2.39px_2.39px_rgb(0_0_0_/_0.25)] hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-red-200 disabled:shadow-none disabled:hover:bg-red-200 max-[374px]:w-full sm:h-[clamp(42px,3.13vw,60px)] sm:min-h-[clamp(42px,3.13vw,60px)] sm:w-[min(100%,500px)] sm:text-[clamp(15px,1.04vw,20px)] sm:leading-[clamp(21px,1.46vw,28px)] sm:shadow-[0_clamp(2.39px,0.21vw,4px)_2px_rgb(0_0_0_/_0.25)]"
           type="submit"
-          disabled={!sessionCode.trim() || joiningSession || creatingSession}
-          >{joiningSession ? "Joining..." : "Join session"}</button
+          disabled={(!sessionCode.trim() && !hasActiveParticipatingSession) || joiningSession || creatingSession}
+        >
+          <div class="flex items-baseline justify-center gap-1">
+            <span>{joinButtonLabel}</span>
+            {#if hasActiveParticipatingSession && !joiningSession}
+              <span class="font-mono"
+                >({activeParticipatingSessionCode})</span
+              >
+            {/if}
+          </div>
+        </button
         >
       </form>
 
