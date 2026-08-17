@@ -4,8 +4,12 @@
   import { onMount } from "svelte";
   import { fetchAuthStatus } from "$lib/api/auth";
   import { apiUrl } from "$lib/api/base";
+  import { checkMotion } from "$lib/api/motion";
+  import { getVoteInstances } from "$lib/api/votes";
   import AppFooter from "$lib/components/AppFooter.svelte";
   import VoterHeader from "$lib/components/VoterHeader.svelte";
+
+  const MOTION_POLL_MS = 2500;
 
   const sessionCode = $derived(
     page.url.searchParams.get("sessionCode")?.trim() || "Demo session",
@@ -25,6 +29,33 @@
   const pendingProxyVoteText = $derived(pendingProxyVoteList.join(", "));
   const pendingProxyVoteCount = $derived(pendingProxyVoteList.length);
   let userAndrewId = $state<string | null>(null);
+  let pollError = $state("");
+  let checkingMotion = $state(true);
+  let votedWaitingForHost = $state(false);
+  let activeMotionName = $state("");
+
+  function ballotHref(): string {
+    const params = new URLSearchParams();
+    const code = page.url.searchParams.get("sessionCode")?.trim();
+    if (code) params.set("sessionCode", code);
+    const proxyVotes = page.url.searchParams.get("proxyVotes")?.trim();
+    if (proxyVotes) params.set("proxyVotes", proxyVotes);
+    const proxyStatus = page.url.searchParams.get("proxyStatus")?.trim();
+    if (proxyStatus) params.set("proxyStatus", proxyStatus);
+    const query = params.toString();
+    return query ? `/ballot?${query}` : "/ballot";
+  }
+
+  function resultsHref(): string {
+    const params = new URLSearchParams({
+      variant: "secret-final",
+      type: "secret",
+      phase: "final",
+    });
+    const code = page.url.searchParams.get("sessionCode")?.trim();
+    if (code) params.set("sessionCode", code);
+    return `/results?${params.toString()}`;
+  }
 
   onMount(() => {
     void fetchAuthStatus()
@@ -34,6 +65,64 @@
       .catch(() => {
         userAndrewId = null;
       });
+
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    async function pollActiveMotion() {
+      try {
+        const { active_motion } = await checkMotion();
+        if (cancelled) return;
+        pollError = "";
+        checkingMotion = false;
+
+        if (!active_motion) {
+          const wasVotedWaiting = votedWaitingForHost;
+          votedWaitingForHost = false;
+          activeMotionName = "";
+          if (wasVotedWaiting) {
+            window.location.href = resultsHref();
+            return;
+          }
+        } else {
+          activeMotionName = active_motion.name;
+          const voteInstances = await getVoteInstances();
+          if (cancelled) return;
+
+          const hasPendingVote =
+            voteInstances.length === 0 ||
+            voteInstances.some((instance) => !instance.has_voted);
+
+          if (hasPendingVote) {
+            votedWaitingForHost = false;
+            window.location.href = ballotHref();
+            return;
+          }
+
+          votedWaitingForHost = true;
+        }
+      } catch (error) {
+        if (cancelled) return;
+        checkingMotion = false;
+        pollError =
+          error instanceof Error && error.message.trim() !== ""
+            ? error.message
+            : "Unable to check for an active motion.";
+      }
+
+      if (!cancelled) {
+        timer = setTimeout(() => {
+          void pollActiveMotion();
+        }, MOTION_POLL_MS);
+      }
+    }
+
+    void pollActiveMotion();
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
   });
 
   function signOut() {
@@ -89,43 +178,62 @@
     <div
       class="flex w-[345px] flex-col items-center gap-2.5 text-center max-[374px]:w-[calc(100%-28px)] sm:w-[min(100%,916px)]"
     >
-      <h1
-        class="m-0 text-lg leading-[21.95px] font-semibold text-black sm:text-[clamp(22px,1.56vw,30px)] sm:leading-[clamp(30px,1.98vw,38px)]"
-        id="waiting-title"
-      >
-        You are in the Waiting Room
-      </h1>
-      <p
-        class="m-0 text-[13px] leading-3.5 font-medium text-grey-700 sm:text-[clamp(18px,1.25vw,24px)] sm:leading-[clamp(26px,1.67vw,32px)]"
-      >
-        Proxy Request:
-        {#if hasPendingProxyReview}
-          <strong class="font-bold text-red-500">Not Yet Requested</strong>
-        {:else}
-          N/A
-        {/if}
-      </p>
-      {#if hasPendingProxyReview}
+      {#if votedWaitingForHost}
+        <h1
+          class="m-0 text-lg leading-[21.95px] font-semibold text-black sm:text-[clamp(22px,1.56vw,30px)] sm:leading-[clamp(30px,1.98vw,38px)]"
+          id="waiting-title"
+        >
+          Vote submitted
+        </h1>
         <p
           class="m-0 text-[13px] leading-5 font-medium text-grey-700 sm:w-[min(100%,780px)] sm:text-[clamp(18px,1.25vw,24px)] sm:leading-[clamp(26px,1.67vw,32px)]"
         >
-          Your host will push a motion or election shortly. Please ensure that
-          all inputted Proxy IDs are accurate before requesting the host's
-          confirmation.
+          {#if activeMotionName}
+            You have voted on <strong class="font-bold">{activeMotionName}</strong>.
+          {:else}
+            You have voted on the active motion.
+          {/if}
+          Please wait for your host to release results.
         </p>
       {:else}
-        <p
-          class="m-0 hidden text-[clamp(18px,1.25vw,24px)] leading-[clamp(26px,1.67vw,32px)] font-medium text-grey-700 sm:block sm:w-[min(100%,778px)]"
+        <h1
+          class="m-0 text-lg leading-[21.95px] font-semibold text-black sm:text-[clamp(22px,1.56vw,30px)] sm:leading-[clamp(30px,1.98vw,38px)]"
+          id="waiting-title"
         >
-          Your host will push a motion or election shortly. You are continuing
-          without proxy votes.
-        </p>
+          You are in the Waiting Room
+        </h1>
         <p
-          class="m-0 text-[13px] leading-5 font-medium text-grey-700 sm:hidden"
+          class="m-0 text-[13px] leading-3.5 font-medium text-grey-700 sm:text-[clamp(18px,1.25vw,24px)] sm:leading-[clamp(26px,1.67vw,32px)]"
         >
-          Your host will push a motion or election shortly. You are continuing
-          without proxy votes.
+          Proxy Request:
+          {#if hasPendingProxyReview}
+            <strong class="font-bold text-red-500">Not Yet Requested</strong>
+          {:else}
+            N/A
+          {/if}
         </p>
+        {#if hasPendingProxyReview}
+          <p
+            class="m-0 text-[13px] leading-5 font-medium text-grey-700 sm:w-[min(100%,780px)] sm:text-[clamp(18px,1.25vw,24px)] sm:leading-[clamp(26px,1.67vw,32px)]"
+          >
+            Your host will push a motion or election shortly. Please ensure that
+            all inputted Proxy IDs are accurate before requesting the host's
+            confirmation.
+          </p>
+        {:else}
+          <p
+            class="m-0 hidden text-[clamp(18px,1.25vw,24px)] leading-[clamp(26px,1.67vw,32px)] font-medium text-grey-700 sm:block sm:w-[min(100%,778px)]"
+          >
+            Your host will push a motion or election shortly. You are continuing
+            without proxy votes.
+          </p>
+          <p
+            class="m-0 text-[13px] leading-5 font-medium text-grey-700 sm:hidden"
+          >
+            Your host will push a motion or election shortly. You are continuing
+            without proxy votes.
+          </p>
+        {/if}
       {/if}
     </div>
 
@@ -139,7 +247,7 @@
         <strong class="font-bold">Your AndrewID:</strong>
         {userAndrewId ?? "Unavailable"}
       </p>
-      {#if hasPendingProxyReview}
+      {#if hasPendingProxyReview && !votedWaitingForHost}
         <p
           class="mt-5 hidden w-[325px] text-[clamp(18px,1.25vw,24px)] leading-[clamp(26px,1.67vw,32px)] font-medium text-slate-800 sm:block"
         >
@@ -155,9 +263,17 @@
           > <em class="italic text-slate-300">{pendingProxyVoteText}</em>
         </p>
       {/if}
+      {#if votedWaitingForHost}
+        <p
+          class="mt-5 w-[325px] text-sm leading-5 font-medium text-slate-800 sm:text-[clamp(18px,1.25vw,24px)] sm:leading-[clamp(26px,1.67vw,32px)]"
+        >
+          <strong class="font-bold text-red-500">Status:</strong> Voted, waiting
+          for host
+        </p>
+      {/if}
     </section>
 
-    {#if hasPendingProxyReview}
+    {#if hasPendingProxyReview && !votedWaitingForHost}
       <button
         class="inline-flex h-9 w-[174px] cursor-pointer items-center justify-center rounded-[50px] border-0 bg-red-500 text-sm leading-[18.48px] font-semibold text-white shadow-[0_2.31px_1.16px_rgb(0_0_0_/_0.25)] hover:bg-red-600 disabled:cursor-not-allowed disabled:bg-red-200 disabled:shadow-none disabled:hover:bg-red-200 sm:h-[clamp(52px,3.13vw,60px)] sm:w-[clamp(250px,18.59vw,357px)] sm:text-[clamp(20px,1.25vw,24px)] sm:leading-[clamp(28px,1.67vw,32px)] sm:font-bold sm:shadow-[0_4px_2px_rgb(0_0_0_/_0.25)]"
         type="button"
@@ -165,6 +281,29 @@
         title="Available after backend connection"
         >Proxy Review-not yet available</button
       >
+    {/if}
+
+    {#if checkingMotion}
+      <p
+        class="m-0 text-[13px] leading-5 font-medium text-grey-600 sm:text-[clamp(16px,1.04vw,20px)]"
+        aria-live="polite"
+      >
+        Checking for an active motion...
+      </p>
+    {:else if pollError}
+      <p
+        class="m-0 text-[13px] leading-5 font-medium text-red-600 sm:text-[clamp(16px,1.04vw,20px)]"
+        role="alert"
+      >
+        {pollError} Retrying...
+      </p>
+    {:else if votedWaitingForHost}
+      <p
+        class="m-0 text-[13px] leading-5 font-medium text-grey-600 sm:text-[clamp(16px,1.04vw,20px)]"
+        aria-live="polite"
+      >
+        Waiting for the host to end this motion and release results...
+      </p>
     {/if}
   </section>
 

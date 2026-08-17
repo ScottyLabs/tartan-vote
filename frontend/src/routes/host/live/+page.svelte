@@ -2,55 +2,116 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
   import Link2 from "@lucide/svelte/icons/link-2";
+  import { fetchAttendance } from "$lib/api/attendance";
+  import { checkMotion, endMotion, exportMotionResults } from "$lib/api/motion";
   import AppFooter from "$lib/components/AppFooter.svelte";
-  import ConfirmLiveResultsSharingDialog from "$lib/components/ConfirmLiveResultsSharingDialog.svelte";
   import EndSessionDialog from "$lib/components/EndSessionDialog.svelte";
   import EndVotingInstanceDialog from "$lib/components/EndVotingInstanceDialog.svelte";
   import HostFinalResultsDialog from "$lib/components/HostFinalResultsDialog.svelte";
-  import { createHostLiveView } from "$lib/domain/hostLive";
+  import {
+    parseHostVoteKind,
+    voteOptionsFromMotionData,
+  } from "$lib/domain/host";
+  import {
+    createHostLiveView,
+    hostLiveViewFromApi,
+    updateHostLiveViewFromResults,
+    type HostLiveViewModel,
+  } from "$lib/domain/hostLive";
   import {
     displayHostSessionCode,
     endHostedSessionWithRedirect,
     ensureHostedSessionCode,
   } from "$lib/domain/hostSession";
+  import {
+    participantVisibilityFromMotionData,
+    votingTypeFromMotionData,
+  } from "$lib/domain/ballot";
   import { onMount } from "svelte";
 
-  const liveView = createHostLiveView(page.url.searchParams);
-  const overviewParams = new URLSearchParams({
-    running: "true",
-    type: liveView.type,
-    title: liveView.title,
-    labels: liveView.options.map((option) => option.label).join("|"),
-    style: page.url.searchParams.get("style") ?? liveView.votingStyle,
-    quorum: page.url.searchParams.get("quorum") ?? "",
-    submitted: String(liveView.votesSubmitted),
-    eligible: String(liveView.eligibleVotes),
-  });
-  const initialSessionCode = page.url.searchParams.get("sessionCode")?.trim();
-  if (initialSessionCode) {
-    overviewParams.set("sessionCode", initialSessionCode);
-  }
-  let resultsShared = $state(page.url.searchParams.get("shared") === "true");
+  const RESULTS_POLL_MS = 2500;
+
+  const initialLiveView = createHostLiveView(page.url.searchParams);
+  let liveView = $state<HostLiveViewModel>(initialLiveView);
+  let votingStyleLabel = $state(
+    page.url.searchParams.get("style") ?? initialLiveView.votingStyle,
+  );
+  /** Reflects create-time participant visibility; not toggleable mid-motion. */
+  let liveResultsVisibleToParticipants = $state(
+    page.url.searchParams.get("shared") === "true",
+  );
   let endDialogOpen = $state(page.url.searchParams.get("dialog") === "end");
   let finalDialogOpen = $state(page.url.searchParams.get("dialog") === "final");
-  let sharingDialogOpen = $state(
-    page.url.searchParams.get("dialog") === "share",
-  );
   let instanceEnded = $state(false);
   let endSessionDialogOpen = $state(false);
-  let sessionCode = $state(page.url.searchParams.get("sessionCode")?.trim() || "");
+  let sessionCode = $state(
+    page.url.searchParams.get("sessionCode")?.trim() || "",
+  );
   let endingSession = $state(false);
+  let endingMotion = $state(false);
   let sessionError = $state("");
+  let liveError = $state("");
   const displayedSessionCode = $derived(displayHostSessionCode(sessionCode));
   const configurationHref = $derived.by(() => {
     const params = new URLSearchParams();
     if (sessionCode) params.set("sessionCode", sessionCode);
-    return params.size > 0 ? `/host/configuration?${params.toString()}` : "/host/configuration";
+    return params.size > 0
+      ? `/host/configuration?${params.toString()}`
+      : "/host/configuration";
   });
+  const overviewHref = $derived.by(() => {
+    const params = new URLSearchParams({
+      running: instanceEnded ? "false" : "true",
+      type: liveView.type,
+      title: liveView.title,
+      labels: liveView.options.map((option) => option.label).join("|"),
+      style: votingStyleLabel,
+      quorum: page.url.searchParams.get("quorum") ?? "",
+      submitted: String(liveView.votesSubmitted),
+      eligible: String(liveView.eligibleVotes),
+    });
+    if (sessionCode) params.set("sessionCode", sessionCode);
+    return `/host?${params.toString()}`;
+  });
+  const liveResultsStatusLabel = $derived(
+    liveResultsVisibleToParticipants
+      ? "Live results visible to voters"
+      : "Live results hidden until end",
+  );
 
-  function confirmEnd() {
-    endDialogOpen = false;
-    finalDialogOpen = true;
+  function toErrorMessage(error: unknown, fallback: string): string {
+    if (error instanceof Error && error.message.trim() !== "") {
+      return error.message;
+    }
+    return fallback;
+  }
+
+  async function loadHostTotals() {
+    const exported = await exportMotionResults();
+    return exported.totals;
+  }
+
+  async function confirmEnd() {
+    if (endingMotion) return;
+    endingMotion = true;
+    liveError = "";
+    try {
+      await endMotion();
+      instanceEnded = true;
+      endDialogOpen = false;
+      finalDialogOpen = true;
+      try {
+        const totals = await loadHostTotals();
+        liveView = updateHostLiveViewFromResults(liveView, totals);
+      } catch {
+        // Keep last polled tallies if final fetch fails.
+      }
+    } catch (error) {
+      liveError = toErrorMessage(error, "Failed to end motion.");
+      endDialogOpen = false;
+    } finally {
+      endingMotion = false;
+    }
   }
 
   function confirmFinalResult() {
@@ -59,15 +120,85 @@
     void goto("/host");
   }
 
-  function confirmLiveResultsSharing() {
-    resultsShared = !resultsShared;
-    sharingDialogOpen = false;
-  }
-
   onMount(() => {
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    async function refreshLive() {
+      if (instanceEnded || cancelled) return;
+      try {
+        const { active_motion } = await checkMotion();
+        if (cancelled || instanceEnded) return;
+
+        if (!active_motion) {
+          liveError = liveError || "No active motion.";
+          return;
+        }
+
+        const kind = parseHostVoteKind(active_motion.data.kind);
+        const optionLabels = voteOptionsFromMotionData(active_motion.data);
+        votingStyleLabel = votingTypeFromMotionData(active_motion.data);
+        liveResultsVisibleToParticipants =
+          participantVisibilityFromMotionData(active_motion.data) === "live";
+
+        let eligible = liveView.eligibleVotes;
+        if (sessionCode) {
+          try {
+            const attendance = await fetchAttendance(sessionCode);
+            if (!cancelled) {
+              eligible = Math.max(
+                attendance.headcount,
+                attendance.attendees.reduce(
+                  (total, attendee) => total + 1 + attendee.proxy_for.length,
+                  0,
+                ),
+              );
+            }
+          } catch {
+            // Keep prior eligible estimate when attendance is unavailable.
+          }
+        }
+
+        const totals = await loadHostTotals();
+        if (cancelled) return;
+        liveView = hostLiveViewFromApi({
+          title: active_motion.name,
+          type: kind,
+          votingStyle:
+            votingStyleLabel === "Secret Ballot"
+              ? "Secret Ballot"
+              : "Standard",
+          results: totals,
+          eligibleVotes: Math.max(eligible, totals.total),
+          optionLabels,
+        });
+        liveError = "";
+      } catch (error) {
+        if (cancelled) return;
+        liveError = toErrorMessage(error, "Failed to load live view.");
+      }
+    }
+
+    async function pollLoop() {
+      if (instanceEnded) return;
+      await refreshLive();
+      if (!cancelled && !instanceEnded) {
+        timer = setTimeout(() => {
+          void pollLoop();
+        }, RESULTS_POLL_MS);
+      }
+    }
+
     void ensureHostedSessionCode(sessionCode).then((resolvedSessionCode) => {
+      if (cancelled) return;
       sessionCode = resolvedSessionCode;
+      void pollLoop();
     });
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
   });
 
   async function confirmEndSession() {
@@ -137,11 +268,13 @@
       >
         <a
           class="flex h-[clamp(40px,3.646vw,70px)] w-full cursor-pointer items-center border-0 bg-transparent px-[clamp(24px,2.344vw,45px)] font-sans text-[clamp(11px,0.938vw,18px)] leading-[26px] font-bold text-white no-underline"
-          href={`/host?${overviewParams.toString()}`}>Overview</a
+          href={overviewHref}>Overview</a
         >
         <a
           class="flex h-[clamp(40px,3.646vw,70px)] w-full cursor-pointer items-center border-0 bg-[#66363e] px-[clamp(24px,2.344vw,45px)] font-sans text-[clamp(11px,0.938vw,18px)] leading-[26px] font-bold text-white no-underline"
-          href="/host/live"
+          href={sessionCode
+            ? `/host/live?sessionCode=${encodeURIComponent(sessionCode)}`
+            : "/host/live"}
           aria-current="page">Live View</a
         >
         <a
@@ -195,7 +328,7 @@
             : liveView.type === "quick-vote"
               ? "Quick Vote"
               : "Motion"} // Voting Style:
-          {page.url.searchParams.get("style") ?? liveView.votingStyle}
+          {votingStyleLabel}
         </p>
 
         <div class="mt-[clamp(12px,1.042vw,20px)] h-0.5 bg-grey-100"></div>
@@ -255,26 +388,31 @@
           <button
             class="h-[clamp(36px,2.604vw,50px)] w-[clamp(140px,10.417vw,200px)] cursor-pointer rounded-[100px] border border-red-500 bg-white font-sans text-[clamp(13px,0.938vw,18px)] font-medium text-red-500 disabled:cursor-not-allowed disabled:border-red-200 disabled:bg-red-200 disabled:text-white"
             type="button"
-            disabled={instanceEnded}
+            disabled={instanceEnded || endingMotion}
             onclick={() => (endDialogOpen = true)}
           >
-            {instanceEnded ? "Ended" : "End now"}
+            {instanceEnded ? "Ended" : endingMotion ? "Ending..." : "End now"}
           </button>
           <button
-            class="h-[clamp(36px,2.604vw,50px)] w-[clamp(180px,14.583vw,280px)] cursor-pointer rounded-[100px] border font-sans text-[clamp(13px,0.938vw,18px)] font-medium text-white disabled:cursor-not-allowed disabled:border-red-200 disabled:bg-red-200 disabled:text-white"
-            class:border-red-600={!resultsShared}
-            class:bg-red-600={!resultsShared}
-            class:border-slate-700={resultsShared}
-            class:bg-slate-700={resultsShared}
+            class="h-[clamp(36px,2.604vw,50px)] w-[clamp(180px,14.583vw,280px)] cursor-not-allowed rounded-[100px] border font-sans text-[clamp(13px,0.938vw,18px)] font-medium text-white disabled:border-red-200 disabled:bg-red-200 disabled:text-white"
+            class:border-slate-700={liveResultsVisibleToParticipants}
+            class:bg-slate-700={liveResultsVisibleToParticipants}
+            class:border-red-600={!liveResultsVisibleToParticipants}
+            class:bg-red-600={!liveResultsVisibleToParticipants}
             type="button"
-            disabled={instanceEnded}
-            aria-pressed={resultsShared}
-            onclick={() => (sharingDialogOpen = true)}
+            disabled
+            aria-pressed={liveResultsVisibleToParticipants}
+            title="Participant visibility is set when the motion is created and cannot be changed while it is active."
           >
-            {resultsShared ? "Unshare live results" : "Share live results"}
+            {liveResultsStatusLabel}
           </button>
         </div>
       </article>
+      {#if liveError}
+        <p class="m-0 mt-3 text-sm font-semibold text-red-700" role="alert">
+          {liveError}
+        </p>
+      {/if}
       {#if sessionError}
         <p class="m-0 mt-3 text-sm font-semibold text-red-700" role="alert">
           {sessionError}
@@ -288,7 +426,7 @@
 {#if endDialogOpen}
   <EndVotingInstanceDialog
     onclose={() => (endDialogOpen = false)}
-    onconfirm={confirmEnd}
+    onconfirm={() => void confirmEnd()}
   />
 {/if}
 
@@ -296,17 +434,10 @@
   <HostFinalResultsDialog
     options={liveView.options}
     totalVotes={liveView.votesSubmitted}
-    shared={resultsShared}
+    shared={true}
+    shareDisabled={true}
     onconfirm={confirmFinalResult}
-    ontoggleshare={() => (resultsShared = !resultsShared)}
-  />
-{/if}
-
-{#if sharingDialogOpen}
-  <ConfirmLiveResultsSharingDialog
-    currentlyShared={resultsShared}
-    onclose={() => (sharingDialogOpen = false)}
-    onconfirm={confirmLiveResultsSharing}
+    ontoggleshare={() => {}}
   />
 {/if}
 

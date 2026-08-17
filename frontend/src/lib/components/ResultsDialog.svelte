@@ -40,10 +40,10 @@
 
 <section
   class={[
-    "results-dialog max-h-[calc(100svh-40px)] w-[min(calc(100%-32px),1200px)] overflow-y-auto rounded-[10px] bg-white px-[clamp(20px,4vw,170px)] pt-[clamp(32px,5vw,78px)] pb-[45px] text-grey-900",
+    "results-dialog max-h-[calc(100svh-40px)] w-[min(calc(100%-32px),1200px)] overflow-y-auto rounded-lg bg-white px-[clamp(20px,4vw,170px)] pt-[clamp(32px,5vw,78px)] pb-11 text-grey-900",
     final ? "border-2 border-red-400" : "border border-grey-400",
     initiallyExpanded
-      ? "sm:min-h-[min(815px,calc(100svh-40px))] sm:pt-[50px]"
+      ? "sm:min-h-[min(815px,calc(100svh-40px))] sm:pt-13"
       : final
         ? "sm:min-h-[min(630px,calc(100svh-40px))]"
         : "sm:min-h-[min(500px,calc(100svh-40px))]",
@@ -52,20 +52,20 @@
 >
   <header class="text-center">
     <h1
-      class="m-0 text-[clamp(24px,4.5vw,45px)] leading-[1.24] font-semibold"
+      class="text-[clamp(24px,4.5vw,45px)] leading-[1.24] font-semibold"
       id="results-title"
     >
       {heading}
     </h1>
     <p
-      class="mx-0 mt-2.5 mb-0 text-[clamp(14px,2vw,20px)] leading-[1.4] font-medium"
+      class="mx-0 mt-3 mb-0 text-[clamp(14px,2vw,20px)] leading-[1.4] font-medium"
     >
       {countLabel}: {count}
     </p>
   </header>
 
   <div
-    class="mx-auto mt-[clamp(30px,4vw,35px)] flex w-[min(100%,859px)] flex-col gap-[30px]"
+    class="mx-auto mt-[clamp(30px,4vw,35px)] flex w-[min(100%,859px)] flex-col gap-8"
   >
     {#each options as option (option.id)}
       <article>
@@ -81,7 +81,7 @@
         </div>
 
         <div
-          class="h-2 w-full overflow-hidden rounded-[30px] bg-grey-200"
+          class="h-2 w-full overflow-hidden rounded-4xl bg-grey-200"
           aria-label={`${option.label}: ${percentageFor(option)}%`}
         >
           <span
@@ -96,17 +96,17 @@
         </div>
 
         {#if option.voters}
-          <div class="mt-[5px] bg-grey-50 px-0 pt-2.5 pb-0">
+          <div class="mt-1 bg-grey-50 px-0 pt-3 pb-0">
             <div
               class={[
-                "grid grid-cols-[repeat(auto-fit,minmax(76px,max-content))] gap-x-2.5 gap-y-[5px] overflow-hidden sm:grid-cols-8 sm:gap-x-[15px]",
-                isExpanded(option.id) ? "max-h-none" : "max-h-[52px]",
+                "grid grid-cols-[repeat(auto-fit,minmax(76px,max-content))] gap-x-3 gap-y-1 overflow-hidden sm:grid-cols-8 sm:gap-x-4",
+                isExpanded(option.id) ? "max-h-none" : "max-h-13",
               ]}
               id={`voters-${option.id}`}
             >
               {#each isExpanded(option.id) ? option.voters : option.voters.slice(0, 16) as voter, voterIndex (`${voter}-${voterIndex}`)}
                 <span
-                  class="inline-flex min-h-6 items-center justify-center whitespace-nowrap rounded border border-grey-200 bg-white px-2 py-0.5 text-[11px] leading-[18px] font-semibold sm:text-xs"
+                  class="inline-flex min-h-6 items-center justify-center whitespace-nowrap rounded border border-grey-200 bg-white px-2 py-1 text-xs leading-5 font-semibold"
                   >{voter}</span
                 >
               {/each}
@@ -114,7 +114,7 @@
 
             {#if option.voters.length > 16}
               <button
-                class="flex min-h-[34px] w-full cursor-pointer items-center justify-end gap-2 border-0 bg-transparent pt-1 pr-0 pb-0 pl-0 font-sans text-sm font-medium text-slate-600 focus-visible:[outline:3px_solid_color-mix(in_srgb,var(--color-red-600),transparent_72%)] focus-visible:outline-offset-2 sm:text-lg sm:leading-[26px]"
+                class="flex min-h-9 w-full cursor-pointer items-center justify-end gap-2 bg-transparent pt-1 pr-0 pb-0 pl-0 text-sm font-medium text-slate-600 focus-visible:[outline:3px_solid_color-mix(in_srgb,var(--color-red-600),transparent_72%)] focus-visible:outline-offset-2 sm:text-lg sm:leading-7"
                 type="button"
                 aria-expanded={isExpanded(option.id)}
                 aria-controls={`voters-${option.id}`}
@@ -123,7 +123,7 @@
                 {isExpanded(option.id) ? "View Less" : "View All"}
                 <ChevronDown
                   class={[
-                    "h-5 w-4 text-slate-600 transition-transform duration-160 ease-[ease] motion-reduce:transition-none sm:h-[26px] sm:w-5",
+                    "h-5 w-4 text-slate-600 transition-transform duration-160 ease-[ease] motion-reduce:transition-none sm:h-7 sm:w-5",
                     isExpanded(option.id) && "rotate-180",
                   ]}
                   aria-hidden="true"

@@ -1,4 +1,5 @@
 import { apiUrl } from "$lib/api/base";
+import { ApiRequestError, isRecord, parseError, readJsonUnknown } from "$lib/api/response";
 
 export type CreateMotionRequest = {
   name: string;
@@ -40,30 +41,10 @@ export type MotionExportResponse = {
   totals: MotionResults;
 };
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-async function readJsonUnknown(response: Response): Promise<unknown> {
-  const text = await response.text();
-  if (text.trim() === "") {
-    return null;
-  }
-  return JSON.parse(text) as unknown;
-}
-
-async function parseError(response: Response): Promise<string> {
-  try {
-    const payload = await readJsonUnknown(response);
-    if (isRecord(payload) && typeof payload.error === "string" && payload.error.trim() !== "") {
-      return payload.error;
-    }
-  } catch {
-    // no-op
-  }
-
-  return `Request failed (${response.status})`;
-}
+export type EndMotionResponse = {
+  id: number;
+  status: string;
+};
 
 function parseCreateMotionResponse(payload: unknown): CreateMotionResponse {
   if (
@@ -73,7 +54,7 @@ function parseCreateMotionResponse(payload: unknown): CreateMotionResponse {
     typeof payload.status !== "string" ||
     typeof payload.start_time !== "string"
   ) {
-    throw new Error("Invalid create motion response");
+    throw new TypeError("Invalid create motion response");
   }
 
   return {
@@ -86,7 +67,7 @@ function parseCreateMotionResponse(payload: unknown): CreateMotionResponse {
 
 function parseCheckMotionResponse(payload: unknown): CheckMotionResponse {
   if (!isRecord(payload)) {
-    throw new Error("Invalid check motion response");
+    throw new TypeError("Invalid check motion response");
   }
 
   const activeMotion = payload.active_motion;
@@ -100,7 +81,7 @@ function parseCheckMotionResponse(payload: unknown): CheckMotionResponse {
     typeof activeMotion.name !== "string" ||
     !isRecord(activeMotion.data)
   ) {
-    throw new Error("Invalid active motion payload");
+    throw new TypeError("Invalid active motion payload");
   }
 
   return {
@@ -112,33 +93,50 @@ function parseCheckMotionResponse(payload: unknown): CheckMotionResponse {
   };
 }
 
-function parseMotionExportResponse(payload: unknown): MotionExportResponse {
-  if (
-    !isRecord(payload) ||
-    typeof payload.motion_id !== "number" ||
-    typeof payload.motion_name !== "string" ||
-    !isRecord(payload.totals) ||
-    typeof payload.totals.total !== "number" ||
-    !Array.isArray(payload.totals.options)
-  ) {
-    throw new Error("Invalid motion export response");
+export function parseMotionResults(payload: unknown): MotionResults {
+  if (!isRecord(payload) || typeof payload.total !== "number" || !Array.isArray(payload.options)) {
+    throw new TypeError("Invalid motion results response");
   }
 
   const options: MotionOptionResult[] = [];
-  for (const option of payload.totals.options) {
+  for (const option of payload.options) {
     if (!isRecord(option) || typeof option.label !== "string" || typeof option.count !== "number") {
-      throw new Error("Invalid motion export totals");
+      throw new TypeError("Invalid motion results option");
     }
     options.push({ label: option.label, count: option.count });
   }
 
   return {
+    total: payload.total,
+    options,
+  };
+}
+
+function parseMotionExportResponse(payload: unknown): MotionExportResponse {
+  if (
+    !isRecord(payload) ||
+    typeof payload.motion_id !== "number" ||
+    typeof payload.motion_name !== "string" ||
+    !isRecord(payload.totals)
+  ) {
+    throw new TypeError("Invalid motion export response");
+  }
+
+  return {
     motion_id: payload.motion_id,
     motion_name: payload.motion_name,
-    totals: {
-      total: payload.totals.total,
-      options,
-    },
+    totals: parseMotionResults(payload.totals),
+  };
+}
+
+function parseEndMotionResponse(payload: unknown): EndMotionResponse {
+  if (!isRecord(payload) || typeof payload.id !== "number" || typeof payload.status !== "string") {
+    throw new TypeError("Invalid end motion response");
+  }
+
+  return {
+    id: payload.id,
+    status: payload.status,
   };
 }
 
@@ -153,7 +151,7 @@ export async function createMotion(request: CreateMotionRequest): Promise<Create
   });
 
   if (!response.ok) {
-    throw new Error(await parseError(response));
+    throw new ApiRequestError(response.status, await parseError(response));
   }
 
   const payload = await readJsonUnknown(response);
@@ -167,7 +165,7 @@ export async function checkMotion(): Promise<CheckMotionResponse> {
   });
 
   if (!response.ok) {
-    throw new Error(await parseError(response));
+    throw new ApiRequestError(response.status, await parseError(response));
   }
 
   const payload = await readJsonUnknown(response);
@@ -181,9 +179,23 @@ export async function exportMotionResults(): Promise<MotionExportResponse> {
   });
 
   if (!response.ok) {
-    throw new Error(await parseError(response));
+    throw new ApiRequestError(response.status, await parseError(response));
   }
 
   const payload = await readJsonUnknown(response);
   return parseMotionExportResponse(payload);
+}
+
+export async function endMotion(): Promise<EndMotionResponse> {
+  const response = await fetch(apiUrl("/motions/end"), {
+    method: "POST",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    throw new ApiRequestError(response.status, await parseError(response));
+  }
+
+  const payload = await readJsonUnknown(response);
+  return parseEndMotionResponse(payload);
 }

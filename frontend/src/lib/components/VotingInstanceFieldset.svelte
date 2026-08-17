@@ -28,7 +28,7 @@
 
 <fieldset
   class={[
-    "m-0 min-h-[220px] min-w-0 rounded-[10px] border border-grey-400 bg-white px-5 pt-[22px] pb-6 sm:px-[clamp(32px,2.24vw,43px)]",
+    "min-h-55 min-w-0 rounded-lg border border-grey-400 bg-white px-5 pt-6 pb-6 sm:px-[clamp(32px,2.24vw,43px)]",
     quickVote
       ? "sm:min-h-[clamp(190px,10.938vw,210px)] sm:py-[clamp(20px,1.563vw,30px)]"
       : compact
@@ -51,15 +51,15 @@
   </div>
 
   <div
-    class="mx-auto mt-[22px] flex w-[min(100%,300px)] flex-col gap-[7px] sm:mt-[clamp(24px,1.41vw,27px)] sm:w-[min(100%,431px)]"
+    class="mx-auto mt-6 flex w-[min(100%,300px)] flex-col gap-2 sm:mt-[clamp(24px,1.41vw,27px)] sm:w-[min(100%,431px)]"
   >
     {#each choices as choice (choice.id)}
       <label
         class={[
-          "relative flex min-h-[42px] cursor-pointer items-center gap-2 rounded-lg text-sm leading-5 font-medium text-slate-900 hover:border-red-400 sm:min-h-[50px] sm:rounded-[10px] sm:text-lg sm:leading-[26px]",
+          "relative flex min-h-11 cursor-pointer items-center gap-2 rounded-lg text-sm leading-5 font-medium text-slate-900 hover:border-red-400 sm:min-h-13 sm:rounded-lg sm:text-lg sm:leading-7",
           selectedChoiceId === choice.id
-            ? "border-2 border-red-400 bg-red-50 px-[13px] py-2 sm:py-2.5"
-            : "border border-slate-900 bg-white px-3.5 py-[9px] sm:py-[11px]",
+            ? "border-2 border-red-400 bg-red-50 px-3 py-2 sm:py-3"
+            : "border border-slate-900 bg-white px-4 py-2 sm:py-3",
         ]}
       >
         <input
@@ -72,12 +72,12 @@
         />
         {#if selectedChoiceId === choice.id}
           <CircleDot
-            class="block size-3.5 flex-none text-red-500 peer-focus-visible:[outline:3px_solid_color-mix(in_srgb,var(--color-red-600),transparent_72%)] peer-focus-visible:outline-offset-[3px] sm:size-[18px]"
+            class="block size-4 flex-none text-red-500 peer-focus-visible:[outline:3px_solid_color-mix(in_srgb,var(--color-red-600),transparent_72%)] peer-focus-visible:outline-offset-3 sm:size-5"
             aria-hidden="true"
           />
         {:else}
           <Circle
-            class="block size-3.5 flex-none text-slate-900 peer-focus-visible:[outline:3px_solid_color-mix(in_srgb,var(--color-red-600),transparent_72%)] peer-focus-visible:outline-offset-[3px] sm:size-[18px]"
+            class="block size-4 flex-none text-slate-900 peer-focus-visible:[outline:3px_solid_color-mix(in_srgb,var(--color-red-600),transparent_72%)] peer-focus-visible:outline-offset-3 sm:size-5"
             aria-hidden="true"
           />
         {/if}

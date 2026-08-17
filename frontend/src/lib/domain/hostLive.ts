@@ -91,3 +91,73 @@ export function createHostLiveView(searchParams: URLSearchParams): HostLiveViewM
     })),
   };
 }
+
+export type HostLiveApiResults = {
+  total: number;
+  options: Array<{ label: string; count: number }>;
+};
+
+export type HostLiveFromApiInput = {
+  title: string;
+  type?: HostLiveVoteType;
+  votingStyle?: HostLiveViewModel["votingStyle"];
+  results: HostLiveApiResults;
+  eligibleVotes: number;
+  optionLabels?: string[];
+};
+
+function mapHostLiveOptions(
+  results: HostLiveApiResults,
+  optionLabels: string[] | undefined,
+): HostLiveOption[] {
+  const labels =
+    results.options.length > 0
+      ? results.options.map((option) => option.label)
+      : (optionLabels ?? []);
+  const countByLabel = new Map(results.options.map((option) => [option.label, option.count]));
+  const votesSubmitted = results.total;
+
+  return labels.map((label, index) => {
+    const votes = countByLabel.get(label) ?? 0;
+    return {
+      id: `option-${index + 1}`,
+      label,
+      votes,
+      color: resultColorForIndex(index),
+      percentage: calculatePercentage(votes, votesSubmitted),
+    };
+  });
+}
+
+export function hostLiveViewFromApi(input: HostLiveFromApiInput): HostLiveViewModel {
+  const type = input.type ?? "motion";
+  const options = mapHostLiveOptions(input.results, input.optionLabels);
+  const votesSubmitted =
+    input.results.total > 0
+      ? input.results.total
+      : options.reduce((total, option) => total + option.votes, 0);
+
+  return {
+    title: input.title.trim() === "" ? defaultTitleForType(type) : input.title.trim(),
+    type,
+    votingStyle: input.votingStyle ?? (type === "election" ? "Secret Ballot" : "Standard"),
+    eligibleVotes: Math.max(votesSubmitted, input.eligibleVotes),
+    votesSubmitted,
+    options,
+  };
+}
+
+export function updateHostLiveViewFromResults(
+  current: HostLiveViewModel,
+  results: HostLiveApiResults,
+  eligibleVotes?: number,
+): HostLiveViewModel {
+  return hostLiveViewFromApi({
+    title: current.title,
+    type: current.type,
+    votingStyle: current.votingStyle,
+    results,
+    eligibleVotes: eligibleVotes ?? current.eligibleVotes,
+    optionLabels: current.options.map((option) => option.label),
+  });
+}
