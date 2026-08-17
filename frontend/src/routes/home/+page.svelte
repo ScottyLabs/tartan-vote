@@ -15,6 +15,7 @@
 
   let sessionCode = $state(page.url.searchParams.get("sessionCode")?.trim() || "");
   let checkingAuth = $state(true);
+  let authLoadError = $state("");
   let userName = $state<string | null>(null);
   let userAndrewId = $state<string | null>(null);
   let sessionActionError = $state("");
@@ -40,21 +41,27 @@
     return hasActiveParticipatingSession ? "Resume session" : "Join session";
   });
 
-  onMount(() => {
-    void fetchAuthStatus()
-      .then((status) => {
-        if (!status.logged_in) {
-          void goto("/", { replaceState: true });
-          return;
-        }
-        userName = status.user_name;
-        userAndrewId = status.user_andrew_id;
-        checkingAuth = false;
-        void syncSessionState();
-      })
-      .catch(() => {
+  async function loadAuthAndSessionState() {
+    authLoadError = "";
+    try {
+      const status = await fetchAuthStatus();
+      if (!status.logged_in) {
         void goto("/", { replaceState: true });
-      });
+        return;
+      }
+      userName = status.user_name;
+      userAndrewId = status.user_andrew_id;
+      checkingAuth = false;
+      await syncSessionState();
+    } catch {
+      checkingAuth = false;
+      authLoadError =
+        "Unable to reach the server. Check that the backend is running, then retry.";
+    }
+  }
+
+  onMount(() => {
+    void loadAuthAndSessionState();
   });
 
   function signOut() {
@@ -111,6 +118,11 @@
     window.location.href = `/${destination}?${searchParams.toString()}`;
   }
 
+  async function resumeParticipatingSession(sessionCodeToOpen: string): Promise<void> {
+    await joinSessionRequest(sessionCodeToOpen);
+    redirectToParticipatingSession(sessionCodeToOpen, "waiting");
+  }
+
   async function createSession() {
     if (creatingSession || joiningSession) return;
     sessionActionError = "";
@@ -157,10 +169,7 @@
           normalizedSessionCode === "" ||
           normalizedSessionCode === activeParticipatingSessionCode
         ) {
-          redirectToParticipatingSession(
-            activeParticipatingSessionCode,
-            "waiting",
-          );
+          await resumeParticipatingSession(activeParticipatingSessionCode);
           return;
         }
 
@@ -177,8 +186,35 @@
       await joinSessionRequest(normalizedSessionCode);
       redirectToParticipatingSession(normalizedSessionCode, "proxy");
     } catch (error) {
-      sessionActionError =
+      const message =
         error instanceof Error ? error.message : "Failed to join session.";
+
+      if (/already participating/iu.test(message)) {
+        await syncSessionState();
+        if (hasActiveParticipatingSession) {
+          if (
+            normalizedSessionCode === "" ||
+            normalizedSessionCode === activeParticipatingSessionCode
+          ) {
+            try {
+              await resumeParticipatingSession(activeParticipatingSessionCode);
+              return;
+            } catch (resumeError) {
+              sessionActionError =
+                resumeError instanceof Error
+                  ? resumeError.message
+                  : "Failed to resume session.";
+              return;
+            }
+          }
+          sessionActionError =
+            `You're already in session ${activeParticipatingSessionCode}. ` +
+            "Resume it before joining another.";
+          return;
+        }
+      }
+
+      sessionActionError = message;
     } finally {
       joiningSession = false;
     }
@@ -257,6 +293,24 @@
       </p>
     </div>
 
+    {#if authLoadError}
+      <div
+        class="flex w-[350px] flex-col items-center gap-3 rounded-[4.25px] border border-red-200 bg-white px-4 py-4 max-[374px]:w-[calc(100%-28px)] sm:w-[min(calc(100vw-48px),700px)]"
+        role="alert"
+      >
+        <p class="m-0 text-center text-sm font-semibold text-red-700">{authLoadError}</p>
+        <button
+          class="inline-flex h-9 cursor-pointer items-center justify-center rounded-full border-0 bg-red-600 px-4 text-[13px] font-medium text-white hover:bg-red-700"
+          type="button"
+          onclick={() => {
+            checkingAuth = true;
+            void loadAuthAndSessionState();
+          }}
+        >
+          Retry
+        </button>
+      </div>
+    {:else}
     <section
       class="flex h-[252px] w-[350px] flex-col items-center rounded-[4.25px] border border-grey-200 bg-white px-3 py-5 max-[374px]:w-[calc(100%-28px)] sm:h-[clamp(310px,26.6vw,510px)] sm:w-[min(calc(100vw-48px),700px)] sm:px-[clamp(24px,3.9vw,75px)] sm:py-[clamp(28px,2.5vw,48px)]"
       aria-label="Session actions"
@@ -327,6 +381,7 @@
         </p>
       {/if}
     </section>
+    {/if}
   </section>
 
   <AppFooter wide />

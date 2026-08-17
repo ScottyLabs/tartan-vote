@@ -145,8 +145,8 @@ pub async fn status_session(user: SyncedUser, State(state): State<AppState>) -> 
         ("session_code" = String, Path, description = "Session join code")
     ),
     responses(
-        (status = 200, description = "Joined the session (or already joined)"),
-        (status = 403, description = "Session is not open"),
+        (status = 200, description = "Joined the session (or already joined, including when locked)"),
+        (status = 403, description = "Session is not open for new joins"),
         (status = 404, description = "Session not found"),
         (status = 409, description = "Caller is already participating in another active session"),
     )
@@ -163,14 +163,6 @@ pub async fn join_session(
         Ok(None) => return (StatusCode::NOT_FOUND).into_response(),
         Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR).into_response(),
     };
-
-    if session.status != SessionStatus::Open {
-        return (
-            StatusCode::FORBIDDEN,
-            Json(json!({"error": "Session is not open"})),
-        )
-            .into_response();
-    }
 
     match store
         .user_sessions()
@@ -189,6 +181,14 @@ pub async fn join_session(
         }
         Ok(None) => {}
         Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR).into_response(),
+    }
+
+    if session.status != SessionStatus::Open {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({"error": "Session is not open"})),
+        )
+            .into_response();
     }
 
     let new_user_session = user_session::ActiveModel {
@@ -721,6 +721,25 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn join_session_is_idempotent_when_already_joined_locked() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results([vec![make_session(1, "ABC123", SessionStatus::Locked, 99)]])
+            .append_query_results([vec![make_user_session(10, 1, 1, None)]])
+            .append_query_results([vec![make_session(1, "ABC123", SessionStatus::Locked, 99)]])
+            .into_connection();
+
+        let response = join_session(
+            test_user(1),
+            State(make_state(db)),
+            Path("ABC123".to_string()),
+        )
+        .await
+        .into_response();
+
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
     async fn join_session_rejects_when_participating_elsewhere() {
         let db = MockDatabase::new(DatabaseBackend::Postgres)
             .append_query_results([vec![make_session(2, "XYZ789", SessionStatus::Open, 99)]])
@@ -743,6 +762,25 @@ mod tests {
     async fn join_session_rejects_closed_session() {
         let db = MockDatabase::new(DatabaseBackend::Postgres)
             .append_query_results([vec![make_session(1, "ABC123", SessionStatus::Closed, 99)]])
+            .append_query_results([vec![] as Vec<user_session::Model>])
+            .into_connection();
+
+        let response = join_session(
+            test_user(1),
+            State(make_state(db)),
+            Path("ABC123".to_string()),
+        )
+        .await
+        .into_response();
+
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[tokio::test]
+    async fn join_session_rejects_new_join_when_locked() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results([vec![make_session(1, "ABC123", SessionStatus::Locked, 99)]])
+            .append_query_results([vec![] as Vec<user_session::Model>])
             .into_connection();
 
         let response = join_session(

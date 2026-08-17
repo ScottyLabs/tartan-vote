@@ -6,6 +6,7 @@
   import { apiUrl } from "$lib/api/base";
   import { checkMotion } from "$lib/api/motion";
   import { getVoteInstances } from "$lib/api/votes";
+  import { participantVisibilityFromMotionData } from "$lib/domain/ballot";
   import AppFooter from "$lib/components/AppFooter.svelte";
   import VoterHeader from "$lib/components/VoterHeader.svelte";
 
@@ -32,7 +33,11 @@
   let pollError = $state("");
   let checkingMotion = $state(true);
   let votedWaitingForHost = $state(false);
+  let noVoteInstances = $state(false);
   let activeMotionName = $state("");
+  let activeMotionVisibility = $state<"live" | "hidden_until_release" | null>(
+    null,
+  );
 
   function ballotHref(): string {
     const params = new URLSearchParams();
@@ -46,11 +51,14 @@
     return query ? `/ballot?${query}` : "/ballot";
   }
 
-  function resultsHref(): string {
+  function resultsHref(
+    visibility: "live" | "hidden_until_release" | null = "hidden_until_release",
+  ): string {
+    const isLive = visibility === "live";
     const params = new URLSearchParams({
-      variant: "secret-final",
-      type: "secret",
-      phase: "final",
+      variant: isLive ? "live" : "secret-final",
+      type: isLive ? "standard" : "secret",
+      phase: isLive ? "live" : "final",
     });
     const code = page.url.searchParams.get("sessionCode")?.trim();
     if (code) params.set("sessionCode", code);
@@ -78,28 +86,38 @@
 
         if (!active_motion) {
           const wasVotedWaiting = votedWaitingForHost;
+          const endedVisibility = activeMotionVisibility;
           votedWaitingForHost = false;
+          noVoteInstances = false;
           activeMotionName = "";
+          activeMotionVisibility = null;
           if (wasVotedWaiting) {
-            window.location.href = resultsHref();
+            window.location.href = resultsHref(endedVisibility);
             return;
           }
         } else {
           activeMotionName = active_motion.name;
+          activeMotionVisibility = participantVisibilityFromMotionData(
+            active_motion.data,
+          );
           const voteInstances = await getVoteInstances();
           if (cancelled) return;
 
-          const hasPendingVote =
-            voteInstances.length === 0 ||
-            voteInstances.some((instance) => !instance.has_voted);
-
-          if (hasPendingVote) {
+          if (voteInstances.length === 0) {
+            votedWaitingForHost = false;
+            noVoteInstances = true;
+          } else if (voteInstances.some((instance) => !instance.has_voted)) {
+            noVoteInstances = false;
             votedWaitingForHost = false;
             window.location.href = ballotHref();
             return;
+          } else if (activeMotionVisibility === "live") {
+            window.location.href = resultsHref("live");
+            return;
+          } else {
+            noVoteInstances = false;
+            votedWaitingForHost = true;
           }
-
-          votedWaitingForHost = true;
         }
       } catch (error) {
         if (cancelled) return;
@@ -270,6 +288,13 @@
           <strong class="font-bold text-red-500">Status:</strong> Voted, waiting
           for host
         </p>
+      {:else if noVoteInstances}
+        <p
+          class="mt-5 w-[325px] text-sm leading-5 font-medium text-slate-800 sm:text-[clamp(18px,1.25vw,24px)] sm:leading-[clamp(26px,1.67vw,32px)]"
+        >
+          <strong class="font-bold text-red-500">Status:</strong> No voting
+          instances for this motion
+        </p>
       {/if}
     </section>
 
@@ -303,6 +328,14 @@
         aria-live="polite"
       >
         Waiting for the host to end this motion and release results...
+      </p>
+    {:else if noVoteInstances}
+      <p
+        class="m-0 text-[13px] leading-5 font-medium text-grey-600 sm:text-[clamp(16px,1.04vw,20px)]"
+        aria-live="polite"
+      >
+        A motion is active, but you don't have any vote instances. Stay here or
+        rejoin from Home if needed.
       </p>
     {/if}
   </section>
