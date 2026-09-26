@@ -9,6 +9,6 @@
     "build": "vite build",
     "build:watch": "vite build --watch",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.svelte.json",
-    "generate-api": "openapi-typescript http://localhost:8080/api/openapi.json -o src/lib/api/schema.d.ts"
+    "generate-api": "openapi-typescript http://localhost:$PORT/api/openapi.json -o src/lib/api/schema.d.ts"
   }
 }

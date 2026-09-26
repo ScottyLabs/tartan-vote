@@ -1,9 +1,9 @@
 import adapter from "@sveltejs/adapter-static";
 import tailwindcss from "@tailwindcss/vite";
 import { sveltekit } from "@sveltejs/kit/vite";
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [
     tailwindcss(),
     sveltekit({
@@ -30,7 +30,8 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      "/api": "http://localhost:8080",
+      // Empty prefix loads unprefixed vars too, so PORT from devenv is visible.
+      "/api": `http://localhost:${loadEnv(mode, ".", "").PORT ?? "8080"}`,
     },
   },
-});
+}));
