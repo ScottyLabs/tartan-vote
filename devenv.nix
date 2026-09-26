@@ -5,6 +5,9 @@
   ...
 }:
 
+let
+  port = "8080";
+in
 {
   imports = [ inputs.scottylabs.devenvModules.default ];
 
@@ -27,7 +30,7 @@
 
     ricochet = {
       enable = true;
-      appUrl = "http://localhost:8080";
+      appUrl = "http://localhost:${port}";
     };
     kennel = {
       services.tartan-vote.customDomain = "tartan.vote";
@@ -39,6 +42,8 @@
   languages.rust.cranelift.enable = lib.mkIf pkgs.stdenv.isDarwin (lib.mkForce false);
 
   packages = [ pkgs.git ];
+
+  env.PORT = port;
 
   # Built SPA served by the backend (run `deno task build` in frontend/ first).
   env.STATIC_DIR = "frontend/dist";
