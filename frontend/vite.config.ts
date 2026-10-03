@@ -16,6 +16,13 @@ export default defineConfig({
       adapter: adapter({ pages: "dist", assets: "dist", fallback: "index.html" }),
     }),
   ],
+  build: {
+    rolldownOptions: {
+      watch: {
+        exclude: ["**/.svelte-kit/**", "**/dist/**", "**/*.timestamp-*.mjs"],
+      },
+    },
+  },
   // Bundle SSR deps so Deno's postbuild analyse worker does not need every
   // transitive package listed as a direct dependency of this project.
   ssr: {
