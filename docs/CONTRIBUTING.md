@@ -2,28 +2,48 @@
 
 Thanks for your interest in contributing to Tartan Vote!
 
-Before contributing to this repository, please discuss the change you wish to make via issue on this repository, email to one of the codeowners, or on the ScottyLabs [discord](go.scottylabs.org/discord).
+Before contributing to this repository, please discuss the change you wish to
+make via issue on this repository, email to one of the codeowners, or on the
+ScottyLabs [discord](https://go.scottylabs.org/discord).
 
 ## How Can I Contribute?
 
 For now, please just refer to the communication channels listed above. As this project matures, we will establish a more well-formed contributing structure.
 
+<!--
+TODO: docs don't exist for most the project yet
+
 ## Documentation
 
-When making a change, it would be wonderful if you could update the corresponding documentation. If you cannot or are unsure how to, please leave an issue or let [Yiyoung Liu](github.com/maybe-yiyi) know so that the documentation does not lag behind. If the documentation does not exist, don't worry about it! (or write the documentation yourself, that would be greatly appreciated.)
+When making a change, it would be wonderful if you could update the
+corresponding documentation. If you cannot or are unsure how to, please leave
+an issue or let [Yiyoung Liu](https://github.com/maybe-yiyi) know so that the
+documentation does not lag behind. If the documentation does not exist, don't
+worry about it! (or write the documentation yourself, that would be greatly
+appreciated.)
+
+-->
 
 ## Pull Requests
 
-Direct pushes to main are blocked. You should create a branch (if you are a contributor in ScottyLabs) or fork the repository, make your changes, then create a PR to main.
+Direct pushes to main are blocked. You should create a branch, make your changes, then create a PR to main.
 
 ## Style Guide
 
-- All Rust code should be formatted using `cargo fmt` and linted with `cargo clippy`. The CI/CD will check that all PR'ed code passes `cargo fmt` and `cargo clippy`.
-- All Svelte code should be checked with `deno task check`. The CI/CD will automatically check this too.
+- All Rust code should be formatted using `cargo fmt` and linted with `cargo clippy`. The CI/CD and pre-commit checks will check that all PR'ed code passes
+  `cargo fmt` and `cargo clippy`.
+- All Svelte code should be checked with `deno task check`. The CI/CD and
+  pre-commit checks will automatically check this too.
 
 ### Commit Guidelines
 
-I am a firm believer in the [kernel commit style](https://docs.kernel.org/process/submitting-patches.html). Not all of the sections in that document are useful, such as the fact that we do not mail patches (unfortunately), but most of the pieces of advice are helpful nonetheless. Good commit habits reflect on the developer. Being able to clearly reflect upon your changes and describe the impact of them means you are able to reason about your code and about why you are making the changes you are.
+I am a firm believer in the [kernel commit
+style](https://docs.kernel.org/process/submitting-patches.html). Not all of the
+sections in that document are useful, such as the fact that we do not mail
+patches (unfortunately), but most of the pieces of advice are helpful
+nonetheless. Good commit habits reflect on the developer. Being able to clearly
+reflect upon your changes and describe the impact of them means you are able to
+reason about your code and about why you are making the changes you are.
 
 #### Commit Subjects
 

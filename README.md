@@ -16,25 +16,23 @@ Hello, reader! For the remainder of this README, and other documentation, we wil
 
 ### Prerequisites
 
+- You are added to the Tartan-Vote team on [governance](https://git.cmu.dev/ScottyLabs/governance)
 - [devenv](https://devenv.sh/getting-started/) provides Cargo, Deno, Node, PostgreSQL, and other tooling via Nix
-- [direnv](https://direnv.net/) (recommended)
 
 ### Quick Setup
 
-For detailed setup instructions, see [SETUP.md](docs/SETUP.md). Configuration and
-secrets are documented in [secrets-and-config.md](docs/secrets-and-config.md).
+For detailed setup instructions, see [SETUP.md](docs/SETUP.md).
 
 Authenticate once per machine with OpenBao so secretspec can read dev secrets:
 
 ```bash
-export BAO_ADDR=https://secrets2.scottylabs.org
-bao login -method=oidc
+nix run git+https://git.cmu.dev/ScottyLabs/kennel#login
 ```
 
-Allow direnv (or enter the shell manually):
+Allow devenv (or enter the shell manually):
 
 ```bash
-direnv allow
+devenv allow
 # or: devenv shell
 ```
 
@@ -44,15 +42,18 @@ Run the app (inside the devenv shell, from the repo root):
 devenv up
 # add --detach or -d to run it in the background
 # devenv processes down to shut it down
+
+# in a separate terminal if you didn't add -d
 cd frontend && deno task build
+
 cargo run
 ```
 
-Then open http://localhost:8080. Inside the devenv shell, `DATABASE_URL` and secrets are provided automatically.
+Then open http://localhost:8080.
 
 ### Deployment
 
-Production runs on [Kennel](https://codeberg.org/ScottyLabs/kennel) via devenv and secretspec.
+Production runs on [Kennel](https://git.cmu.dev/ScottyLabs/kennel) via devenv and secretspec.
 
 ### Contributing
 
