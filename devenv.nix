@@ -14,7 +14,10 @@
     conventionalCommits.enable = false;
 
     rust.enable = true;
-    deno.enable = true;
+    deno = {
+      enable = true;
+      dirs = [ "frontend" ];
+    };
     postgres.enable = true;
     valkey.enable = true;
 
