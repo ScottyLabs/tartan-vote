@@ -6,7 +6,8 @@
 }:
 
 let
-  port = "8080";
+  # .env.shared is the single source of truth for the port.
+  port = lib.removePrefix "PORT=" (lib.removeSuffix "\n" (builtins.readFile ./.env.shared));
 in
 {
   imports = [ inputs.scottylabs.devenvModules.default ];
@@ -37,13 +38,14 @@ in
     };
   };
 
+  dotenv.enable = true;
+  dotenv.filename = ".env.shared";
+
   # more temp fixes
   languages.rust.lld.enable = lib.mkIf pkgs.stdenv.isDarwin (lib.mkForce false);
   languages.rust.cranelift.enable = lib.mkIf pkgs.stdenv.isDarwin (lib.mkForce false);
 
   packages = [ pkgs.git ];
-
-  env.PORT = port;
 
   # Built SPA served by the backend (run `deno task build` in frontend/ first).
   env.STATIC_DIR = "frontend/dist";
