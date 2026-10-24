@@ -12,10 +12,10 @@ Now, we will get your own instance of Tartan Vote running!
 
 You will need [git](https://git-scm.com/install/).
 
-Clone the repository from Codeberg:
+Clone the repository from git.cmu.dev:
 
 ```bash
-git clone https://codeberg.org/ScottyLabs/tartan-vote.git
+git clone https://git.cmu.dev/ScottyLabs/tartan-vote.git
 cd tartan-vote
 ```
 

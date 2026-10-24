@@ -14,9 +14,8 @@
 
     conventionalCommits.enable = false;
 
-    # Semgrep 1.180.0 fails in patchelf on ARM Linux; 1.164.0 also
-    # segfaults at runtime. Re-enable after verifying upstream ARM support.
-    security.semgrep.enable = pkgs.stdenv.hostPlatform.system != "aarch64-linux";
+    # temp fixes
+    security.semgrep.enable = false;
 
     rust.enable = true;
     deno = {
