@@ -35,7 +35,8 @@
   };
 
   # more temp fixes
-  languages.rust.lld.enable = lib.mkForce (!pkgs.stdenv.isDarwin);
+  languages.rust.lld.enable = lib.mkIf pkgs.stdenv.isDarwin (lib.mkForce false);
+  languages.rust.cranelift.enable = lib.mkIf pkgs.stdenv.isDarwin (lib.mkForce false);
 
   packages = [ pkgs.git ];
 
