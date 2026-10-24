@@ -34,6 +34,9 @@
     };
   };
 
+  # more temp fixes
+  languages.rust.lld.enable = lib.mkForce (!pkgs.stdenv.isDarwin);
+
   packages = [ pkgs.git ];
 
   # Built SPA served by the backend (run `deno task build` in frontend/ first).
