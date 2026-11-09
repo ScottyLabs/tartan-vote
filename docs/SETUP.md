@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-This project uses [devenv](https://devenv.sh/getting-started/) to provide Cargo, Deno, Node, PostgreSQL, and all other development dependencies. Follow the devenv installation instructions.
+Install Lix by following kennel's [local development guide](https://docs.kennel.scottylabs.org/guides/local-development/#installing-nix). The dev shell provides Cargo, Deno, Node, PostgreSQL, and all other development dependencies.
 
 ## Starting up
 
@@ -19,34 +19,18 @@ git clone https://git.cmu.dev/ScottyLabs/tartan-vote.git
 cd tartan-vote
 ```
 
-Run `devenv allow` (or `devenv shell`) to enter the development environment. This exposes Cargo, Deno, Node, PostgreSQL, and other tooling.
+Run `nix develop` to enter the development environment. This exposes Cargo, Deno, Node, PostgreSQL, and other tooling.
 
 ### Secrets
 
-Configuration is provided automatically inside `devenv shell`, so there's no
-need to create a `.env`. Secrets are pulled from OpenBao via secretspec, so
-authenticate once:
-
-```bash
-nix run git+https://git.cmu.dev/ScottyLabs/kennel#login
-```
+Configuration is provided automatically inside `nix develop`, so there's no need to create a `.env`. Secrets are pulled from OpenBao via secretspec, so log in as described in kennel's [secrets guide](https://docs.kennel.scottylabs.org/guides/secrets/#local-development).
 
 ### Run everything
 
-From the repo root, inside the devenv shell:
+From the repo root, inside the dev shell:
 
 ```bash
-# 1. Start the managed services (Postgres, OAuth relay)
-devenv up
-
-# 2. In another terminal: build the frontend into frontend/dist
-cd frontend && deno task build && cd ..
-
-# 3. run the backend on :8080
-cargo run
+pitchfork start --local
 ```
 
-Then open http://localhost:8080.
-
-When working on the frontend, run `deno task build:watch` in a separate
-terminal instead of the one-build, since it rebuilds the frontend on file change.
+This starts Postgres, the OAuth relay, a frontend build that reruns on file change, and the backend on :8080. Then open http://localhost:8080.

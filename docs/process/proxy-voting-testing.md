@@ -3,7 +3,7 @@
 ## Pre-Testing Checklist
 
 - [ ] Backend compiled successfully: `cargo check` passes
-- [ ] Frontend compiled successfully: `npm run check` passes
+- [ ] Frontend compiled successfully: `deno task check` passes
 - [ ] Database exists and migrations have been run
 - [ ] Auth service running if required
 - [ ] Fresh database state recommended
@@ -131,14 +131,14 @@ ______________________________________________________________________
 **Manual Test (via curl or API client):**
 
 ```bash
-curl -X POST http://localhost:8000/session/ABC123/proxy \
+curl -X POST http://localhost:8080/api/session/ABC123/proxy \
   -H "Content-Type: application/json" \
   -H "Cookie: <auth_cookie>" \
   -d '{"is_senator": true, "proxy_for": "Jane Doe"}'
 # Response: 2 instances
 
 # Call again with same payload
-curl -X POST http://localhost:8000/session/ABC123/proxy \
+curl -X POST http://localhost:8080/api/session/ABC123/proxy \
   -H "Content-Type: application/json" \
   -H "Cookie: <auth_cookie>" \
   -d '{"is_senator": true, "proxy_for": "Jane Doe"}'
@@ -169,12 +169,12 @@ ______________________________________________________________________
 
 ```bash
 # First call
-curl -X POST http://localhost:8000/session/ABC123/proxy \
+curl -X POST http://localhost:8080/api/session/ABC123/proxy \
   -d '{"is_senator": true, "proxy_for": "Jane"}'
 # Response: 2 instances
 
 # Second call with different proxy
-curl -X POST http://localhost:8000/session/ABC123/proxy \
+curl -X POST http://localhost:8080/api/session/ABC123/proxy \
   -d '{"is_senator": true, "proxy_for": "John"}'
 # Response: 2 instances (but for John, not Jane)
 
@@ -206,12 +206,12 @@ ______________________________________________________________________
 
 ```bash
 # First call (senator)
-curl -X POST http://localhost:8000/session/ABC123/proxy \
+curl -X POST http://localhost:8080/api/session/ABC123/proxy \
   -d '{"is_senator": true, "proxy_for": "Jane"}'
 # Response: 2 instances
 
 # Second call (non-senator, same proxy)
-curl -X POST http://localhost:8000/session/ABC123/proxy \
+curl -X POST http://localhost:8080/api/session/ABC123/proxy \
   -d '{"is_senator": false, "proxy_for": "Jane"}'
 # Response: 1 instance
 
@@ -265,7 +265,7 @@ ______________________________________________________________________
 **Manual Test:**
 
 ```bash
-curl -X POST http://localhost:8000/session/ABC123/proxy \
+curl -X POST http://localhost:8080/api/session/ABC123/proxy \
   -d '{"is_senator": true, "proxy_for": "  Jane Doe  "}'
 # Response: should work, instance created with "Jane Doe"
 ```
@@ -291,11 +291,11 @@ ______________________________________________________________________
 **Manual Test:**
 
 ```bash
-curl -X POST http://localhost:8000/session/ABC123/proxy \
+curl -X POST http://localhost:8080/api/session/ABC123/proxy \
   -d '{"is_senator": true, "proxy_for": ""}'
 # Response: 1 instance (base only)
 
-curl -X POST http://localhost:8000/session/ABC123/proxy \
+curl -X POST http://localhost:8080/api/session/ABC123/proxy \
   -d '{"is_senator": false, "proxy_for": ""}'
 # Response: 0 instances
 ```
@@ -414,14 +414,14 @@ ORDER BY user_session_id
 ### Verify attendance endpoint
 
 ```bash
-curl http://localhost:8000/session/ABC123/attendance \
+curl http://localhost:8080/api/session/ABC123/attendance \
   -H "Cookie: <auth_cookie>"
 ```
 
 ### Test proxy endpoint directly
 
 ```bash
-curl -X POST http://localhost:8000/session/ABC123/proxy \
+curl -X POST http://localhost:8080/api/session/ABC123/proxy \
   -H "Content-Type: application/json" \
   -H "Cookie: <auth_cookie>" \
   -d '{"is_senator": true, "proxy_for": "Test Name"}'
@@ -432,7 +432,7 @@ ______________________________________________________________________
 ## Expected Behavior Matrix
 
 | User Type | Input | Expected Instances | Base | Proxy | Notice |
-| ----------- | ------------ | ------------------ | ---- | ----- | -------------------------------------- |
+| -- | -- | -- | -- | -- | -- |
 | Senator | No proxy | 1 | ✓ | - | "You now have 1 vote instance." |
 | Senator | Proxy "Jane" | 2 | ✓ | ✓ | "You now have 2 vote instances..." |
 | Non-senator | No proxy | 0 | - | - | "You currently have 0 vote instances." |

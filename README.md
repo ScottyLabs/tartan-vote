@@ -16,44 +16,27 @@ Hello, reader! For the remainder of this README, and other documentation, we wil
 
 ### Prerequisites
 
-- You are added to the Tartan-Vote team on [governance](https://git.cmu.dev/ScottyLabs/governance)
-- [devenv](https://devenv.sh/getting-started/) provides Cargo, Deno, Node, PostgreSQL, and other tooling via Nix
+- You are on the Tartan Vote team, which you can [join through governance](https://git.cmu.dev/ScottyLabs/governance#joining-a-team)
+- Lix, installed by following kennel's [local development guide](https://docs.kennel.scottylabs.org/guides/local-development/#installing-nix). The dev shell provides Cargo, Deno, Node, PostgreSQL, and other tooling.
 
 ### Quick Setup
 
 For detailed setup instructions, see [SETUP.md](docs/SETUP.md).
 
-Authenticate once per machine with OpenBao so secretspec can read dev secrets:
+Log in to OpenBao as described in kennel's [secrets guide](https://docs.kennel.scottylabs.org/guides/secrets/#local-development) so secretspec can read dev secrets.
+
+Enter the dev shell and start PostgreSQL, the OAuth relay, the frontend build in watch mode, and the backend:
 
 ```bash
-nix run git+https://git.cmu.dev/ScottyLabs/kennel#login
-```
-
-Allow devenv (or enter the shell manually):
-
-```bash
-devenv allow
-# or: devenv shell
-```
-
-Run the app (inside the devenv shell, from the repo root):
-
-```bash
-devenv up
-# add --detach or -d to run it in the background
-# devenv processes down to shut it down
-
-# in a separate terminal if you didn't add -d
-cd frontend && deno task build
-
-cargo run
+nix develop
+pitchfork start --local
 ```
 
 Then open http://localhost:8080.
 
 ### Deployment
 
-Production runs on [Kennel](https://git.cmu.dev/ScottyLabs/kennel) via devenv and secretspec.
+Production runs on [Kennel](https://docs.kennel.scottylabs.org/guides/deploying/), which builds the flake and loads secrets with secretspec.
 
 ### Contributing
 

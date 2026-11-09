@@ -23,8 +23,7 @@ export default defineConfig({
       },
     },
   },
-  // Bundle SSR deps so Deno's postbuild analyse worker does not need every
-  // transitive package listed as a direct dependency of this project.
+  // Bundle SSR deps so Deno's postbuild analyse worker does not need every transitive package listed as a direct dependency of this project.
   ssr: {
     noExternal: true,
   },

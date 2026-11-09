@@ -109,8 +109,7 @@ export function createDemoResults(request: ResultsRequest): ResultsViewModel {
   const votesCast = optionCounts.reduce((total, votes) => total + votes, 0);
   const longOption = "Voting Options Have a 36 Chara Limit";
   const optionLabels = isSecret ? [longOption, "Reject", "Abstain"] : ["Pass", "Reject", "Abstain"];
-  // These three colors match the supplied Figma examples. Backend-provided
-  // options can use resultColorForIndex() to cycle through all five colors.
+  // These three colors match the supplied Figma examples. Backend-provided options can use resultColorForIndex() to cycle through all five colors.
   const colors: ResultColor[] = ["green", "red", "yellow"];
 
   return {

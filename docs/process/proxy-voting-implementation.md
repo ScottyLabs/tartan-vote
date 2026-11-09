@@ -9,7 +9,7 @@ The voting application now supports a sophisticated proxy voting system where us
 The system allocates vote instances based on senator status and proxy assignment:
 
 | User Type | Base Instance | Proxy Instance | Total Instances | Notes |
-| ----------------------- | ------------- | -------------- | --------------- | ----------------------------------- |
+| -- | -- | -- | -- | -- |
 | Senator, no proxy | ✓ | - | 1 | Votes as self |
 | Senator, with proxy | ✓ | ✓ | 2 | Votes as self + proxies for someone |
 | Non-senator, no proxy | - | - | 0 | Cannot vote |
@@ -168,8 +168,7 @@ Updated to display participation confirmation banner.
 
 - `notice: string | null` — confirmation message from `ProxySetup`
 
-**New UI Element:**
-If `notice` is provided, displays styled banner:
+**New UI Element:** If `notice` is provided, displays styled banner:
 
 ```html
 <p class="notice">{notice}</p>
@@ -249,8 +248,7 @@ This ensures only active, joined sessions are counted when provisioning votes.
 
 ### Compilation Status
 
-**Frontend (svelte-check + tsc):** ✅ 0 errors, 0 warnings
-**Backend (cargo check):** ✅ 2 harmless warnings (unused `HasActiveEventResponse` + `has_active_event()` function)
+**Frontend (svelte-check + tsc):** ✅ 0 errors, 0 warnings **Backend (cargo check):** ✅ 2 harmless warnings (unused `HasActiveEventResponse` + `has_active_event()` function)
 
 ### Test Coverage Needed
 
@@ -291,12 +289,7 @@ This ensures only active, joined sessions are counted when provisioning votes.
 
 ## Edge Cases Handled
 
-✅ Proxy name with leading/trailing whitespace (trimmed server-side)
-✅ Proxy name as empty string (treated as null)
-✅ Changing senator status clears base instance if needed
-✅ Changing proxy target updates existing instance (no duplicates)
-✅ Users with 0 vote instances can view waiting page (no voting options appear)
-✅ Multiple proxy assignments for one user (only shows proxy instances, not base)
+✅ Proxy name with leading/trailing whitespace (trimmed server-side) ✅ Proxy name as empty string (treated as null) ✅ Changing senator status clears base instance if needed ✅ Changing proxy target updates existing instance (no duplicates) ✅ Users with 0 vote instances can view waiting page (no voting options appear) ✅ Multiple proxy assignments for one user (only shows proxy instances, not base)
 
 ## Future Enhancements (Out of Scope)
 
@@ -310,7 +303,7 @@ This ensures only active, joined sessions are counted when provisioning votes.
 
 - [ ] Run database migrations (no new migrations needed; `proxy` field made nullable in past migration)
 - [ ] Backend: `cargo build --release`
-- [ ] Frontend: `npm run build`
+- [ ] Frontend: `deno task build`
 - [ ] Test with fresh database
 - [ ] Verify session creation and attendance endpoints work
 - [ ] Manual end-to-end test: Create session, join as senator with proxy, vote, check results

@@ -1,9 +1,19 @@
 [[IgnoredVulns]]
 id = "RUSTSEC-2024-0436"
 reason = "No fixed version is available; pulled by utoipa-axum as a build-time proc-macro dependency. Revisit when upstream releases a fix or replacement."
-ignoreUntil = 2026-10-15
 
 [[IgnoredVulns]]
 id = "RUSTSEC-2023-0071"
 reason = "No fixed version is available; present through sqlx lockfile metadata for the unused MySQL path, while cargo tree shows no rsa dependency path for current or all targets."
-ignoreUntil = 2026-10-15
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0235"
+reason = "rkyv is only in the lockfile through rust_decimal's optional rkyv feature, which nothing in the workspace enables"
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0387"
+reason = "crypto-bigint 0.5 sits under p256 and p384 for openidconnect's JWT verification, which only handles public keys, and the fix is in the incompatible 0.7 line"
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0459"
+reason = "SQLx's SQLite driver is locked but never compiled. sqlx-sqlite 0.9.0 caps libsqlite3-sys below the fixed 0.39.0."

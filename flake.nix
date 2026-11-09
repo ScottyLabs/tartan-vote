@@ -9,61 +9,91 @@
   };
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
-    scottylabs = {
-      url = "git+https://git.cmu.dev/ScottyLabs/kennel";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
+    scottylabs.url = "git+https://git.cmu.dev/ScottyLabs/kennel";
+    nixpkgs.follows = "scottylabs/nixpkgs";
+    flake-parts.follows = "scottylabs/flake-parts";
   };
 
   outputs =
-    {
-      nixpkgs,
-      scottylabs,
-      ...
-    }:
-    let
-      forAllSystems = nixpkgs.lib.genAttrs [
+    inputs:
+    inputs.flake-parts.lib.mkFlake { inherit inputs; } {
+      imports = [ inputs.scottylabs.flakeModules.default ];
+      systems = [
         "x86_64-linux"
         "aarch64-linux"
+        "aarch64-darwin"
       ];
-    in
-    {
-      packages = forAllSystems (
-        system:
-        let
-          pkgs = nixpkgs.legacyPackages.${system};
-          helpers = scottylabs.mkLib pkgs;
 
+      perSystem =
+        {
+          lib,
+          pkgs,
+          helpers,
+          ...
+        }:
+        let
           frontend = helpers.buildDenoTask {
             src = ./frontend;
-            pname = "frontend";
-            task = "build";
-          };
-
-          tartan-vote = helpers.buildRustService {
-            src = ./.;
-            pname = "tartan-vote";
-            buildInputs = [ pkgs.openssl ];
-            nativeBuildInputs = [
-              pkgs.pkg-config
-              pkgs.makeWrapper
-            ];
-            buildArgs = {
-              cargoExtraArgs = "-p backend";
-              postInstall = ''
-                mkdir -p $out/share/tartan-vote/www
-                cp -r ${frontend}/* $out/share/tartan-vote/www/
-                chmod -R u+w $out/share/tartan-vote/www
-                wrapProgram $out/bin/backend \
-                  --set-default STATIC_DIR $out/share/tartan-vote/www
-              '';
-            };
+            pname = "tartan-vote-frontend";
           };
         in
         {
-          inherit frontend tartan-vote;
-        }
-      );
+          scottylabs = {
+            project.name = "tartan-vote";
+            conventionalCommits.enable = false;
+
+            rust.enable = true;
+            deno = {
+              enable = true;
+              dirs = [ "frontend" ];
+            };
+            postgres.enable = true;
+            valkey.enable = true;
+
+            ricochet = {
+              enable = true;
+              appUrl = "http://localhost:8080";
+            };
+
+            processes = {
+              backend = {
+                run = "exec secretspec run -P dev -- cargo run -p backend";
+                depends = [
+                  "postgres-setup"
+                  "valkey"
+                ];
+              };
+              frontend.run = "cd frontend && deno task build:watch";
+            };
+
+            shell = {
+              packages = [ pkgs.sea-orm-cli ];
+              # the backend serves the SPA that frontend.run builds
+              env.STATIC_DIR = "frontend/dist";
+              scripts.generate-api = "cd frontend && deno task generate-api";
+            };
+          };
+
+          pre-commit.settings.hooks = {
+            deno-check.entry = lib.mkForce "bash -c 'cd frontend && deno check .'";
+            deno-test.entry = lib.mkForce "deno test --ignore=.scottylabs --permit-no-files";
+            block-ai-slop.excludes = [ "^docs/" ];
+            oxlint.settings.deny = lib.mkForce [
+              "correctness"
+              "suspicious"
+              "perf"
+            ];
+          };
+
+          services.tartan-vote = {
+            package = helpers.buildRustService {
+              src = ./.;
+              pname = "tartan-vote";
+              buildArgs.cargoExtraArgs = "--locked -p backend";
+            };
+            customDomain = "tartan.vote";
+            env.STATIC_DIR = "${frontend}";
+          };
+        };
     };
 }

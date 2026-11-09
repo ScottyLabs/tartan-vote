@@ -10,13 +10,13 @@ To create a new migration file, navigate to the `crates` folder and run
 backend/crates $ sea-orm-cli migrate generate MIGRATION_NAME
 ```
 
-To migrate the database, follow the steps in [SETUP.md](../SETUP.md#backend) or for short, run
+To migrate the database, follow the steps in [SETUP.md](../SETUP.md#run-everything) or for short, run
 
 ```sh
 backend/crates/voting-app $ cargo run
 ```
 
-(PostgreSQL is managed automatically by devenv when you enter the shell.)
+(Start PostgreSQL with `pitchfork start --local` from the dev shell.)
 
 ## Entities
 

@@ -2,9 +2,7 @@
 
 Thanks for your interest in contributing to Tartan Vote!
 
-Before contributing to this repository, please discuss the change you wish to
-make via issue on this repository, email to one of the codeowners, or on the
-ScottyLabs [discord](https://go.scottylabs.org/discord).
+Before contributing to this repository, please discuss the change you wish to make via issue on this repository, email to one of the codeowners, or on the ScottyLabs [discord](https://go.scottylabs.org/discord).
 
 ## How Can I Contribute?
 
@@ -30,20 +28,11 @@ Direct pushes to main are blocked. You should create a branch, make your changes
 
 ## Style Guide
 
-- All Rust code should be formatted using `cargo fmt` and linted with `cargo clippy`. The CI/CD and pre-commit checks will check that all PR'ed code passes
-  `cargo fmt` and `cargo clippy`.
-- All Svelte code should be checked with `deno task check`. The CI/CD and
-  pre-commit checks will automatically check this too.
+- All Rust code should be formatted using `cargo fmt` and linted with `cargo clippy`, and all Svelte code checked with `deno task check`. Kennel's [git hooks](https://docs.kennel.scottylabs.org/guides/local-development/#git-hooks) run these on every commit.
 
 ### Commit Guidelines
 
-I am a firm believer in the [kernel commit
-style](https://docs.kernel.org/process/submitting-patches.html). Not all of the
-sections in that document are useful, such as the fact that we do not mail
-patches (unfortunately), but most of the pieces of advice are helpful
-nonetheless. Good commit habits reflect on the developer. Being able to clearly
-reflect upon your changes and describe the impact of them means you are able to
-reason about your code and about why you are making the changes you are.
+I am a firm believer in the [kernel commit style](https://docs.kernel.org/process/submitting-patches.html). Not all of the sections in that document are useful, such as the fact that we do not mail patches (unfortunately), but most of the pieces of advice are helpful nonetheless. Good commit habits reflect on the developer. Being able to clearly reflect upon your changes and describe the impact of them means you are able to reason about your code and about why you are making the changes you are.
 
 #### Commit Subjects
 
@@ -58,7 +47,7 @@ A list of possible commit types, but not exhaustive:
 - `backend: auth: created migrations for token storage`
 - `backend: session: ensures user must exist before joining`
 - `docs: process: add section on code review`
-- `devenv: update to latest scottylabs version`
+- `nix: update to latest scottylabs version`
 - `frontend: motion: center vote div`
 
 I would prefer not to see 'chore: format' or 'fix: some stuff'. This is not helpful to me as a maintainer or to your future self or other people by being vague about what you are doing.
