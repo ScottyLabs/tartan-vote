@@ -42,17 +42,7 @@
             project.name = "tartan-vote";
             conventionalCommits.enable = false;
 
-            rust = {
-              enable = true;
-              # linkme's \x01section$start symbols break under cranelift on macOS
-              cranelift.excludePackages = [
-                "aws-lc-sys"
-                "aws-lc-rs"
-                "rustls"
-                "zmij"
-                "secretspec"
-              ];
-            };
+            rust.enable = true;
             deno = {
               enable = true;
               dirs = [ "frontend" ];
