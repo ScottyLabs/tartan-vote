@@ -17,6 +17,11 @@
     saveOrganizationSettings,
     type OrganizationSettings,
   } from "$lib/domain/organizationSettings";
+  import {
+    displayHostSessionCode,
+    endHostedSessionWithRedirect,
+    ensureHostedSessionCode,
+  } from "$lib/domain/hostSession";
 
   let organization = $state("Default");
   let defaultQuorum = $state("");
@@ -40,6 +45,15 @@
   let nameDialogMode = $state<"create" | "edit" | null>(null);
   let nameDialogError = $state("");
   let endSessionDialogOpen = $state(false);
+  let sessionCode = $state(page.url.searchParams.get("sessionCode")?.trim() || "");
+  let endingSession = $state(false);
+  let sessionError = $state("");
+  const displayedSessionCode = $derived(displayHostSessionCode(sessionCode));
+  const overviewHref = $derived.by(() => {
+    const params = new URLSearchParams();
+    if (sessionCode) params.set("sessionCode", sessionCode);
+    return params.size > 0 ? `/host?${params.toString()}` : "/host";
+  });
 
   const isDefault = $derived(organization === "Default");
 
@@ -62,7 +76,23 @@
       return;
     }
     applyOrganization(storedSettings);
+
+    void ensureHostedSessionCode(sessionCode).then((resolvedSessionCode) => {
+      sessionCode = resolvedSessionCode;
+    });
   });
+
+  async function confirmEndSession() {
+    if (endingSession) return;
+    endingSession = true;
+    const success = await endHostedSessionWithRedirect((message) => {
+      sessionError = message;
+    });
+    if (!success) {
+      endingSession = false;
+      endSessionDialogOpen = false;
+    }
+  }
 
   function applyOrganization(settings: OrganizationSettings) {
     organization = settings.name;
@@ -268,10 +298,10 @@
         <p
           class="mt-0 mb-[clamp(6px,1.667vw,32px)] text-[clamp(17px,1.563vw,30px)] leading-[clamp(22px,1.979vw,38px)] font-semibold"
         >
-          happy-giraffe
+          {displayedSessionCode}
         </p>
         <button
-          class="inline-flex h-6 max-w-full cursor-pointer items-center gap-2 border-0 bg-transparent p-0 text-[clamp(9px,0.833vw,16px)] text-red-200"
+          class="inline-flex h-6 max-w-full cursor-pointer items-center gap-2 bg-transparent p-0 text-[clamp(9px,0.833vw,16px)] text-red-200"
           type="button"
         >
           <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
@@ -289,33 +319,33 @@
       </section>
 
       <nav
-        class="mt-[clamp(12px,1.198vw,23px)] grid gap-[5px]"
+        class="mt-[clamp(12px,1.198vw,23px)] grid gap-1"
         aria-label="Session sections"
       >
         <a
-          class="flex h-[clamp(40px,3.646vw,70px)] w-full cursor-pointer items-center bg-transparent px-[clamp(24px,2.344vw,45px)] text-left text-[clamp(11px,0.938vw,18px)] leading-[26px] font-bold text-white no-underline"
-          href="/host">Overview</a
+          class="flex h-[clamp(40px,3.646vw,70px)] w-full cursor-pointer items-center bg-transparent px-[clamp(24px,2.344vw,45px)] text-left text-[clamp(11px,0.938vw,18px)] leading-7 font-bold text-white"
+          href={overviewHref}>Overview</a
         >
         <button
-          class="flex h-[clamp(40px,3.646vw,70px)] w-full cursor-not-allowed items-center border-0 bg-transparent px-[clamp(24px,2.344vw,45px)] text-left text-[clamp(11px,0.938vw,18px)] leading-[26px] font-bold text-grey-100 opacity-100"
+          class="flex h-[clamp(40px,3.646vw,70px)] w-full cursor-not-allowed items-center bg-transparent px-[clamp(24px,2.344vw,45px)] text-left text-[clamp(11px,0.938vw,18px)] leading-7 font-bold text-grey-100 opacity-100"
           type="button"
           disabled
           title="Live View is available while a vote is running"
           >Live View</button
         >
         <a
-          class="flex h-[clamp(40px,3.646vw,70px)] w-full cursor-pointer items-center bg-[#66363e] px-[clamp(24px,2.344vw,45px)] text-left text-[clamp(11px,0.938vw,18px)] leading-[26px] font-bold text-white no-underline"
+          class="flex h-[clamp(40px,3.646vw,70px)] w-full cursor-pointer items-center bg-[#66363e] px-[clamp(24px,2.344vw,45px)] text-left text-[clamp(11px,0.938vw,18px)] leading-7 font-bold text-white"
           href="/host/configuration"
           aria-current="page">Session Configuration</a
         >
         <button
-          class="flex h-[clamp(40px,3.646vw,70px)] w-full cursor-pointer items-center border-0 bg-transparent px-[clamp(24px,2.344vw,45px)] text-left text-[clamp(11px,0.938vw,18px)] leading-[26px] font-bold text-white"
+          class="flex h-[clamp(40px,3.646vw,70px)] w-full cursor-pointer items-center bg-transparent px-[clamp(24px,2.344vw,45px)] text-left text-[clamp(11px,0.938vw,18px)] leading-7 font-bold text-white"
           type="button">Comprehensive Session Results</button
         >
       </nav>
 
       <button
-        class="absolute bottom-[35px] left-1/2 h-[clamp(34px,3.125vw,60px)] w-[min(calc(100%-42px),300px)] -translate-x-1/2 cursor-pointer rounded-[100px] border border-red-500 bg-transparent text-[clamp(14px,1.25vw,24px)] text-grey-200"
+        class="absolute bottom-9 left-1/2 h-[clamp(34px,3.125vw,60px)] w-[min(calc(100%-42px),300px)] -translate-x-1/2 cursor-pointer rounded-full border border-red-500 bg-transparent text-[clamp(14px,1.25vw,24px)] text-grey-200"
         type="button"
         onclick={() => (endSessionDialogOpen = true)}>End session</button
       >
@@ -333,24 +363,24 @@
       </h1>
 
       <form
-        class="w-full max-w-[1470px] rounded-[10px] border-2 border-grey-200 bg-white px-[clamp(20px,2.083vw,40px)] pt-[clamp(12px,1.979vw,38px)] pb-[clamp(22px,2.083vw,40px)]"
+        class="w-full max-w-368 rounded-lg border-2 border-grey-200 bg-white px-[clamp(20px,2.083vw,40px)] pt-[clamp(12px,1.979vw,38px)] pb-[clamp(22px,2.083vw,40px)]"
         onsubmit={saveSettings}
       >
         <header class="flex items-start justify-between">
           <div>
             <h2
-              class="mt-0 mb-[3px] text-[clamp(14px,1.25vw,24px)] leading-[clamp(20px,1.667vw,32px)] font-medium text-black"
+              class="mt-0 mb-1 text-[clamp(14px,1.25vw,24px)] leading-[clamp(20px,1.667vw,32px)] font-medium text-black"
             >
               Customize Room (Optional)
             </h2>
             <p
-              class="m-0 text-[clamp(9px,0.833vw,16px)] leading-[clamp(13px,1.25vw,24px)] font-medium text-grey-700"
+              class="text-[clamp(9px,0.833vw,16px)] leading-[clamp(13px,1.25vw,24px)] font-medium text-grey-700"
             >
               Configure organization specific settings
             </p>
           </div>
           <button
-            class="inline-flex cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-[clamp(9px,0.938vw,18px)] text-grey-700 underline disabled:cursor-not-allowed disabled:opacity-72"
+            class="inline-flex cursor-pointer items-center gap-2 bg-transparent p-0 text-[clamp(9px,0.938vw,18px)] text-grey-700 underline disabled:cursor-not-allowed disabled:opacity-72"
             type="button"
             disabled={isDefault}
             onclick={openEditOrganizationDialog}
@@ -370,7 +400,7 @@
 
         {#if isDefault}
           <p
-            class="mt-2 mb-[-4px] text-[clamp(9px,0.833vw,16px)] leading-[clamp(13px,1.25vw,24px)] italic text-grey-600"
+            class="mt-2 -mb-1 text-[clamp(9px,0.833vw,16px)] leading-[clamp(13px,1.25vw,24px)] italic text-grey-600"
           >
             Default settings are read-only. Add another organization to create
             and save custom settings.
@@ -387,12 +417,12 @@
                 >Selected Organization:</span
               >
               <small
-                class="m-0 block text-[clamp(9px,0.833vw,16px)] leading-[clamp(13px,1.25vw,24px)] font-medium text-grey-700"
+                class="block text-[clamp(9px,0.833vw,16px)] leading-[clamp(13px,1.25vw,24px)] font-medium text-grey-700"
                 >Configure an organization or use Default settings</small
               >
-              <div class="relative mt-[5px] w-[clamp(160px,15.781vw,303px)]">
+              <div class="relative mt-1 w-[clamp(160px,15.781vw,303px)]">
                 <button
-                  class="flex h-[clamp(28px,2.604vw,50px)] w-full cursor-pointer items-center justify-between rounded-[10px] border border-black bg-white px-3.5 text-[clamp(9px,0.833vw,16px)] font-medium text-black"
+                  class="flex h-[clamp(28px,2.604vw,50px)] w-full cursor-pointer items-center justify-between rounded-lg border border-black bg-white px-4 text-[clamp(9px,0.833vw,16px)] font-medium text-black"
                   type="button"
                   aria-haspopup="listbox"
                   aria-expanded={dropdownOpen}
@@ -403,7 +433,7 @@
 
                 {#if dropdownOpen}
                   <div
-                    class="absolute top-[calc(100%+1px)] left-0 z-5 w-full overflow-hidden rounded-[5px] border-[0.5px] border-grey-100 bg-white py-0.5 shadow-[0_2px_3px_rgb(0_0_0_/_0.25)]"
+                    class="absolute top-[calc(100%+1px)] left-0 z-5 w-full overflow-hidden rounded-sm border border-grey-100 bg-white py-1 shadow-[0_2px_3px_rgb(0_0_0_/_0.25)]"
                     role="listbox"
                     aria-label="Organizations"
                   >
@@ -414,7 +444,7 @@
                       >
                         {#if settings.name !== "Default"}
                           <button
-                            class="flex h-[clamp(28px,2.604vw,50px)] w-[38px] cursor-pointer items-center justify-center border-0 bg-transparent p-0 text-[clamp(16px,1.25vw,24px)] leading-none font-medium text-grey-500 hover:text-red-500"
+                            class="flex h-[clamp(28px,2.604vw,50px)] w-10 cursor-pointer items-center justify-center bg-transparent p-0 text-[clamp(16px,1.25vw,24px)] leading-none font-medium text-grey-500 hover:text-red-500"
                             type="button"
                             aria-label={`Delete ${settings.name}`}
                             onclick={() =>
@@ -423,10 +453,10 @@
                             x
                           </button>
                         {:else}
-                          <span class="w-[38px]" aria-hidden="true"></span>
+                          <span class="w-10" aria-hidden="true"></span>
                         {/if}
                         <button
-                          class="flex h-[clamp(28px,2.604vw,50px)] w-full cursor-pointer items-center border-0 bg-transparent pr-3.5 text-left text-[clamp(9px,0.833vw,16px)] font-medium text-black"
+                          class="flex h-[clamp(28px,2.604vw,50px)] w-full cursor-pointer items-center bg-transparent pr-4 text-left text-[clamp(9px,0.833vw,16px)] font-medium text-black"
                           type="button"
                           role="option"
                           aria-selected={settings.name === organization}
@@ -437,7 +467,7 @@
                       </div>
                     {/each}
                     <button
-                      class="flex h-[clamp(28px,2.604vw,50px)] w-full cursor-pointer items-center border-0 bg-transparent px-3.5 text-left text-[clamp(9px,0.833vw,16px)] font-medium text-grey-400 italic"
+                      class="flex h-[clamp(28px,2.604vw,50px)] w-full cursor-pointer items-center bg-transparent px-4 text-left text-[clamp(9px,0.833vw,16px)] font-medium text-grey-400 italic"
                       type="button"
                       onclick={addOrganization}
                       >+ Add another organization</button
@@ -453,12 +483,12 @@
                 >Default Organization Quorum:</span
               >
               <small
-                class="m-0 block text-[clamp(9px,0.833vw,16px)] leading-[clamp(13px,1.25vw,24px)] font-medium text-grey-700"
+                class="block text-[clamp(9px,0.833vw,16px)] leading-[clamp(13px,1.25vw,24px)] font-medium text-grey-700"
                 >Input the default minimum number of active participants
                 required to begin a vote.</small
               >
               <input
-                class="mt-[5px] h-[clamp(28px,2.604vw,50px)] w-[clamp(160px,15.781vw,303px)] rounded-[10px] border border-black bg-white px-3.5 text-[clamp(9px,0.833vw,16px)] text-black placeholder:text-grey-400 placeholder:opacity-100 disabled:cursor-not-allowed disabled:bg-grey-50 disabled:text-grey-400"
+                class="mt-1 h-[clamp(28px,2.604vw,50px)] w-[clamp(160px,15.781vw,303px)] rounded-lg border border-black bg-white px-4 text-[clamp(9px,0.833vw,16px)] text-black placeholder:text-grey-400 disabled:cursor-not-allowed disabled:bg-grey-50 disabled:text-grey-400"
                 value={defaultQuorum}
                 inputmode="numeric"
                 pattern="[0-9]*"
@@ -476,11 +506,11 @@
                 >Quick Vote Voting Options:</span
               >
               <small
-                class="m-0 block text-[clamp(9px,0.833vw,16px)] leading-[clamp(13px,1.25vw,24px)] font-medium text-grey-700"
+                class="block text-[clamp(9px,0.833vw,16px)] leading-[clamp(13px,1.25vw,24px)] font-medium text-grey-700"
                 >Input the default quick voting selections separated by a comma.</small
               >
               <input
-                class="mt-[5px] h-[clamp(28px,2.604vw,50px)] w-[clamp(160px,15.781vw,303px)] rounded-[10px] border border-black bg-white px-3.5 text-[clamp(9px,0.833vw,16px)] text-black disabled:cursor-not-allowed disabled:bg-grey-50 disabled:text-grey-400"
+                class="mt-1 h-[clamp(28px,2.604vw,50px)] w-[clamp(160px,15.781vw,303px)] rounded-lg border border-black bg-white px-4 text-[clamp(9px,0.833vw,16px)] text-black disabled:cursor-not-allowed disabled:bg-grey-50 disabled:text-grey-400"
                 value={quickVoteOptions}
                 maxlength="369"
                 oninput={keepQuickVoteOptions}
@@ -495,12 +525,12 @@
               >Approved Voting Members:</span
             >
             <small
-              class="m-0 block text-[clamp(9px,0.833vw,16px)] leading-[clamp(13px,1.25vw,24px)] font-medium text-grey-700"
+              class="block text-[clamp(9px,0.833vw,16px)] leading-[clamp(13px,1.25vw,24px)] font-medium text-grey-700"
               >Input the AndrewID(s) of allowed participants separated by a
               comma. Leave blank to allow unrestricted session joining.</small
             >
             <textarea
-              class="mt-2.5 h-[clamp(182px,17.813vw,342px)] min-h-[clamp(182px,17.813vw,342px)] max-h-[520px] w-full resize-y rounded-[10px] border border-black bg-white px-4 py-3.5 text-[clamp(9px,0.833vw,16px)] text-black placeholder:text-grey-400 placeholder:opacity-100 disabled:cursor-not-allowed disabled:bg-grey-50 disabled:text-grey-400"
+              class="mt-3 h-[clamp(182px,17.813vw,342px)] min-h-[clamp(182px,17.813vw,342px)] max-h-130 w-full resize-y rounded-lg border border-black bg-white px-4 py-4 text-[clamp(9px,0.833vw,16px)] text-black placeholder:text-grey-400 disabled:cursor-not-allowed disabled:bg-grey-50 disabled:text-grey-400"
               value={approvedMembers}
               maxlength="7399"
               placeholder="N/A"
@@ -514,31 +544,36 @@
           aria-live="polite"
         >
           {#if error}<p
-              class="m-0 text-center text-[clamp(11px,0.729vw,14px)] text-red-700"
+              class="text-center text-[clamp(11px,0.729vw,14px)] text-red-700"
               role="alert"
             >
               {error}
             </p>{/if}
           {#if hasUnsavedChanges}
             <p
-              class="m-0 text-center text-sm font-semibold text-red-500"
+              class="text-center text-sm font-semibold text-red-500"
               role="status"
             >
               You have unsaved changes
             </p>
           {/if}
           {#if saved}<p
-              class="m-0 text-center text-sm font-semibold text-green-600"
+              class="text-center text-sm font-semibold text-green-600"
             >
               Settings saved.
             </p>{/if}
         </div>
         <button
-          class="mx-auto block h-[clamp(34px,3.125vw,60px)] w-[clamp(268px,26.042vw,500px)] cursor-pointer rounded-[100px] border-0 bg-red-600 text-[clamp(14px,1.25vw,24px)] font-bold text-white shadow-[0_4px_2px_rgb(0_0_0_/_0.25)] disabled:cursor-not-allowed disabled:bg-grey-400 disabled:shadow-none"
+          class="mx-auto block h-[clamp(34px,3.125vw,60px)] w-[clamp(268px,26.042vw,500px)] cursor-pointer rounded-full bg-red-600 text-[clamp(14px,1.25vw,24px)] font-bold text-white shadow-[0_4px_2px_rgb(0_0_0_/_0.25)] disabled:cursor-not-allowed disabled:bg-grey-400 disabled:shadow-none"
           type="submit"
           disabled={isDefault}>Save Settings</button
         >
       </form>
+      {#if sessionError}
+        <p class="mt-3 text-center text-sm font-semibold text-red-700" role="alert">
+          {sessionError}
+        </p>
+      {/if}
     </section>
   </div>
 
@@ -565,6 +600,6 @@
 {#if endSessionDialogOpen}
   <EndSessionDialog
     onclose={() => (endSessionDialogOpen = false)}
-    onconfirm={() => (window.location.href = "/home")}
+    onconfirm={() => void confirmEndSession()}
   />
 {/if}

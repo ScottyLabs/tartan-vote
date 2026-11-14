@@ -106,13 +106,13 @@
   role="presentation"
 >
   <div
-    class="relative min-h-[776px] w-[min(calc(100%-40px),800px)] overflow-y-auto rounded-[10px] border border-grey-600 bg-white px-[49px] pt-[74px] pb-[42px] max-[760px]:max-h-[calc(100svh-24px)] max-[760px]:px-6 max-[760px]:pt-[54px] max-[760px]:pb-7"
+    class="relative min-h-194 w-[min(calc(100%-40px),800px)] overflow-y-auto rounded-lg border border-grey-600 bg-white px-12 pt-19 pb-11 max-[760px]:max-h-[calc(100svh-24px)] max-[760px]:px-6 max-[760px]:pt-14 max-[760px]:pb-7"
     role="dialog"
     aria-modal="true"
     aria-labelledby="configuration-title"
   >
     <button
-      class="absolute top-[39px] right-[49px] size-5 cursor-pointer border-0 bg-transparent p-0 max-[760px]:top-6 max-[760px]:right-6"
+      class="absolute top-10 right-12 size-5 cursor-pointer bg-transparent p-0 max-[760px]:top-6 max-[760px]:right-6"
       type="button"
       aria-label={`Close ${noun.toLowerCase()} configuration`}
       onclick={onclose}
@@ -125,7 +125,7 @@
     </button>
 
     <h2
-      class="mt-0 mb-[29px] text-center text-4xl leading-11 font-semibold max-[760px]:text-[28px] max-[760px]:leading-9"
+      class="mt-0 mb-7 text-center text-4xl leading-11 font-semibold max-[760px]:text-3xl max-[760px]:leading-9"
       id="configuration-title"
     >
       {title}
@@ -137,7 +137,7 @@
           >{noun} Name</span
         >
         <input
-          class="h-10 w-full rounded-[10px] border border-slate-800 bg-white px-5 text-sm text-black placeholder:text-grey-500 placeholder:italic placeholder:opacity-100"
+          class="h-10 w-full rounded-lg border border-slate-800 bg-white px-5 text-sm text-black placeholder:text-grey-500 placeholder:italic"
           bind:value={name}
           maxlength="98"
           placeholder={nameExample}
@@ -146,7 +146,7 @@
       </label>
 
       <div
-        class="mt-[52px] grid grid-cols-[344px_1fr] gap-[30px] max-[760px]:grid-cols-1"
+        class="mt-13 grid grid-cols-[344px_1fr] gap-8 max-[760px]:grid-cols-1"
       >
         <div>
           <label>
@@ -155,7 +155,7 @@
               >Voting Type</span
             >
             <select
-              class="h-10 w-[270px] rounded-[10px] border border-slate-800 bg-white px-3.5 text-sm text-black"
+              class="h-10 w-68 rounded-lg border border-slate-800 bg-white px-4 text-sm text-black"
               bind:value={votingType}
             >
               <option>Standard</option>
@@ -164,16 +164,16 @@
             </select>
           </label>
 
-          <fieldset class="mt-[26px] border-0 p-0">
+          <fieldset class="mt-7 p-0">
             <legend
               class="mb-3 block text-xl leading-7 font-medium text-slate-900"
               >Voting Options</legend
             >
-            <div class="grid gap-1.5">
+            <div class="grid gap-2">
               {#each options as option, index (index)}
-                <div class="flex items-center gap-1.5">
+                <div class="flex items-center gap-2">
                   <input
-                    class="h-10 w-[270px] rounded-[10px] border border-slate-800 bg-white px-4 text-sm text-black placeholder:text-grey-500 placeholder:italic placeholder:opacity-100"
+                    class="h-10 w-68 rounded-lg border border-slate-800 bg-white px-4 text-sm text-black placeholder:text-grey-500 placeholder:italic"
                     value={option}
                     maxlength="36"
                     placeholder={kind === "motion"
@@ -191,7 +191,7 @@
                   />
                   {#if index >= 2}
                     <button
-                      class="size-7 cursor-pointer border-0 bg-transparent p-0"
+                      class="size-7 cursor-pointer bg-transparent p-0"
                       type="button"
                       aria-label={`Delete option ${index + 1}`}
                       onclick={() => removeOption(index)}
@@ -207,21 +207,21 @@
               {/each}
             </div>
             <button
-              class="mt-3.5 h-10 w-[170px] cursor-pointer rounded-full border border-slate-900 bg-white text-sm text-slate-800"
+              class="mt-4 h-10 w-43 cursor-pointer rounded-full border border-slate-900 bg-white text-sm text-slate-800"
               type="button"
               onclick={addOption}>+ &nbsp; Add additional</button
             >
           </fieldset>
         </div>
 
-        <div class="grid content-start gap-[15px]">
+        <div class="grid content-start gap-4">
           <label class="flex items-center justify-between gap-4">
             <span
               class="whitespace-nowrap text-xl leading-7 font-medium text-black"
               >Display Live Results</span
             >
             <input
-              class="h-6 w-11 cursor-pointer appearance-none rounded-full border border-black bg-white before:mx-[3px] before:my-0.5 before:block before:size-[18px] before:rounded-full before:bg-slate-900 before:content-[''] before:transition-transform before:duration-150 checked:bg-slate-900 checked:before:translate-x-[18px] checked:before:bg-white"
+              class="h-6 w-11 cursor-pointer appearance-none rounded-full border border-black bg-white before:mx-1 before:my-1 before:block before:size-4 before:rounded-full before:bg-slate-900 before:content-[''] before:transition-transform before:duration-150 checked:bg-slate-900 checked:before:translate-x-5 checked:before:bg-white"
               type="checkbox"
               role="switch"
               bind:checked={displayLiveResults}
@@ -233,7 +233,7 @@
               >Allow Proxy Voting</span
             >
             <input
-              class="h-6 w-11 cursor-pointer appearance-none rounded-full border border-black bg-white before:mx-[3px] before:my-0.5 before:block before:size-[18px] before:rounded-full before:bg-slate-900 before:content-[''] before:transition-transform before:duration-150 checked:bg-slate-900 checked:before:translate-x-[18px] checked:before:bg-white"
+              class="h-6 w-11 cursor-pointer appearance-none rounded-full border border-black bg-white before:mx-1 before:my-1 before:block before:size-4 before:rounded-full before:bg-slate-900 before:content-[''] before:transition-transform before:duration-150 checked:bg-slate-900 checked:before:translate-x-5 checked:before:bg-white"
               type="checkbox"
               role="switch"
               bind:checked={allowProxyVoting}
@@ -245,7 +245,7 @@
               >Enable Quorum Setup</span
             >
             <input
-              class="h-6 w-11 cursor-pointer appearance-none rounded-full border border-black bg-white before:mx-[3px] before:my-0.5 before:block before:size-[18px] before:rounded-full before:bg-slate-900 before:content-[''] before:transition-transform before:duration-150 checked:bg-slate-900 checked:before:translate-x-[18px] checked:before:bg-white"
+              class="h-6 w-11 cursor-pointer appearance-none rounded-full border border-black bg-white before:mx-1 before:my-1 before:block before:size-4 before:rounded-full before:bg-slate-900 before:content-[''] before:transition-transform before:duration-150 checked:bg-slate-900 checked:before:translate-x-5 checked:before:bg-white"
               type="checkbox"
               role="switch"
               bind:checked={enableQuorum}
@@ -253,7 +253,7 @@
           </label>
           {#if enableQuorum}
             <input
-              class="h-10 w-[175px] rounded-[10px] border border-slate-800 bg-white px-5 text-sm text-black placeholder:text-grey-500 placeholder:italic placeholder:opacity-100"
+              class="h-10 w-44 rounded-lg border border-slate-800 bg-white px-5 text-sm text-black placeholder:text-grey-500 placeholder:italic"
               value={quorum}
               inputmode="numeric"
               pattern="[0-9]+"
@@ -267,11 +267,11 @@
         </div>
       </div>
 
-      {#if error}<p class="mt-[15px] text-center text-red-700" role="alert">
+      {#if error}<p class="mt-4 text-center text-red-700" role="alert">
           {error}
         </p>{/if}
       <button
-        class="mx-auto mt-12 block h-[58px] w-[280px] cursor-pointer rounded-full border-0 bg-red-600 text-lg font-medium text-white shadow-[0_4px_2px_rgb(0_0_0_/_0.25)]"
+        class="mx-auto mt-12 block h-15 w-70 cursor-pointer rounded-full bg-red-600 text-lg font-medium text-white shadow-[0_4px_2px_rgb(0_0_0_/_0.25)]"
         type="submit">+ Push a {noun}</button
       >
     </form>

@@ -5,12 +5,19 @@
     options: HostLiveOption[];
     totalVotes: number;
     shared: boolean;
+    shareDisabled?: boolean;
     onconfirm: () => void;
     ontoggleshare: () => void;
   }
 
-  let { options, totalVotes, shared, onconfirm, ontoggleshare }: Props =
-    $props();
+  let {
+    options,
+    totalVotes,
+    shared,
+    shareDisabled = false,
+    onconfirm,
+    ontoggleshare,
+  }: Props = $props();
 
   const winningOption = $derived(
     options.reduce(
@@ -25,26 +32,26 @@
   role="presentation"
 >
   <div
-    class="flex min-h-[630px] w-[min(1200px,calc(100vw-40px))] flex-col rounded-[10px] border border-grey-500 bg-white px-5 pt-[clamp(48px,4.063vw,78px)] pb-[45px] text-grey-900 [@media(max-height:760px)]:max-h-[calc(100svh-40px)] [@media(max-height:760px)]:min-h-0 [@media(max-height:760px)]:overflow-y-auto"
+    class="flex min-h-158 w-[min(1200px,calc(100vw-40px))] flex-col rounded-lg border border-grey-500 bg-white px-5 pt-[clamp(48px,4.063vw,78px)] pb-11 text-grey-900 [@media(max-height:760px)]:max-h-[calc(100svh-40px)] [@media(max-height:760px)]:min-h-0 [@media(max-height:760px)]:overflow-y-auto"
     role="dialog"
     aria-modal="true"
     aria-labelledby="final-result-title"
   >
     <header class="text-center">
       <h2
-        class="m-0 text-[clamp(30px,2.344vw,45px)] leading-[1.25] font-semibold"
+        class="text-[clamp(30px,2.344vw,45px)] leading-[1.25] font-semibold"
         id="final-result-title"
       >
         Final Result: {winningOption.label}
       </h2>
       <p
-        class="mx-0 mt-2.5 mb-0 text-[clamp(16px,1.042vw,20px)] leading-[1.4] font-medium"
+        class="mx-0 mt-3 mb-0 text-[clamp(16px,1.042vw,20px)] leading-[1.4] font-medium"
       >
         Total Votes: {totalVotes}
       </p>
     </header>
 
-    <div class="mx-auto mt-5 flex w-[min(100%,859px)] flex-col gap-[30px]">
+    <div class="mx-auto mt-5 flex w-[min(100%,859px)] flex-col gap-8">
       {#each options as option (option.id)}
         <article>
           <div
@@ -59,7 +66,7 @@
             >
           </div>
           <div
-            class="mt-1 h-2 w-full overflow-hidden rounded-[30px] bg-grey-200"
+            class="mt-1 h-2 w-full overflow-hidden rounded-4xl bg-grey-200"
             role="progressbar"
             aria-label={`${option.label}: ${option.percentage}%`}
             aria-valuenow={option.percentage}
@@ -80,20 +87,24 @@
       {/each}
     </div>
 
-    <div class="mt-auto flex items-center justify-center gap-[22px]">
+    <div class="mt-auto flex items-center justify-center gap-6">
       <button
-        class="h-[63px] w-[315px] cursor-pointer rounded-[100px] border-0 bg-red-500 font-sans text-2xl font-bold text-grey-50 shadow-[0_4px_2px_rgb(0_0_0_/_0.25)]"
+        class="h-16 w-79 cursor-pointer rounded-full bg-red-500 text-2xl font-bold text-grey-50 shadow-[0_4px_2px_rgb(0_0_0_/_0.25)]"
         type="button"
         onclick={onconfirm}
       >
         Confirm
       </button>
       <button
-        class="h-[63px] w-[315px] cursor-pointer rounded-[100px] border-0 font-sans text-2xl font-bold text-grey-50 shadow-[0_4px_2px_rgb(0_0_0_/_0.25)]"
+        class="h-16 w-79 cursor-pointer rounded-full text-2xl font-bold text-grey-50 shadow-[0_4px_2px_rgb(0_0_0_/_0.25)] disabled:cursor-not-allowed disabled:opacity-65"
         class:bg-red-500={!shared}
         class:bg-slate-700={shared}
         type="button"
         aria-pressed={shared}
+        disabled={shareDisabled}
+        title={shareDisabled
+          ? "Final results are released when the motion ends."
+          : undefined}
         onclick={ontoggleshare}
       >
         {shared ? "Unshare Final Results" : "Share Final Results"}

@@ -93,6 +93,68 @@ export function requestForVariant(variant: ResultsVariant): ResultsRequest {
   }
 }
 
+export type ResultsApiTotals = {
+  total: number;
+  options: Array<{ label: string; count: number }>;
+};
+
+export type ResultsViewModelFromApiOptions = {
+  phase: ResultsPhase;
+  voteType?: VoteType;
+  eligible?: number;
+  expanded?: boolean;
+  compact?: boolean;
+  heading?: string;
+};
+
+function winningLabel(options: Array<{ label: string; count: number }>): string {
+  if (options.length === 0) return "-";
+  return options.reduce((winner, option) => (option.count > winner.count ? option : winner)).label;
+}
+
+export function resultsViewModelFromApi(
+  totals: ResultsApiTotals,
+  opts: ResultsViewModelFromApiOptions,
+): ResultsViewModel {
+  const {
+    phase,
+    voteType = "standard",
+    eligible,
+    expanded = false,
+    compact = false,
+    heading: headingOverride,
+  } = opts;
+  const isLive = phase === "live";
+  const isSecret = voteType === "secret";
+  const votesCast = totals.total;
+  const eligibleVotes = Math.max(votesCast, eligible ?? votesCast);
+  const winner = winningLabel(totals.options);
+
+  const heading =
+    headingOverride ??
+    (isLive
+      ? "Live Results(Unofficial)"
+      : isSecret
+        ? `Final Result: ${winner}`
+        : compact
+          ? `Final Result: ${winner}`
+          : `Result: ${winner}`);
+
+  return {
+    heading,
+    countLabel: isLive ? "Votes Submitted" : "Total Votes",
+    count: isLive ? `${votesCast}/${eligibleVotes}` : String(votesCast),
+    final: !isLive,
+    initiallyExpanded: expanded,
+    options: totals.options.map((option, index) => ({
+      id: `option-${index + 1}`,
+      label: option.label,
+      votes: option.count,
+      color: resultColorForIndex(index),
+    })),
+  };
+}
+
 export function createDemoResults(request: ResultsRequest): ResultsViewModel {
   const { voteType, phase, expanded = false, compact = false } = request;
   const isLive = phase === "live";
