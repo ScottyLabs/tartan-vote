@@ -79,6 +79,9 @@ pub async fn create_session(user: SyncedUser, State(state): State<AppState>) -> 
         Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR).into_response(),
     }
 
+    //Generates unique session code
+    //Doesn't work if two sessions create same code at same time
+    //Probably doesn't matter
     let session_code = loop {
         let candidate = petname::petname(2, "-").expect("Failed to generate session code");
         match store.sessions().find_by_join_code(candidate.clone()).await {
@@ -88,8 +91,6 @@ pub async fn create_session(user: SyncedUser, State(state): State<AppState>) -> 
         }
     };
 
-    // logic should be implemented to verify that the join code is actually unique but as of right now this is low priority because 36^6 > 2 billion
-    // TODO: database logic to force uniqueness
     let session = session::ActiveModel {
         join_code: Set(session_code),
         status: Set(SessionStatus::Open),
