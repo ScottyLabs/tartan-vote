@@ -1,0 +1,4 @@
+{
+  "extends": ["./.scottylabs/oxlint/oxlintrc.json"],
+  "ignorePatterns": ["frontend/src/lib/api/schema.d.ts"]
+}

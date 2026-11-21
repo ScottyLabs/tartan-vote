@@ -1,0 +1,2 @@
+# The dev server URLs in README.md and docs/SETUP.md are unreachable from CI
+exclude_loopback = true
