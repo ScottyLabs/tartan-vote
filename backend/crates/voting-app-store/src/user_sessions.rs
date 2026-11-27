@@ -62,6 +62,20 @@ impl<'a> UserSessionRepository<'a> {
         user_session.insert(self.db).await
     }
 
+    pub async fn kick_participant(&self, session_id: i32, user_id: i32) -> Result<u64, DbErr> {
+        UserSession::update_many()
+            .set(user_session::ActiveModel {
+                join_left: Set(JoinLeft::Left),
+                ..Default::default()
+            })
+            .filter(user_session::Column::SessionId.eq(session_id))
+            .filter(user_session::Column::UserId.eq(user_id))
+            .filter(user_session::Column::JoinLeft.eq(JoinLeft::Joined))
+            .exec(self.db)
+            .await
+            .map(|result| result.rows_affected)
+    }
+
     pub async fn get_distinct_users(&self, session_id: i32) -> Result<Vec<user::Model>, DbErr> {
         let mut user_ids: Vec<i32> = UserSession::find()
             .filter(user_session::Column::SessionId.eq(session_id))
